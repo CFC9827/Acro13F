@@ -1,0 +1,222 @@
+.splash-screen.geometric {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: 9999;
+    background: #020617;
+    background-image: radial-gradient(circle at center 40%, #0f172a 0%, #020617 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    animation: splashFadeOut 0.5s ease-out 1.5s forwards;
+}
+
+/* Subtle scanlines for retrowave feel */
+.splash-screen.geometric::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(0deg,
+            rgba(0, 0, 0, 0.1),
+            rgba(0, 0, 0, 0.1) 1px,
+            transparent 1px,
+            transparent 2px);
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* Grid Floor */
+.grid-floor-container {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 55%;
+    perspective: 500px;
+    perspective-origin: 50% 0%;
+    overflow: hidden;
+    z-index: 1;
+}
+
+.horizon-glow-line {
+    position: absolute;
+    top: 45%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #38bdf8;
+    box-shadow:
+        0 0 15px #38bdf8,
+        0 0 30px rgba(56, 189, 248, 0.6);
+    z-index: 5;
+    opacity: 0.6;
+}
+
+.grid-floor {
+    width: 300%;
+    height: 300%;
+    position: absolute;
+    top: 0;
+    left: -100%;
+    background-image:
+        linear-gradient(to right, #00d4ff 1px, transparent 1px),
+        linear-gradient(to bottom, #00d4ff 1px, transparent 1px);
+    background-size: 20px 20px;
+    transform: rotateX(75deg);
+    transform-origin: center top;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 1) 100%);
+    opacity: 0.9;
+    animation: floorScroll 1.2s linear infinite;
+}
+
+@keyframes floorScroll {
+    from {
+        background-position: 0 0;
+    }
+
+    to {
+        background-position: 0 20px;
+    }
+}
+
+/* Hovering Logo Stage */
+.hovering-logo-stage {
+    position: relative;
+    z-index: 10;
+    margin-bottom: 20vh;
+}
+
+.logo-panel-premium {
+    width: 420px;
+    height: 160px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid #38bdf8;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.9),
+        0 0 40px rgba(0, 212, 255, 0.4),
+        0 0 100px rgba(0, 212, 255, 0.2);
+    position: relative;
+    animation: glowPulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes glowPulse {
+    from {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 212, 255, 0.3), 0 0 100px rgba(0, 212, 255, 0.1);
+    }
+
+    to {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 60px rgba(0, 212, 255, 0.6), 0 0 120px rgba(0, 212, 255, 0.3);
+    }
+}
+
+/* Backlight Aura */
+.logo-panel-premium::before {
+    content: "";
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    right: -20px;
+    bottom: -20px;
+    background: radial-gradient(circle, rgba(0, 212, 255, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.logo-text {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    color: #f8fafc;
+}
+
+.part-blue {
+    color: #38bdf8;
+    margin-left: 12px;
+    text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+}
+
+.logo-separator {
+    width: 60px;
+    height: 2px;
+    background: #38bdf8;
+    margin: 12px 0;
+    box-shadow: 0 0 10px #38bdf8;
+}
+
+.logo-tagline {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    letter-spacing: 0.35em;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Bottom Meta Info */
+.splash-meta-bottom {
+    position: absolute;
+    bottom: 30px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10;
+}
+
+.progress-track {
+    width: 200px;
+    height: 2px;
+    background: rgba(56, 189, 248, 0.1);
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 100%;
+    background: #38bdf8;
+    animation: progressSlow 1.4s ease-out forwards;
+}
+
+@keyframes progressSlow {
+    from {
+        transform: translateX(-100%);
+    }
+
+    to {
+        transform: translateX(0);
+    }
+}
+
+.legal-text {
+    font-size: 10px;
+    color: #64748b;
+    letter-spacing: 0.15em;
+    margin: 0;
+}
+
+@keyframes splashFadeOut {
+
+    0%,
+    85% {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    100% {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
