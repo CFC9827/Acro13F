@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle } from 'lucide-react'
+import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
@@ -7,6 +7,12 @@ import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
 import { calculateIRR } from './utils/performanceUtils'
+
+const getFundEdgarUrl = (cik?: string) => {
+    if (!cik) return undefined;
+    const cleanCik = cik.replace(/^0+/, ''); // Remove leading zeros
+    return `https://www.sec.gov/edgar/browse/?CIK=${cleanCik}`;
+};
 
 interface Fund {
     cik: string;
@@ -503,7 +509,20 @@ function App() {
                         {selectedCik && view !== 'about' ? (
                             <div className="holdings-view">
                                 <div className="view-header">
-                                    <h2>Holdings for {funds.find(f => f.cik === selectedCik)?.name}</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <h2>Holdings for {funds.find(f => f.cik === selectedCik)?.name}</h2>
+                                        {selectedCik && (
+                                            <a
+                                                href={getFundEdgarUrl(selectedCik)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="sec-link-btn"
+                                                title="View on SEC EDGAR"
+                                            >
+                                                <ExternalLink size={18} />
+                                            </a>
+                                        )}
+                                    </div>
                                     <div className="view-tabs">
                                         <button
                                             className="tab refresh-btn-context"
@@ -657,7 +676,10 @@ function App() {
                                         onOffsetChange={setOffset}
                                     />
                                 ) : (
-                                    <HoldingsTable history={history} />
+                                    <HoldingsTable
+                                        history={history}
+                                        fundName={funds.find(f => f.cik === selectedCik)?.name || 'Hedge Fund Portfolio'}
+                                    />
                                 )}
                             </div>
                         ) : view === 'about' ? (

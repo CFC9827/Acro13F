@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download } from 'lucide-react';
 import {
     AreaChart,
     Area,
@@ -12,9 +12,11 @@ import {
 } from 'recharts';
 import { formatCurrency, HistoricalHolding } from './PortfolioChart';
 import { calculateIRR } from '../utils/performanceUtils';
+import { CsvExportModal } from './CsvExportModal';
 
 interface HoldingsTableProps {
     history: HistoricalHolding[];
+    fundName: string;
 }
 
 type SortField = 'name' | 'shares' | 'value' | 'percent' | 'pnl' | 'cap_allocation' | 'roi' | 'irr' | 'percent_delta' | 'price_delta';
@@ -1081,7 +1083,7 @@ const StockHistoryChart: React.FC<{
     );
 };
 
-export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history }) => {
+export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName }) => {
     // Helper to generate unique key for each position (including put_call to distinguish options)
     const getPositionKey = (h: HistoricalHolding) => {
         const baseKey = h.ticker || h.cusip;
@@ -1095,6 +1097,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [quarterIndex, setQuarterIndex] = useState(0); // 0 = latest
     const [showQuarterDropdown, setShowQuarterDropdown] = useState(false);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
     const itemsPerPage = 15;
 
@@ -1175,6 +1178,16 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history }) => {
             totals[period] += h.value;
         });
         return totals;
+    }, [history]);
+
+    // Fast lookup for history
+    const historicalDataMap = useMemo(() => {
+        const map: Record<string, Map<string, HistoricalHolding>> = {};
+        history.forEach(h => {
+            if (!map[h.period_of_report]) map[h.period_of_report] = new Map();
+            map[h.period_of_report].set(getPositionKey(h), h);
+        });
+        return map;
     }, [history]);
 
     // 5. Pre-calculate PnL and Capital Allocation for all tickers
@@ -1577,6 +1590,14 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history }) => {
                             className="table-search-input"
                         />
                     </div>
+                    <button
+                        className="download-csv-btn"
+                        onClick={() => setIsExportModalOpen(true)}
+                        title="Download CSV"
+                    >
+                        <Download size={16} />
+                        <span>Export</span>
+                    </button>
                 </div>
 
                 <div className="table-actions-right">
@@ -2517,6 +2538,98 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history }) => {
                     </button>
                 </div>
             )}
+
+            <CsvExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                currentQuarterData={processedData.map(h => {
+                    const key = getPositionKey(h);
+                    const stats = allTickerStats[key] || { pnl: 0, cap: 0, roi: 0, irr: 0 };
+                    const prevH = prevHoldingMap.get(key);
+
+                    const currentWeight = totalPortfolioValue > 0 ? (h.value / totalPortfolioValue) * 100 : 0;
+                    const prevWeight = (prevH && previousTotalPortfolioValue > 0) ? (prevH.value / previousTotalPortfolioValue) * 100 : 0;
+
+                    // Price Delta logic (simplified for export)
+                    const p2 = h.shares > 0 ? h.value / h.shares : 0;
+                    const p1 = (prevH && prevH.shares > 0) ? prevH.value / prevH.shares : 0;
+                    let priceDelta = 0;
+                    if (p1 > 0) {
+                        // Basic split detection for export
+                        const shareRatio = h.shares > 0 ? h.shares / prevH!.shares : 1;
+                        const priceRatio = p2 / p1;
+                        const valueRatio = h.value / prevH!.value;
+                        let adjustedP1 = p1;
+                        if (shareRatio > 1.4 && priceRatio < 0.72 && valueRatio > 0.5 && valueRatio < 2.5) {
+                            adjustedP1 = p1 / shareRatio;
+                        }
+                        priceDelta = ((p2 / adjustedP1) - 1) * 100;
+                    }
+
+                    return {
+                        ...h,
+                        percent: currentWeight,
+                        deltaShares: h.shares - (prevH?.shares || 0),
+                        deltaValue: h.value - (prevH?.value || 0),
+                        percent_delta: currentWeight - prevWeight,
+                        price_delta: priceDelta,
+                        cap_allocation: stats.cap,
+                        roi: stats.roi,
+                        irr: stats.irr
+                    };
+                })}
+                fullHistoryData={history.map(h => {
+                    const key = getPositionKey(h);
+                    const stats = allTickerStats[key] || { pnl: 0, cap: 0, roi: 0, irr: 0 };
+
+                    const period = h.period_of_report;
+                    const quarterIdx = sortedQuarters.indexOf(period);
+                    const prevPeriod = sortedQuarters[quarterIdx + 1];
+                    const prevH = prevPeriod ? historicalDataMap[prevPeriod]?.get(key) : undefined;
+
+                    const qTotal = quarterTotals[period] || 0;
+                    const prevQTotal = prevPeriod ? quarterTotals[prevPeriod] : 0;
+
+                    const currentWeight = qTotal > 0 ? (h.value / qTotal) * 100 : 0;
+                    const prevWeight = (prevH && prevQTotal > 0) ? (prevH.value / prevQTotal) * 100 : 0;
+
+                    // Price Delta logic (simplified for export)
+                    const p2 = h.shares > 0 ? h.value / h.shares : 0;
+                    const p1 = (prevH && prevH.shares > 0) ? prevH.value / prevH.shares : 0;
+                    let priceDelta = 0;
+                    if (p1 > 0) {
+                        const shareRatio = h.shares > 0 ? h.shares / prevH!.shares : 1;
+                        const priceRatio = p2 / p1;
+                        const valueRatio = h.value / prevH!.value;
+                        let adjustedP1 = p1;
+                        if (shareRatio > 1.4 && priceRatio < 0.72 && valueRatio > 0.5 && valueRatio < 2.5) {
+                            adjustedP1 = p1 / shareRatio;
+                        }
+                        priceDelta = ((p2 / adjustedP1) - 1) * 100;
+                    }
+
+                    return {
+                        ...h,
+                        percent: currentWeight,
+                        deltaShares: h.shares - (prevH?.shares || 0),
+                        deltaValue: h.value - (prevH?.value || 0),
+                        percent_delta: currentWeight - prevWeight,
+                        price_delta: priceDelta,
+                        cap_allocation: stats.cap,
+                        roi: stats.roi,
+                        irr: stats.irr
+                    };
+                }).sort((a, b) => {
+                    // Sort history export by period (desc) then value (desc)
+                    if (a.period_of_report !== b.period_of_report) {
+                        return new Date(b.period_of_report).getTime() - new Date(a.period_of_report).getTime();
+                    }
+                    return b.value - a.value;
+                })}
+                availableQuarters={sortedQuarters}
+                fundName={fundName}
+                quarterLabel={formatQuarterLabel(currentQuarterDate)}
+            />
         </div >
     );
 };
