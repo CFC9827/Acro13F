@@ -266,6 +266,120 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
             """, data)
 
+    def get_dashboard_summary(self) -> Dict:
+        """Returns aggregated data across all funds for the global dashboard."""
+        all_funds = self.get_funds()
+        summary = {
+            "fund_highlights": [],
+            "big_movers": [], # Top absolute value changes
+            "portfolio_shifts": [], # Top weight changes (>3%)
+            "latest_period": None,
+            "prior_period": None,
+            "kpis": {
+                "fund_count": len(all_funds),
+                "total_aum": 0,
+                "prior_aum": 0,
+                "new_positions": 0,
+                "exited_positions": 0
+            }
+        }
+
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            for fund in all_funds:
+                cik = fund['cik']
+                # Get latest 2 filings
+                cursor.execute("""
+                    SELECT accession_number, period_of_report 
+                    FROM filings WHERE cik = ? 
+                    ORDER BY period_of_report DESC LIMIT 2
+                """, (cik,))
+                filings = cursor.fetchall()
+                if not filings: continue
+
+                latest_acc = filings[0]['accession_number']
+                latest_period = filings[0]['period_of_report']
+                prev_acc = filings[1]['accession_number'] if len(filings) > 1 else None
+                prev_period = filings[1]['period_of_report'] if len(filings) > 1 else None
+
+                # Track global latest/prior periods (use first fund's as reference)
+                if summary["latest_period"] is None:
+                    summary["latest_period"] = latest_period
+                if summary["prior_period"] is None and prev_period:
+                    summary["prior_period"] = prev_period
+
+                # Get holdings for latest
+                cursor.execute("SELECT issuer_name, ticker, cusip, shares, value FROM holdings WHERE accession_number = ?", (latest_acc,))
+                latest_holdings = [dict(h) for h in cursor.fetchall()]
+                total_value = sum(h['value'] for h in latest_holdings)
+                summary["kpis"]["total_aum"] += total_value
+
+                # Top 3
+                top_3 = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
+                
+                summary["fund_highlights"].append({
+                    "cik": cik,
+                    "name": fund['name'],
+                    "total_value": total_value,
+                    "period": latest_period,
+                    "top_holdings": top_3
+                })
+
+                # If we have a previous filing, calculate movers and shifts
+                if prev_acc:
+                    cursor.execute("SELECT ticker, cusip, shares, value FROM holdings WHERE accession_number = ?", (prev_acc,))
+                    prev_holdings_list = [dict(h) for h in cursor.fetchall()]
+                    prev_total_value = sum(h['value'] for h in prev_holdings_list)
+                    summary["kpis"]["prior_aum"] += prev_total_value
+                    prev_map = { (h['ticker'] or h['cusip']): h for h in prev_holdings_list }
+                    latest_keys = set((h['ticker'] or h['cusip']) for h in latest_holdings)
+                    prev_keys = set(prev_map.keys())
+
+                    # Count new and exited positions
+                    summary["kpis"]["new_positions"] += len(latest_keys - prev_keys)
+                    summary["kpis"]["exited_positions"] += len(prev_keys - latest_keys)
+
+                    for h in latest_holdings:
+                        key = h['ticker'] or h['cusip']
+                        prev_h = prev_map.get(key)
+                        
+                        curr_weight = (h['value'] * 100.0 / total_value) if total_value else 0
+                        prev_weight = (prev_h['value'] * 100.0 / prev_total_value) if prev_h and prev_total_value else 0
+                        
+                        val_change = h['value'] - (prev_h['value'] if prev_h else 0)
+                        weight_delta = curr_weight - prev_weight
+
+                        # Track big movers (absolute value change)
+                        summary["big_movers"].append({
+                            "fund_name": fund['name'],
+                            "ticker": h['ticker'],
+                            "issuer_name": h['issuer_name'],
+                            "val_change": val_change,
+                            "shares": h['shares'],
+                            "value": h['value']
+                        })
+
+                        # Track portfolio shifts (weight delta > 3% or < -3%)
+                        if abs(weight_delta) >= 3.0:
+                            summary["portfolio_shifts"].append({
+                                "fund_name": fund['name'],
+                                "ticker": h['ticker'],
+                                "issuer_name": h['issuer_name'],
+                                "weight_delta": weight_delta,
+                                "curr_weight": curr_weight,
+                                "prev_weight": prev_weight
+                            })
+
+            # Sort and limit big movers
+            summary["big_movers"].sort(key=lambda x: abs(x['val_change']), reverse=True)
+            summary["big_movers"] = summary["big_movers"][:20]
+
+            # Sort portfolio shifts
+            summary["portfolio_shifts"].sort(key=lambda x: abs(x['weight_delta']), reverse=True)
+
+        return summary
     def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:
         """Returns historical prices for a ticker."""
         with self._get_connection() as conn:

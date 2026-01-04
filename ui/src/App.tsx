@@ -3,6 +3,7 @@ import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, Chevro
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
+import { GlobalDashboard } from './components/GlobalDashboard'
 import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
@@ -79,7 +80,8 @@ function App() {
     const [refreshCik, setRefreshCik] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
-    const [view, setView] = useState<'table' | 'chart' | 'performance' | 'about'>('table')
+    const [view, setView] = useState<'table' | 'chart' | 'performance' | 'about' | 'dashboard'>('dashboard')
+    const [dashboardSummary, setDashboardSummary] = useState<any>(null)
     const [timeRange, setTimeRange] = useState('1Y')
     const [offset, setOffset] = useState(0) // Number of quarters to offset from latest
     const [filingRange, setFilingRange] = useState<{ earliest: string | null, latest: string | null, total: number } | null>(null)
@@ -113,7 +115,28 @@ function App() {
     }
 
     useEffect(() => {
+        if (view === 'dashboard' && !dashboardSummary) {
+            fetchDashboardSummary();
+        }
+    }, [view]);
+
+    const fetchDashboardSummary = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch('/api/dashboard/summary');
+            const data = await res.json();
+            setDashboardSummary(data);
+        } catch (err) {
+            console.error("Failed to fetch dashboard summary", err);
+            setError("Failed to load dashboard data");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         if (selectedCik) {
+            setView('table'); // Auto-switch to table view when a specific fund is selected
             setLoading(true)
             setError(null)
             setLegacyInfo(null)
@@ -438,7 +461,16 @@ function App() {
                 <main className="app-main">
                     <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
                         <div className="sidebar-header">
-                            {!sidebarCollapsed && <h3>Funds</h3>}
+                            <button
+                                className={`dashboard-nav-btn ${view === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => {
+                                    setSelectedCik(null);
+                                    setView('dashboard');
+                                }}
+                            >
+                                <LayoutGrid size={18} />
+                                {!sidebarCollapsed && <span>Global Overview</span>}
+                            </button>
                             <button
                                 className="sidebar-toggle"
                                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -447,39 +479,56 @@ function App() {
                                 {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
                             </button>
                         </div>
-                        {!sidebarCollapsed && (
-                            <button
-                                className="cik-lookup-link"
-                                onClick={() => setShowCikSearch(true)}
-                            >
-                                <PlusCircle size={14} />
-                                Add New Fund
-                            </button>
-                        )}
-                        {!sidebarCollapsed && (
-                            <ul>
-                                {funds.map((f: Fund) => (
-                                    <li
-                                        key={f.cik}
-                                        className={selectedCik === f.cik ? 'active' : ''}
-                                        onClick={() => { setSelectedCik(f.cik); if (view === 'about') setView('table'); }}
+                        <div className="divider"></div>
+                        <div className="sidebar-content">
+                            {!sidebarCollapsed && (
+                                <button
+                                    className="cik-lookup-link"
+                                    onClick={() => setShowCikSearch(true)}
+                                >
+                                    <PlusCircle size={14} />
+                                    Add New Fund
+                                </button>
+                            )}
+
+                            <div className="section-title">
+                                {!sidebarCollapsed && <span>TRACKED FUNDS</span>}
+                                {!sidebarCollapsed && (
+                                    <button
+                                        className="refresh-all-small"
+                                        onClick={handleGlobalRefresh}
+                                        title="Refresh all funds"
+                                        disabled={loading}
                                     >
-                                        <div className="fund-info">
-                                            <span className="fund-name">{f.name}</span>
-                                            <span className="fund-cik">{f.cik}</span>
-                                        </div>
-                                        <div className="fund-actions">
-                                            <Trash2
-                                                size={16}
-                                                className="delete-btn"
-                                                onClick={(e) => handleDelete(e, f.cik)}
-                                            />
-                                            <ChevronRight size={14} className="chevron" />
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                                        <RefreshCw className={loading ? 'spin' : ''} size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            {!sidebarCollapsed && (
+                                <ul>
+                                    {funds.map((f: Fund) => (
+                                        <li
+                                            key={f.cik}
+                                            className={selectedCik === f.cik ? 'active' : ''}
+                                            onClick={() => { setSelectedCik(f.cik); if (view === 'about') setView('table'); }}
+                                        >
+                                            <div className="fund-info">
+                                                <span className="fund-name">{f.name}</span>
+                                                <span className="fund-cik">{f.cik}</span>
+                                            </div>
+                                            <div className="fund-actions">
+                                                <Trash2
+                                                    size={16}
+                                                    className="delete-btn"
+                                                    onClick={(e) => handleDelete(e, f.cik)}
+                                                />
+                                                <ChevronRight size={14} className="chevron" />
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
                     </aside>
 
                     <CikSearchModal
@@ -506,7 +555,15 @@ function App() {
                             </div>
                         )}
 
-                        {selectedCik && view !== 'about' ? (
+                        {view === 'dashboard' ? (
+                            <GlobalDashboard
+                                summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [] }}
+                                onSelectFund={(cik) => {
+                                    setSelectedCik(cik);
+                                    setView('table');
+                                }}
+                            />
+                        ) : selectedCik && view !== 'about' ? (
                             <div className="holdings-view">
                                 <div className="view-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

@@ -28,6 +28,14 @@ async def root():
 async def get_funds():
     return db.get_funds()
 
+@app.get("/dashboard/summary")
+async def get_dashboard_summary():
+    try:
+        summary = db.get_dashboard_summary()
+        return summary
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/funds/{cik}/holdings")
 async def get_holdings(cik: str):
     holdings = db.get_latest_holdings(cik)
