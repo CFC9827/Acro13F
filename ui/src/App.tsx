@@ -427,6 +427,20 @@ function App() {
                                 fontWeight: 500,
                                 transition: 'all 0.2s'
                             }}
+                            onMouseOver={(e) => {
+                                if (view !== 'about') {
+                                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
+                                    e.currentTarget.style.color = '#60a5fa';
+                                    e.currentTarget.style.borderColor = '#3b82f6';
+                                }
+                            }}
+                            onMouseOut={(e) => {
+                                if (view !== 'about') {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = '#94a3b8';
+                                    e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)';
+                                }
+                            }}
                         >
                             <Info size={16} />
                             About
@@ -478,18 +492,18 @@ function App() {
                             >
                                 {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
                             </button>
-                        </div>
-                        <div className="divider"></div>
-                        <div className="sidebar-content">
                             {!sidebarCollapsed && (
                                 <button
-                                    className="cik-lookup-link"
+                                    className="dashboard-nav-btn add-fund-sidebar"
                                     onClick={() => setShowCikSearch(true)}
                                 >
-                                    <PlusCircle size={14} />
+                                    <PlusCircle size={18} />
                                     Add New Fund
                                 </button>
                             )}
+                        </div>
+                        <div className="divider"></div>
+                        <div className="sidebar-content">
 
                             <div className="section-title">
                                 {!sidebarCollapsed && <span>TRACKED FUNDS</span>}

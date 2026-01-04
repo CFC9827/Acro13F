@@ -281,8 +281,20 @@ class DatabaseManager:
                 "prior_aum": 0,
                 "new_positions": 0,
                 "exited_positions": 0
-            }
+            },
+            "crowding_signals": {
+                "most_held": [],        # Top 5 by current fund count
+                "gaining_funds": [],    # Top 5 gaining fund count
+                "losing_funds": []      # Top 5 losing fund count
+            },
+            "new_positions": [],  # New positions spotlight
+            "ticker_fund_activity": {}  # Aggregated buying/selling by ticker
         }
+
+        # Track ticker ownership across funds (for crowding signals)
+        current_ticker_funds = {}  # ticker -> set of fund names
+        prior_ticker_funds = {}    # ticker -> set of fund names
+        all_new_positions = []     # For new positions spotlight
 
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -311,10 +323,18 @@ class DatabaseManager:
                     summary["prior_period"] = prev_period
 
                 # Get holdings for latest
-                cursor.execute("SELECT issuer_name, ticker, cusip, shares, value FROM holdings WHERE accession_number = ?", (latest_acc,))
+                cursor.execute("SELECT issuer_name, ticker, cusip, shares, value, put_call FROM holdings WHERE accession_number = ?", (latest_acc,))
                 latest_holdings = [dict(h) for h in cursor.fetchall()]
                 total_value = sum(h['value'] for h in latest_holdings)
                 summary["kpis"]["total_aum"] += total_value
+
+                # Track current ticker ownership for crowding
+                for h in latest_holdings:
+                    key = h['ticker'] or h['cusip']
+                    if key not in current_ticker_funds:
+                        current_ticker_funds[key] = {"funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
+                    current_ticker_funds[key]["funds"].add(fund['name'])
+                    current_ticker_funds[key]["total_value"] += h['value']
 
                 # Top 3
                 top_3 = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
@@ -329,37 +349,76 @@ class DatabaseManager:
 
                 # If we have a previous filing, calculate movers and shifts
                 if prev_acc:
-                    cursor.execute("SELECT ticker, cusip, shares, value FROM holdings WHERE accession_number = ?", (prev_acc,))
+                    cursor.execute("SELECT ticker, cusip, shares, value, put_call FROM holdings WHERE accession_number = ?", (prev_acc,))
                     prev_holdings_list = [dict(h) for h in cursor.fetchall()]
                     prev_total_value = sum(h['value'] for h in prev_holdings_list)
                     summary["kpis"]["prior_aum"] += prev_total_value
-                    prev_map = { (h['ticker'] or h['cusip']): h for h in prev_holdings_list }
-                    latest_keys = set((h['ticker'] or h['cusip']) for h in latest_holdings)
+                    # Include put_call in key to distinguish stock vs options
+                    prev_map = { ((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')): h for h in prev_holdings_list }
+                    latest_keys = set(((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')) for h in latest_holdings)
                     prev_keys = set(prev_map.keys())
 
+                    # Track prior ticker ownership for crowding
+                    for h in prev_holdings_list:
+                        key = h['ticker'] or h['cusip']
+                        if key not in prior_ticker_funds:
+                            prior_ticker_funds[key] = set()
+                        prior_ticker_funds[key].add(fund['name'])
+
                     # Count new and exited positions
-                    summary["kpis"]["new_positions"] += len(latest_keys - prev_keys)
+                    new_keys = latest_keys - prev_keys
+                    summary["kpis"]["new_positions"] += len(new_keys)
                     summary["kpis"]["exited_positions"] += len(prev_keys - latest_keys)
 
+                    # Track new positions for spotlight
                     for h in latest_holdings:
                         key = h['ticker'] or h['cusip']
+                        if key in new_keys:
+                            weight = (h['value'] * 100.0 / total_value) if total_value else 0
+                            all_new_positions.append({
+                                "ticker": h['ticker'],
+                                "issuer_name": h['issuer_name'],
+                                "fund_name": fund['name'],
+                                "value": h['value'],
+                                "weight": weight
+                            })
+
+                    for h in latest_holdings:
+                        key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                         prev_h = prev_map.get(key)
                         
                         curr_weight = (h['value'] * 100.0 / total_value) if total_value else 0
                         prev_weight = (prev_h['value'] * 100.0 / prev_total_value) if prev_h and prev_total_value else 0
                         
+                        # Display ticker with PUT/CALL suffix if applicable
+                        display_ticker = h['ticker']
+                        if h.get('put_call'):
+                            display_ticker = f"{h['ticker']} {h['put_call']}"
+                        
                         val_change = h['value'] - (prev_h['value'] if prev_h else 0)
                         weight_delta = curr_weight - prev_weight
+                        pct_of_fund = (val_change * 100.0 / total_value) if total_value else 0
 
                         # Track big movers (absolute value change)
                         summary["big_movers"].append({
                             "fund_name": fund['name'],
-                            "ticker": h['ticker'],
+                            "ticker": display_ticker,
                             "issuer_name": h['issuer_name'],
                             "val_change": val_change,
+                            "pct_of_fund": weight_delta,  # Use weight delta as % metric
+                            "curr_weight": curr_weight,
                             "shares": h['shares'],
                             "value": h['value']
                         })
+
+                        # Track buying/selling activity per ticker
+                        ticker_key = h['ticker'] or h['cusip']
+                        if ticker_key not in summary["ticker_fund_activity"]:
+                            summary["ticker_fund_activity"][ticker_key] = {"buying": 0, "selling": 0, "ticker": h['ticker'], "issuer": h['issuer_name']}
+                        if val_change > 0:
+                            summary["ticker_fund_activity"][ticker_key]["buying"] += 1
+                        elif val_change < 0:
+                            summary["ticker_fund_activity"][ticker_key]["selling"] += 1
 
                         # Track portfolio shifts (weight delta > 3% or < -3%)
                         if abs(weight_delta) >= 3.0:
@@ -378,6 +437,41 @@ class DatabaseManager:
 
             # Sort portfolio shifts
             summary["portfolio_shifts"].sort(key=lambda x: abs(x['weight_delta']), reverse=True)
+
+            # Compute crowding signals
+            # Most widely held (by fund count)
+            most_held = sorted(
+                [(k, v) for k, v in current_ticker_funds.items()],
+                key=lambda x: len(x[1]["funds"]),
+                reverse=True
+            )[:5]
+            summary["crowding_signals"]["most_held"] = [
+                {"ticker": v["ticker"], "issuer_name": v["issuer"], "fund_count": len(v["funds"]), "funds": list(v["funds"])}
+                for k, v in most_held
+            ]
+
+            # Gaining/losing fund count
+            fund_count_changes = []
+            for ticker, data in current_ticker_funds.items():
+                curr_count = len(data["funds"])
+                prev_count = len(prior_ticker_funds.get(ticker, set()))
+                change = curr_count - prev_count
+                fund_count_changes.append({
+                    "ticker": data["ticker"],
+                    "issuer_name": data["issuer"],
+                    "curr_count": curr_count,
+                    "prev_count": prev_count,
+                    "change": change
+                })
+            
+            gaining = sorted([x for x in fund_count_changes if x["change"] > 0], key=lambda x: x["change"], reverse=True)[:5]
+            losing = sorted([x for x in fund_count_changes if x["change"] < 0], key=lambda x: x["change"])[:5]
+            summary["crowding_signals"]["gaining_funds"] = gaining
+            summary["crowding_signals"]["losing_funds"] = losing
+
+            # New positions spotlight (top 10 by value)
+            all_new_positions.sort(key=lambda x: x["value"], reverse=True)
+            summary["new_positions"] = all_new_positions[:10]
 
         return summary
     def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:

@@ -1,5 +1,5 @@
-import React from 'react';
-import { TrendingUp, Activity, ChevronRight, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, Activity, ChevronRight, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles } from 'lucide-react';
 
 interface Holding {
     ticker?: string;
@@ -21,6 +21,8 @@ interface Mover {
     ticker?: string;
     issuer_name: string;
     val_change: number;
+    pct_of_fund?: number;
+    curr_weight?: number;
     value: number;
 }
 
@@ -41,6 +43,39 @@ interface KPIs {
     exited_positions: number;
 }
 
+interface CrowdingItem {
+    ticker?: string;
+    issuer_name: string;
+    fund_count?: number;
+    funds?: string[];
+    curr_count?: number;
+    prev_count?: number;
+    change?: number;
+}
+
+interface CrowdingSignals {
+    most_held: CrowdingItem[];
+    gaining_funds: CrowdingItem[];
+    losing_funds: CrowdingItem[];
+}
+
+interface NewPosition {
+    ticker?: string;
+    issuer_name: string;
+    fund_name: string;
+    value: number;
+    weight: number;
+}
+
+interface TickerFundActivity {
+    [ticker: string]: {
+        buying: number;
+        selling: number;
+        ticker?: string;
+        issuer?: string;
+    };
+}
+
 interface DashboardSummary {
     fund_highlights: FundHighlight[];
     big_movers: Mover[];
@@ -48,6 +83,9 @@ interface DashboardSummary {
     latest_period?: string;
     prior_period?: string;
     kpis?: KPIs;
+    crowding_signals?: CrowdingSignals;
+    new_positions?: NewPosition[];
+    ticker_fund_activity?: TickerFundActivity;
 }
 
 interface GlobalDashboardProps {
@@ -70,10 +108,43 @@ const formatQ = (dateStr: string) => {
     return `${q}Q '${d.getFullYear().toString().slice(2)}`;
 };
 
+type MoversMode = 'dollar' | 'percent' | 'funds';
+
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSelectFund }) => {
+    const [moversMode, setMoversMode] = useState<MoversMode>('dollar');
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
     const aumChangePercent = kpis && kpis.prior_aum > 0 ? ((aumChange / kpis.prior_aum) * 100).toFixed(1) : '0';
+    const crowding = summary.crowding_signals;
+    const newPositions = summary.new_positions || [];
+    const tickerActivity = summary.ticker_fund_activity || {};
+
+    const getMoverDisplay = (mover: Mover) => {
+        const ticker = mover.ticker || 'N/A';
+        const activity = tickerActivity[ticker];
+        switch (moversMode) {
+            case 'percent':
+                return `${mover.pct_of_fund !== undefined && mover.pct_of_fund >= 0 ? '+' : ''}${(mover.pct_of_fund || 0).toFixed(1)}%`;
+            case 'funds':
+                if (activity) {
+                    return `${activity.buying}B / ${activity.selling}S`;
+                }
+                return '-';
+            default:
+                return formatCurrency(mover.val_change);
+        }
+    };
+
+    const getMoverDescription = () => {
+        switch (moversMode) {
+            case 'percent':
+                return 'Weight change (%)';
+            case 'funds':
+                return 'Buying / Selling';
+            default:
+                return '$ change (QoQ)';
+        }
+    };
 
     return (
         <div className="dashboard-container">
@@ -193,61 +264,155 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                     </section>
                 </div>
 
-                {/* Right Column: Movers & Shifts */}
+                {/* Right Column: Movers, Shifts, Crowding, New Positions */}
                 <div className="dashboard-sidebar">
+                    {/* Big Movers with Toggle */}
                     <section className="dashboard-section compact">
                         <div className="section-header">
                             <TrendingUp className="section-icon-small" />
-                            <h3 className="section-title-small">
-                                Big Movers ($ Change)
-                                <span className="info-tooltip" title="Largest net position changes across all tracked funds (QoQ, $ notional)">
-                                    <Info size={12} />
-                                </span>
-                            </h3>
+                            <div>
+                                <h3 className="section-title-small">Big Movers</h3>
+                                <p className="section-desc-small">{getMoverDescription()}</p>
+                            </div>
+                            <div className="toggle-group">
+                                <button
+                                    className={`toggle-btn ${moversMode === 'dollar' ? 'active' : ''}`}
+                                    onClick={() => setMoversMode('dollar')}
+                                    title="Dollar change"
+                                >$</button>
+                                <button
+                                    className={`toggle-btn ${moversMode === 'percent' ? 'active' : ''}`}
+                                    onClick={() => setMoversMode('percent')}
+                                    title="Percent of fund"
+                                >%</button>
+                                <button
+                                    className={`toggle-btn ${moversMode === 'funds' ? 'active' : ''}`}
+                                    onClick={() => setMoversMode('funds')}
+                                    title="Fund count"
+                                >#</button>
+                            </div>
                         </div>
 
-                        <div className="movers-list">
-                            {summary.big_movers.slice(0, 8).map((mover, i) => (
-                                <div key={i} className="mover-item">
-                                    <div className="mover-info">
-                                        <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
-                                        <span className="mover-fund">{mover.fund_name}</span>
-                                    </div>
-                                    <div className={`mover-delta ${mover.val_change >= 0 ? 'positive' : 'negative'}`}>
-                                        {mover.val_change >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                                        {formatCurrency(mover.val_change)}
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="movers-list scrollable">
+                            {[...summary.big_movers]
+                                .sort((a, b) => {
+                                    if (moversMode === 'percent') {
+                                        return Math.abs(b.pct_of_fund || 0) - Math.abs(a.pct_of_fund || 0);
+                                    }
+                                    if (moversMode === 'funds') {
+                                        const tickerA = a.ticker || '';
+                                        const tickerB = b.ticker || '';
+                                        const actA = tickerActivity[tickerA];
+                                        const actB = tickerActivity[tickerB];
+                                        const countA = actA ? actA.buying + actA.selling : 0;
+                                        const countB = actB ? actB.buying + actB.selling : 0;
+                                        return countB - countA;
+                                    }
+                                    return Math.abs(b.val_change) - Math.abs(a.val_change);
+                                })
+                                .map((mover, i) => {
+                                    const displayValue = moversMode === 'percent' ? (mover.pct_of_fund || 0) : mover.val_change;
+                                    const isPositive = displayValue >= 0;
+                                    return (
+                                        <div key={i} className="mover-item">
+                                            <div className="mover-info">
+                                                <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
+                                                <span className="mover-fund">{mover.fund_name}</span>
+                                            </div>
+                                            <div className={`mover-delta ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}>
+                                                {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                                                {getMoverDisplay(mover)}
+                                                {moversMode === 'percent' && mover.curr_weight !== undefined && (
+                                                    <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                         </div>
                     </section>
 
-                    <section className="dashboard-section compact mt-1">
-                        <div className="section-header">
-                            <Activity className="section-icon-small" />
-                            <h3 className="section-title-small">
-                                Portfolio Shifts
-                                <span className="info-tooltip" title="Positions with weight changes ≥ 3% (QoQ)">
-                                    <Info size={12} />
-                                </span>
-                            </h3>
-                        </div>
+                    {/* Crowding Signals */}
+                    {crowding && (crowding.most_held.length > 0 || crowding.gaining_funds.length > 0) && (
+                        <section className="dashboard-section compact">
+                            <div className="section-header">
+                                <Users className="section-icon-small" />
+                                <div>
+                                    <h3 className="section-title-small">Crowding Signals</h3>
+                                    <p className="section-desc-small">Stocks held by multiple funds</p>
+                                </div>
+                            </div>
 
-                        <div className="shifts-list">
-                            {summary.portfolio_shifts.slice(0, 8).map((shift, i) => (
-                                <div key={i} className="shift-item">
-                                    <div className="shift-info">
-                                        <span className="shift-ticker">{shift.ticker || 'N/A'}</span>
-                                        <span className="shift-fund">{shift.fund_name}</span>
-                                    </div>
-                                    <div className={`shift-weight ${shift.weight_delta >= 0 ? 'positive' : 'negative'}`}>
-                                        {shift.weight_delta >= 0 ? '+' : ''}{shift.weight_delta.toFixed(1)}%
-                                        <span className="weight-current">@ {shift.curr_weight.toFixed(1)}%</span>
+                            {crowding.most_held.length > 0 && (
+                                <div className="crowding-subsection">
+                                    <div className="crowding-label">Most Widely Held</div>
+                                    <div className="crowding-list">
+                                        {crowding.most_held.slice(0, 3).map((item, i) => (
+                                            <div key={i} className="crowding-item">
+                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                <span className="crowding-count">{item.fund_count} funds</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </section>
+                            )}
+
+                            {crowding.gaining_funds.length > 0 && (
+                                <div className="crowding-subsection">
+                                    <div className="crowding-label">↑ Fund Count</div>
+                                    <div className="crowding-list">
+                                        {crowding.gaining_funds.slice(0, 3).map((item, i) => (
+                                            <div key={i} className="crowding-item">
+                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                <span className="crowding-change positive">+{item.change}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {crowding.losing_funds.length > 0 && (
+                                <div className="crowding-subsection">
+                                    <div className="crowding-label">↓ Fund Count</div>
+                                    <div className="crowding-list">
+                                        {crowding.losing_funds.slice(0, 3).map((item, i) => (
+                                            <div key={i} className="crowding-item">
+                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                <span className="crowding-change negative">{item.change}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
+
+                    {/* New Positions Spotlight */}
+                    {newPositions.length > 0 && (
+                        <section className="dashboard-section compact">
+                            <div className="section-header">
+                                <Sparkles className="section-icon-small" />
+                                <div>
+                                    <h3 className="section-title-small">New This Quarter</h3>
+                                    <p className="section-desc-small">First-time positions and initial weights</p>
+                                </div>
+                            </div>
+
+                            <div className="new-positions-list scrollable">
+                                {newPositions.map((pos, i) => (
+                                    <div key={i} className="new-position-item">
+                                        <div className="new-position-info">
+                                            <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
+                                            <span className="new-position-fund">{pos.fund_name}</span>
+                                        </div>
+                                        <div className="new-position-weight">
+                                            {pos.weight.toFixed(1)}%
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
             </div>
         </div>
