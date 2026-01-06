@@ -1839,6 +1839,15 @@ body {
   font-weight: 500;
 }
 
+/* Mixed period warning */
+.dashboard-time-context.mixed-periods {
+  color: #fbbf24;
+}
+
+.period-warning {
+  font-weight: 600;
+}
+
 .section-icon-small {
   color: #38bdf8;
   width: 18px;
@@ -1907,17 +1916,17 @@ body {
 }
 
 .mini-holding {
-  display: flex;
+  display: grid;
+  grid-template-columns: 50px 1fr 70px 85px;
   align-items: center;
   gap: 12px;
+  padding: 4px 0;
 }
 
 .holding-ticker {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #94a3b8;
-  width: 45px;
-  flex-shrink: 0;
+  color: #e2e8f0;
 }
 
 .holding-bar-container {
@@ -1941,6 +1950,93 @@ body {
   width: 45px;
   text-align: right;
   flex-shrink: 0;
+}
+
+/* Enhanced fund card elements */
+.fund-aum-block {
+  text-align: right;
+}
+
+.fund-change {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.fund-change.positive {
+  color: #10b981;
+}
+
+.fund-change.negative {
+  color: #ef4444;
+}
+
+.fund-stats-row {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 8px;
+}
+
+.fund-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.holding-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.holding-val {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  text-align: right;
+}
+
+.holding-weight-col {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.holding-weight {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.holding-change {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.holding-change.positive {
+  color: #10b981;
+}
+
+.holding-change.negative {
+  color: #ef4444;
 }
 
 .card-footer {

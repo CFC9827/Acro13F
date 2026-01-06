@@ -6,13 +6,20 @@ interface Holding {
     issuer_name: string;
     value: number;
     shares: number;
+    weight?: number;
+    weight_change?: number;
 }
 
 interface FundHighlight {
     cik: string;
     name: string;
     total_value: number;
+    prior_value?: number;
+    value_change?: number;
+    value_change_pct?: number;
     period: string;
+    position_count?: number;
+    concentration?: number;
     top_holdings: Holding[];
 }
 
@@ -82,6 +89,8 @@ interface DashboardSummary {
     portfolio_shifts: Shift[];
     latest_period?: string;
     prior_period?: string;
+    fund_periods?: string[];  // All unique periods across funds
+    periods_aligned?: boolean;  // True if all funds have same latest period
     kpis?: KPIs;
     crowding_signals?: CrowdingSignals;
     new_positions?: NewPosition[];
@@ -153,10 +162,17 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                 <h1 className="dashboard-title">Portfolio Intelligence</h1>
                 <p className="dashboard-subtitle">Aggregated insights across all tracked hedge funds</p>
                 {summary.latest_period && (
-                    <p className="dashboard-time-context">
-                        Data reflects latest filed 13Fs ({formatQ(summary.latest_period)}).
-                        {summary.prior_period && ` Changes are vs ${formatQ(summary.prior_period)}.`}
-                    </p>
+                    summary.periods_aligned ? (
+                        <p className="dashboard-time-context">
+                            Data reflects latest filed 13Fs ({formatQ(summary.latest_period)}).
+                            {summary.prior_period && ` Changes are vs ${formatQ(summary.prior_period)}.`}
+                        </p>
+                    ) : (
+                        <p className="dashboard-time-context mixed-periods">
+                            <span className="period-warning">⚠️ Filing periods vary across funds.</span>
+                            {' '}Each fund reflects its latest 13F. Compare with caution.
+                        </p>
+                    )
                 )}
             </div>
 
@@ -236,7 +252,25 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                             <h4 className="fund-name">{fund.name}</h4>
                                             <span className="fund-period">{formatQ(fund.period)}</span>
                                         </div>
-                                        <div className="fund-value">{formatCurrency(fund.total_value)}</div>
+                                        <div className="fund-aum-block">
+                                            <div className="fund-value">{formatCurrency(fund.total_value)}</div>
+                                            {fund.value_change !== undefined && fund.value_change !== 0 && (
+                                                <div className={`fund-change ${fund.value_change >= 0 ? 'positive' : 'negative'}`}>
+                                                    {fund.value_change >= 0 ? '↑' : '↓'} {fund.value_change_pct?.toFixed(1)}%
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="fund-stats-row">
+                                        <div className="fund-stat">
+                                            <span className="stat-value">{fund.position_count || '—'}</span>
+                                            <span className="stat-label">positions</span>
+                                        </div>
+                                        <div className="fund-stat">
+                                            <span className="stat-value">{fund.concentration?.toFixed(0) || '—'}%</span>
+                                            <span className="stat-label">top 3</span>
+                                        </div>
                                     </div>
 
                                     <div className="top-holdings-list">
@@ -250,6 +284,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                                     ></div>
                                                 </div>
                                                 <div className="holding-val">{formatCurrency(h.value)}</div>
+                                                <div className="holding-weight-col">
+                                                    <span className="holding-weight">{h.weight?.toFixed(1)}%</span>
+                                                    <span className={`holding-change ${(h.weight_change ?? 0) >= 0 ? 'positive' : 'negative'}`}>
+                                                        ({(h.weight_change ?? 0) >= 0 ? '+' : ''}{(h.weight_change ?? 0).toFixed(1)}%)
+                                                    </span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

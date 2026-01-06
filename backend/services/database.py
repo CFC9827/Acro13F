@@ -275,6 +275,8 @@ class DatabaseManager:
             "portfolio_shifts": [], # Top weight changes (>3%)
             "latest_period": None,
             "prior_period": None,
+            "fund_periods": [],  # List of unique periods across funds
+            "periods_aligned": True,  # False if funds have different latest periods
             "kpis": {
                 "fund_count": len(all_funds),
                 "total_aum": 0,
@@ -290,6 +292,9 @@ class DatabaseManager:
             "new_positions": [],  # New positions spotlight
             "ticker_fund_activity": {}  # Aggregated buying/selling by ticker
         }
+
+        # Track all fund periods for alignment detection
+        all_latest_periods = set()
 
         # Track ticker ownership across funds (for crowding signals)
         current_ticker_funds = {}  # ticker -> set of fund names
@@ -316,8 +321,11 @@ class DatabaseManager:
                 prev_acc = filings[1]['accession_number'] if len(filings) > 1 else None
                 prev_period = filings[1]['period_of_report'] if len(filings) > 1 else None
 
-                # Track global latest/prior periods (use first fund's as reference)
-                if summary["latest_period"] is None:
+                # Track this fund's period for alignment detection
+                all_latest_periods.add(latest_period)
+
+                # Track global latest/prior periods (use most recent across all funds)
+                if summary["latest_period"] is None or latest_period > summary["latest_period"]:
                     summary["latest_period"] = latest_period
                 if summary["prior_period"] is None and prev_period:
                     summary["prior_period"] = prev_period
@@ -336,16 +344,35 @@ class DatabaseManager:
                     current_ticker_funds[key]["funds"].add(fund['name'])
                     current_ticker_funds[key]["total_value"] += h['value']
 
-                # Top 3
-                top_3 = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
+                # Top 3 with weights
+                top_3_raw = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
+                top_3 = []
+                concentration = 0
+                for h in top_3_raw:
+                    weight = (h['value'] * 100.0 / total_value) if total_value else 0
+                    concentration += weight
+                    top_3.append({
+                        **h,
+                        "weight": weight
+                    })
                 
-                summary["fund_highlights"].append({
+                # Position count
+                position_count = len(latest_holdings)
+                
+                # Store fund highlight (prior_value will be added after we process prev filing)
+                fund_highlight = {
                     "cik": cik,
                     "name": fund['name'],
                     "total_value": total_value,
+                    "prior_value": 0,  # Will be updated below
+                    "value_change": 0,
+                    "value_change_pct": 0,
                     "period": latest_period,
+                    "position_count": position_count,
+                    "concentration": concentration,  # Top 3 as % of portfolio
                     "top_holdings": top_3
-                })
+                }
+                summary["fund_highlights"].append(fund_highlight)
 
                 # If we have a previous filing, calculate movers and shifts
                 if prev_acc:
@@ -353,6 +380,23 @@ class DatabaseManager:
                     prev_holdings_list = [dict(h) for h in cursor.fetchall()]
                     prev_total_value = sum(h['value'] for h in prev_holdings_list)
                     summary["kpis"]["prior_aum"] += prev_total_value
+                    
+                    # Update fund_highlight with prior value info
+                    fund_highlight["prior_value"] = prev_total_value
+                    fund_highlight["value_change"] = total_value - prev_total_value
+                    fund_highlight["value_change_pct"] = ((total_value - prev_total_value) * 100.0 / prev_total_value) if prev_total_value else 0
+                    
+                    # Also add weight changes for top holdings
+                    prev_map_simple = { (h['ticker'] or h['cusip']): h for h in prev_holdings_list }
+                    for th in fund_highlight["top_holdings"]:
+                        key = th.get('ticker') or th.get('cusip')
+                        prev_h = prev_map_simple.get(key)
+                        if prev_h and prev_total_value:
+                            prev_weight = (prev_h['value'] * 100.0 / prev_total_value)
+                            th["weight_change"] = th["weight"] - prev_weight
+                        else:
+                            th["weight_change"] = th["weight"]  # New position
+                    
                     # Include put_call in key to distinguish stock vs options
                     prev_map = { ((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')): h for h in prev_holdings_list }
                     latest_keys = set(((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')) for h in latest_holdings)
@@ -472,6 +516,10 @@ class DatabaseManager:
             # New positions spotlight (top 10 by value)
             all_new_positions.sort(key=lambda x: x["value"], reverse=True)
             summary["new_positions"] = all_new_positions[:10]
+
+            # Calculate period alignment status
+            summary["fund_periods"] = sorted(list(all_latest_periods), reverse=True)
+            summary["periods_aligned"] = len(all_latest_periods) <= 1
 
         return summary
     def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:
