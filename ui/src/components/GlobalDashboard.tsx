@@ -144,6 +144,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
     const tickerActivity = summary.ticker_fund_activity || {};
     const fundHighlights = summary.fund_highlights || [];
     const sortedFundsByAUM = [...fundHighlights].sort((a, b) => b.total_value - a.total_value);
+    const sortedFundsByChange = [...fundHighlights].sort((a, b) => (b.value_change_pct || 0) - (a.value_change_pct || 0));
 
     const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string) => {
         setMoverTooltip({ x: e.clientX, y: e.clientY, ticker });
@@ -287,11 +288,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'delta' && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">AUM Δ QoQ by Fund</div>
-                                {sortedFundsByAUM.map((fund, i) => (
+                                {sortedFundsByChange.map((fund, i) => (
                                     <div key={i} className="tooltip-fund-row">
                                         <span className="fund-name">{fund.name}</span>
                                         <span className={`fund-change ${(fund.value_change_pct || 0) >= 0 ? 'positive' : 'negative'}`}>
                                             {(fund.value_change_pct || 0) >= 0 ? '+' : ''}{(fund.value_change_pct || 0).toFixed(1)}%
+                                        </span>
+                                        <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`} style={{ fontWeight: 500, fontSize: '0.75rem' }}>
+                                            {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
                                         </span>
                                     </div>
                                 ))}
