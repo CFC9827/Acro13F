@@ -320,6 +320,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                     <div key={i} className="tooltip-position-row">
                                         <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
                                         <span className="pos-fund">{pos.fund_name}</span>
+                                        <span className="pos-weight">+{pos.weight.toFixed(1)}%</span>
                                     </div>
                                 ))}
                                 {newPositions.length > 8 && (
@@ -346,6 +347,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                     <div key={i} className="tooltip-position-row">
                                         <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
                                         <span className="pos-fund">{pos.fund_name}</span>
+                                        <span className="pos-weight negative">-{pos.weight.toFixed(1)}%</span>
                                     </div>
                                 ))}
                                 {exitedPositions.length > 8 && (

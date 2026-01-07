@@ -2563,28 +2563,41 @@ body {
 }
 
 .kpi-tooltip .tooltip-position-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 50px 1fr 60px;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.2);
+}
+
+.kpi-tooltip .tooltip-position-row:last-of-type {
+  border-bottom: none;
 }
 
 .kpi-tooltip .pos-ticker {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
   color: #f1f5f9;
-  min-width: 60px;
 }
 
 .kpi-tooltip .pos-fund {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  text-align: right;
-  flex: 1;
+  font-size: 0.65rem;
+  color: #64748b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.kpi-tooltip .pos-weight {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #10b981;
+  text-align: right;
+}
+
+.kpi-tooltip .pos-weight.negative {
+  color: #ef4444;
 }
 
 .kpi-tooltip .tooltip-more {
