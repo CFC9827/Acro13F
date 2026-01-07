@@ -365,12 +365,16 @@ class DatabaseManager:
                     "cik": cik,
                     "name": fund['name'],
                     "total_value": total_value,
-                    "prior_value": 0,  # Will be updated below
+                    "prior_value": 0,
                     "value_change": 0,
                     "value_change_pct": 0,
                     "period": latest_period,
                     "position_count": position_count,
-                    "concentration": concentration,  # Top 3 as % of portfolio
+                    "concentration": concentration,
+                    "concentration_change": 0, 
+                    "new_count": 0,
+                    "exit_count": 0,
+                    "top_add": None,
                     "top_holdings": top_3
                 }
                 summary["fund_highlights"].append(fund_highlight)
@@ -412,8 +416,17 @@ class DatabaseManager:
 
                     # Count new and exited positions
                     new_keys = latest_keys - prev_keys
+                    exited_keys = prev_keys - latest_keys
                     summary["kpis"]["new_positions"] += len(new_keys)
-                    summary["kpis"]["exited_positions"] += len(prev_keys - latest_keys)
+                    summary["kpis"]["exited_positions"] += len(exited_keys)
+                    
+                    fund_highlight["new_count"] = len(new_keys)
+                    fund_highlight["exit_count"] = len(exited_keys)
+
+                    # Calculate concentration change
+                    prev_top_3_raw = sorted(prev_holdings_list, key=lambda x: x['value'], reverse=True)[:3]
+                    prev_concentration = (sum(h['value'] for h in prev_top_3_raw) * 100.0 / prev_total_value) if prev_total_value else 0
+                    fund_highlight["concentration_change"] = concentration - prev_concentration
 
                     # Track new positions for spotlight
                     for h in latest_holdings:
@@ -457,6 +470,16 @@ class DatabaseManager:
                         val_change = h['value'] - (prev_h['value'] if prev_h else 0)
                         weight_delta = curr_weight - prev_weight
                         pct_of_fund = (val_change * 100.0 / total_value) if total_value else 0
+
+                        # Track top add for the fund
+                        if weight_delta > 0:
+                            if fund_highlight["top_add"] is None or weight_delta > fund_highlight["top_add"]["weight_change"]:
+                                fund_highlight["top_add"] = {
+                                    "ticker": h['ticker'],
+                                    "issuer_name": h['issuer_name'],
+                                    "weight_change": weight_delta,
+                                    "curr_weight": curr_weight
+                                }
 
                         # Track big movers (absolute value change)
                         summary["big_movers"].append({
@@ -550,6 +573,104 @@ class DatabaseManager:
             summary["periods_aligned"] = len(all_latest_periods) <= 1
 
         return summary
+    def get_all_funds_performance(self) -> Dict:
+        """Calculates TWR performance for all funds over time for comparison."""
+        all_funds = self.get_funds()
+        performance_data = {} # cik -> data
+        all_periods = set()
+
+        for fund in all_funds:
+            cik = fund['cik']
+            history = self.get_historical_holdings(cik)
+            if not history: continue
+
+            # Group by period
+            periods_map = {}
+            for h in history:
+                p = h['period_of_report']
+                if p not in periods_map: periods_map[p] = []
+                periods_map[p].append(h)
+            
+            sorted_periods = sorted(periods_map.keys())
+            if len(sorted_periods) < 2: continue
+
+            fund_series = []
+            cum_ret = 0.0
+            
+            # Initial point
+            fund_series.append({
+                "period": sorted_periods[0],
+                "return": 0.0,
+                "total_value": sum(h['value'] for h in periods_map[sorted_periods[0]])
+            })
+            all_periods.add(sorted_periods[0])
+
+            for i in range(1, len(sorted_periods)):
+                curr_p = sorted_periods[i]
+                prev_p = sorted_periods[i-1]
+                
+                curr_holdings = periods_map[curr_p]
+                prev_holdings = periods_map[prev_p]
+                
+                total_val_t = sum(h['value'] for h in curr_holdings)
+                total_val_prev = sum(h['value'] for h in prev_holdings)
+                
+                if total_val_prev == 0: continue
+
+                # Calculate Net Flow for TWR calculation
+                # Flow = (Shares_t - Shares_prev) * Price_t
+                prev_shares_map = { (h['ticker'] or h['cusip']): h['shares'] for h in prev_holdings }
+                net_flow = 0.0
+                
+                for h in curr_holdings:
+                    key = h['ticker'] or h['cusip']
+                    shares_t = h['shares']
+                    shares_prev = prev_shares_map.get(key, 0)
+                    price_t = h['value'] / h['shares'] if h['shares'] > 0 else 0
+                    
+                    flow = (shares_t - shares_prev) * price_t
+                    net_flow += flow
+                
+                # Check for exits
+                curr_keys = { (h['ticker'] or h['cusip']) for h in curr_holdings }
+                for h in prev_holdings:
+                    key = h['ticker'] or h['cusip']
+                    if key not in curr_keys:
+                        net_flow += -h['value']
+
+                period_ret = (total_val_t - net_flow) / total_val_prev - 1
+                cum_ret = (1 + cum_ret) * (1 + period_ret) - 1
+                
+                fund_series.append({
+                    "period": curr_p,
+                    "return": cum_ret * 100.0,
+                    "total_value": total_val_t
+                })
+                all_periods.add(curr_p)
+
+            performance_data[cik] = {
+                "name": fund['name'],
+                "series": fund_series
+            }
+
+        # Format into a cross-sectional list for charts
+        sorted_all_periods = sorted(list(all_periods))
+        chart_data = []
+        for p in sorted_all_periods:
+            row = {"period": p}
+            for cik, fund_data in performance_data.items():
+                match = next((s for s in fund_data["series"] if s["period"] == p), None)
+                if match:
+                    row[fund_data["name"]] = match["return"]
+                else:
+                    row[fund_data["name"]] = None
+            chart_data.append(row)
+
+        return {
+            "chart_data": chart_data,
+            "funds": [f['name'] for f in all_funds if f['cik'] in performance_data]
+        }
+
     def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:
         """Returns historical prices for a ticker."""
         with self._get_connection() as conn:

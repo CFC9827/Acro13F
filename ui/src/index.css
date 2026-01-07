@@ -6,6 +6,35 @@
   --accent: #38bdf8;
   --accent-hover: #0ea5e9;
   --border: #334155;
+  --border-color: rgba(255, 255, 255, 0.05);
+}
+
+.control-btn-mini {
+  padding: 4px 10px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.control-btn-mini:hover {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.control-btn-mini.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+}
+
+.legend-item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 * {
@@ -2055,6 +2084,89 @@ body {
   color: #10b981;
 }
 
+/* Enhanced Fund Summary Styles */
+.fund-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.activity-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.badge.new {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.badge.exited {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.stat-trend {
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.stat-trend.positive {
+  color: #10b981;
+}
+
+.stat-trend.negative {
+  color: #ef4444;
+}
+
+.top-add-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 4px;
+}
+
+.sparkle-icon {
+  color: #38bdf8;
+}
+
+.add-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: 0.05em;
+}
+
+.add-ticker {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.add-delta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.add-delta.positive {
+  color: #10b981;
+}
+
 /* Movers & Shifts List */
 .movers-list,
 .shifts-list {
@@ -2613,4 +2725,68 @@ body {
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Performance Comparison Chart */
+.performance-section {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 24px;
+}
+
+.performance-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.performance-section .section-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(56, 189, 248, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.performance-section .section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.performance-section .section-desc {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 2px 0 0 0;
+}
+
+.comparison-chart-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Recharts Customization */
+.recharts-cartesian-grid-horizontal line {
+  stroke-opacity: 0.1;
+}
+
+.recharts-legend-wrapper {
+  padding-top: 20px !important;
+}
+
+.recharts-legend-item-text {
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+}
+
+.recharts-tooltip-wrapper {
+  outline: none;
 }

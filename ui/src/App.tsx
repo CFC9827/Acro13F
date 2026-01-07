@@ -386,9 +386,22 @@ function App() {
                 <header className="app-header">
                     <div className="logo">
                         <TrendingUp size={24} />
-                        <span>Hedge Fund 13F Tracker</span>
+                        <span>Abrams13F</span>
                     </div>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <div style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            color: '#38bdf8',
+                            letterSpacing: '0.1em',
+                            padding: '4px 8px',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            borderRadius: '4px',
+                            background: 'rgba(56, 189, 248, 0.1)',
+                            marginRight: '8px'
+                        }}>
+                            ABRAMS13F
+                        </div>
                         <button
                             onClick={handleGlobalRefresh}
                             disabled={loading}

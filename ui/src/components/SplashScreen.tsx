@@ -28,8 +28,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
             <div className="hovering-logo-stage">
                 <div className="logo-panel-premium">
                     <h1 className="logo-text">
-                        <span className="part-white">Fund</span>
-                        <span className="part-blue">Tracker</span>
+                        <span className="part-white">Abrams</span>
+                        <span className="part-blue">13F</span>
                     </h1>
                     <div className="logo-separator"></div>
                     <p className="logo-tagline">13F HOLDINGS INTELLIGENCE</p>

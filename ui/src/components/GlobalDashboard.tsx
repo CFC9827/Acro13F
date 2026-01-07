@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { TrendingUp, Activity, ChevronRight, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TrendingUp, Activity, ChevronRight, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
     ticker?: string;
@@ -20,6 +21,15 @@ interface FundHighlight {
     period: string;
     position_count?: number;
     concentration?: number;
+    concentration_change?: number;
+    new_count?: number;
+    exit_count?: number;
+    top_add?: {
+        ticker?: string;
+        issuer_name: string;
+        weight_change: number;
+        curr_weight: number;
+    } | null;
     top_holdings: Holding[];
 }
 
@@ -128,6 +138,263 @@ const formatQ = (dateStr: string) => {
     return `${q}Q '${d.getFullYear().toString().slice(2)}`;
 };
 
+const COLORS = [
+    '#38bdf8', // Sky 400
+    '#10b981', // Emerald 500
+    '#fb7185', // Rose 400
+    '#f472b6', // Pink 400
+    '#a78bfa', // Violet 400
+    '#fbbf24', // Amber 400
+    '#fb923c', // Orange 400
+    '#22d3ee', // Cyan 400
+];
+
+const PerformanceComparisonChart: React.FC = () => {
+    const [data, setData] = useState<{ chart_data: any[], funds: string[] } | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [showBenchmark, setShowBenchmark] = useState(true);
+    const [benchmarkData, setBenchmarkData] = useState<any[]>([]);
+    const [timeRange, setTimeRange] = useState<'1Y' | '2Y' | '3Y' | '5Y' | 'MAX'>('MAX');
+    const [selectedFunds, setSelectedFunds] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const res = await fetch('/api/dashboard/performance');
+                const result = await res.json();
+                setData(result);
+                if (result.funds) setSelectedFunds(result.funds);
+
+                if (result.chart_data?.length > 0) {
+                    const start = result.chart_data[0].period;
+                    const end = result.chart_data[result.chart_data.length - 1].period;
+                    fetchBenchmark(start, end);
+                }
+            } catch (err) {
+                console.error("Failed to fetch performance comparison", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const fetchBenchmark = async (start: string, end: string) => {
+        try {
+            const res = await fetch(`/api/market/benchmark?start=${start}&end=${end}`);
+            const bData = await res.json();
+            if (Array.isArray(bData)) setBenchmarkData(bData);
+        } catch (err) {
+            console.error("Failed to fetch benchmark", err);
+        }
+    };
+
+    const filteredAndIndexedData = useMemo(() => {
+        if (!data || !data.chart_data) return [];
+
+        let filtered = [...data.chart_data];
+        if (timeRange !== 'MAX') {
+            const now = new Date();
+            let startLimit = new Date();
+            if (timeRange === '1Y') startLimit.setFullYear(now.getFullYear() - 1);
+            else if (timeRange === '2Y') startLimit.setFullYear(now.getFullYear() - 2);
+            else if (timeRange === '3Y') startLimit.setFullYear(now.getFullYear() - 3);
+            else if (timeRange === '5Y') startLimit.setFullYear(now.getFullYear() - 5);
+
+            filtered = filtered.filter(d => new Date(d.period) >= startLimit);
+        }
+
+        if (filtered.length === 0) return [];
+
+        const baseValues: { [key: string]: number } = {};
+        data.funds.forEach(fund => {
+            baseValues[fund] = filtered[0][fund] ?? 0;
+        });
+
+        let benchBase = 0;
+        if (showBenchmark && benchmarkData.length > 0) {
+            const firstDate = new Date(filtered[0].period).getTime();
+            const closest = benchmarkData.reduce((prev, curr) => {
+                return Math.abs(new Date(curr.date).getTime() - firstDate) < Math.abs(new Date(prev.date).getTime() - firstDate) ? curr : prev;
+            });
+            benchBase = closest.value;
+        }
+
+        return filtered.map(d => {
+            const row: any = { period: d.period };
+            data.funds.forEach(fund => {
+                const val = d[fund];
+                if (val !== null && val !== undefined) {
+                    row[fund] = ((1 + val / 100) / (1 + baseValues[fund] / 100) - 1) * 100;
+                } else {
+                    row[fund] = null;
+                }
+            });
+            if (showBenchmark && benchmarkData.length > 0) {
+                const dDate = new Date(d.period).getTime();
+                const closest = benchmarkData.reduce((prev, curr) => {
+                    return Math.abs(new Date(curr.date).getTime() - dDate) < Math.abs(new Date(prev.date).getTime() - dDate) ? curr : prev;
+                });
+                row["S&P 500"] = ((closest.value / benchBase) - 1) * 100;
+            }
+            return row;
+        });
+    }, [data, benchmarkData, showBenchmark, timeRange]);
+
+    const toggleFund = (fund: string) => {
+        setSelectedFunds(prev =>
+            prev.includes(fund) ? prev.filter(f => f !== fund) : [...prev, fund]
+        );
+    };
+
+    if (loading) return (
+        <div className="dashboard-section performance-section" style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span>Loading performance comparison...</span>
+        </div>
+    );
+
+    if (!data || data.chart_data.length === 0) return null;
+
+    return (
+        <section className="dashboard-section performance-section" style={{ marginTop: '20px' }}>
+            <div className="section-header">
+                <div className="section-icon-box" style={{ color: '#38bdf8' }}>
+                    <LineIcon size={20} />
+                </div>
+                <div style={{ flexGrow: 1 }}>
+                    <h3 className="section-title">Performance Comparison</h3>
+                    <p className="section-desc">Cumulative TWR across portfolios (Indexed to 0%)</p>
+                </div>
+                <div className="header-controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="time-controls-group" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {(['1Y', '2Y', '3Y', '5Y', 'MAX'] as const).map(range => (
+                            <button
+                                key={range}
+                                className={`control-btn-mini ${timeRange === range ? 'active' : ''}`}
+                                onClick={() => setTimeRange(range)}
+                            >
+                                {range}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="toggle-group">
+                        <button
+                            className={`toggle-btn ${showBenchmark ? 'active' : ''}`}
+                            onClick={() => setShowBenchmark(!showBenchmark)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '32px' }}
+                        >
+                            <Activity size={14} />
+                            S&P 500
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="comparison-chart-container" style={{ height: '400px', marginTop: '20px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={filteredAndIndexedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis
+                            dataKey="period"
+                            stroke="#64748b"
+                            tickFormatter={(val) => {
+                                const d = new Date(val);
+                                const q = Math.floor((d.getMonth() + 3) / 3);
+                                return `Q${q} '${d.getFullYear().toString().slice(2)}`;
+                            }}
+                            tick={{ fontSize: 11 }}
+                        />
+                        <YAxis
+                            stroke="#64748b"
+                            tickFormatter={(val) => `${val >= 0 ? '+' : ''}${val.toFixed(0)}%`}
+                            tick={{ fontSize: 11 }}
+                        />
+                        <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" />
+                        <Tooltip
+                            contentStyle={{
+                                backgroundColor: '#0f172a',
+                                border: '1px solid #1e293b',
+                                borderRadius: '12px',
+                                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+                            }}
+                            itemStyle={{ fontSize: '11px', padding: '2px 0' }}
+                            labelStyle={{ color: '#f8fafc', fontWeight: 600, fontSize: '12px', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}
+                            formatter={(value: number, name: string) => [
+                                <span style={{ color: value >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>
+                                    {value >= 0 ? '+' : ''}{value.toFixed(2)}%
+                                </span>,
+                                name
+                            ]}
+                            labelFormatter={(label) => formatQ(label)}
+                        />
+                        <Legend
+                            content={({ payload }) => (
+                                <div className="custom-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                                    {payload?.map((entry: any, index: number) => {
+                                        if (entry.value === 'S&P 500') return null;
+                                        const isActive = selectedFunds.includes(entry.value);
+                                        return (
+                                            <div
+                                                key={`item-${index}`}
+                                                className={`legend-item ${isActive ? 'active' : 'inactive'}`}
+                                                onClick={() => toggleFund(entry.value)}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: 'pointer',
+                                                    opacity: isActive ? 1 : 0.4,
+                                                    transition: 'all 0.2s ease',
+                                                    padding: '4px 8px',
+                                                    borderRadius: '6px',
+                                                    background: isActive ? 'rgba(255,255,255,0.03)' : 'transparent'
+                                                }}
+                                            >
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: entry.color }}></div>
+                                                <span style={{ fontSize: '11px', fontWeight: 600, color: isActive ? '#f1f5f9' : '#94a3b8' }}>{entry.value}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {showBenchmark && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 1, padding: '4px 8px' }}>
+                                            <div style={{ width: '12px', height: '0', borderTop: '2px dashed #6366f1' }}></div>
+                                            <span style={{ fontSize: '11px', fontWeight: 600, color: '#f1f5f9' }}>S&P 500</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        />
+                        {data.funds.map((fund, idx) => (
+                            <Line
+                                key={fund}
+                                type="monotone"
+                                dataKey={fund}
+                                stroke={COLORS[idx % COLORS.length]}
+                                strokeWidth={selectedFunds.includes(fund) ? 2.5 : 0}
+                                dot={false}
+                                activeDot={selectedFunds.includes(fund) ? { r: 5, strokeWidth: 0 } : false}
+                                connectNulls
+                                hide={!selectedFunds.includes(fund)}
+                            />
+                        ))}
+                        {showBenchmark && (
+                            <Line
+                                type="monotone"
+                                dataKey="S&P 500"
+                                stroke="#6366f1"
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                dot={false}
+                            />
+                        )}
+                    </LineChart>
+                </ResponsiveContainer>
+            </div>
+        </section>
+    );
+};
+
 type MoversMode = 'dollar' | 'percent' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSelectFund }) => {
@@ -135,6 +402,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
+    const [newPosSort, setNewPosSort] = useState<'value' | 'weight'>('value');
+    const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
     const aumChangePercent = kpis && kpis.prior_aum > 0 ? ((aumChange / kpis.prior_aum) * 100).toFixed(1) : '0';
@@ -145,6 +414,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
     const fundHighlights = summary.fund_highlights || [];
     const sortedFundsByAUM = [...fundHighlights].sort((a, b) => b.total_value - a.total_value);
     const sortedFundsByChange = [...fundHighlights].sort((a, b) => (b.value_change_pct || 0) - (a.value_change_pct || 0));
+
+    const weightSortedNew = [...newPositions].sort((a, b) => b.weight - a.weight);
+    const weightSortedExited = [...exitedPositions].sort((a, b) => b.weight - a.weight);
+
+    const displayNewPositions = [...newPositions].sort((a, b) =>
+        newPosSort === 'value' ? b.value - a.value : b.weight - a.weight
+    );
+    const displayExitedPositions = [...exitedPositions].sort((a, b) =>
+        exitPosSort === 'value' ? b.value - a.value : b.weight - a.weight
+    );
 
     const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string) => {
         setMoverTooltip({ x: e.clientX, y: e.clientY, ticker });
@@ -316,7 +595,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'new' && newPositions.length > 0 && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">New Positions</div>
-                                {newPositions.slice(0, 8).map((pos, i) => (
+                                {weightSortedNew.slice(0, 8).map((pos, i) => (
                                     <div key={i} className="tooltip-position-row">
                                         <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
                                         <span className="pos-fund">{pos.fund_name}</span>
@@ -343,7 +622,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'exited' && exitedPositions.length > 0 && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">Exited Positions</div>
-                                {exitedPositions.slice(0, 8).map((pos, i) => (
+                                {weightSortedExited.slice(0, 8).map((pos, i) => (
                                     <div key={i} className="tooltip-position-row">
                                         <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
                                         <span className="pos-fund">{pos.fund_name}</span>
@@ -389,7 +668,15 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                     <div className="card-header">
                                         <div className="fund-info">
                                             <h4 className="fund-name">{fund.name}</h4>
-                                            <span className="fund-period">{formatQ(fund.period)}</span>
+                                            <div className="fund-meta">
+                                                <span className="fund-period">{formatQ(fund.period)}</span>
+                                                {(fund.new_count !== undefined || fund.exit_count !== undefined) && (
+                                                    <div className="activity-badges">
+                                                        {(fund.new_count || 0) > 0 && <span className="badge new">{fund.new_count} New</span>}
+                                                        {(fund.exit_count || 0) > 0 && <span className="badge exited">{fund.exit_count} Exit</span>}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="fund-aum-block">
                                             <div className="fund-value">{formatCurrency(fund.total_value)}</div>
@@ -407,7 +694,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                             <span className="stat-label">positions</span>
                                         </div>
                                         <div className="fund-stat">
-                                            <span className="stat-value">{fund.concentration?.toFixed(0) || '—'}%</span>
+                                            <span className="stat-value">
+                                                {fund.concentration?.toFixed(0) || '—'}%
+                                                {fund.concentration_change !== undefined && fund.concentration_change !== 0 && (
+                                                    <span className={`stat-trend ${fund.concentration_change >= 0 ? 'positive' : 'negative'}`}>
+                                                        {fund.concentration_change >= 0 ? '↑' : '↓'}{Math.abs(fund.concentration_change).toFixed(0)}%
+                                                    </span>
+                                                )}
+                                            </span>
                                             <span className="stat-label">top 3</span>
                                         </div>
                                     </div>
@@ -433,6 +727,15 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                         ))}
                                     </div>
 
+                                    {fund.top_add && (
+                                        <div className="top-add-banner">
+                                            <Sparkles size={12} className="sparkle-icon" />
+                                            <span className="add-label">TOP ADD:</span>
+                                            <span className="add-ticker">{fund.top_add.ticker || fund.top_add.issuer_name.slice(0, 4)}</span>
+                                            <span className="add-delta positive">+{fund.top_add.weight_change.toFixed(1)}%</span>
+                                        </div>
+                                    )}
+
                                     <div className="card-footer">
                                         <span>View Full Portfolio</span>
                                         <ChevronRight size={14} />
@@ -441,6 +744,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                             ))}
                         </div>
                     </section>
+
+                    <PerformanceComparisonChart />
                 </div>
 
                 {/* Right Column: Movers, Shifts, Crowding, New Positions */}
@@ -641,10 +946,22 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                     <h3 className="section-title-small">New This Quarter</h3>
                                     <p className="section-desc-small">New positions and re-entries</p>
                                 </div>
+                                <div className="toggle-group">
+                                    <button
+                                        className={`toggle-btn ${newPosSort === 'value' ? 'active' : ''}`}
+                                        onClick={() => setNewPosSort('value')}
+                                        title="Sort by dollar value"
+                                    >$</button>
+                                    <button
+                                        className={`toggle-btn ${newPosSort === 'weight' ? 'active' : ''}`}
+                                        onClick={() => setNewPosSort('weight')}
+                                        title="Sort by portfolio %"
+                                    >%</button>
+                                </div>
                             </div>
 
                             <div className="new-positions-list scrollable">
-                                {newPositions.map((pos, i) => (
+                                {displayNewPositions.map((pos, i) => (
                                     <div key={i} className="new-position-item">
                                         <div className="new-position-info">
                                             <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
@@ -669,10 +986,22 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                     <h3 className="section-title-small">Exited This Quarter</h3>
                                     <p className="section-desc-small">Positions fully sold off</p>
                                 </div>
+                                <div className="toggle-group">
+                                    <button
+                                        className={`toggle-btn ${exitPosSort === 'value' ? 'active' : ''}`}
+                                        onClick={() => setExitPosSort('value')}
+                                        title="Sort by dollar value"
+                                    >$</button>
+                                    <button
+                                        className={`toggle-btn ${exitPosSort === 'weight' ? 'active' : ''}`}
+                                        onClick={() => setExitPosSort('weight')}
+                                        title="Sort by portfolio %"
+                                    >%</button>
+                                </div>
                             </div>
 
                             <div className="exited-positions-list scrollable">
-                                {exitedPositions.map((pos, i) => (
+                                {displayExitedPositions.map((pos, i) => (
                                     <div key={i} className="exited-position-item">
                                         <div className="exited-position-info">
                                             <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>

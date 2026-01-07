@@ -36,6 +36,13 @@ async def get_dashboard_summary():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/dashboard/performance")
+async def get_dashboard_performance():
+    try:
+        return db.get_all_funds_performance()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/funds/{cik}/holdings")
 async def get_holdings(cik: str):
     holdings = db.get_latest_holdings(cik)
@@ -67,7 +74,7 @@ async def refresh_fund(cik: str, limit: int = None, force_all: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/market/benchmark")
+@app.get("/market/benchmark")
 async def get_market_benchmark(start: str, end: str = None):
     try:
         data = get_benchmark_data(start, end)
