@@ -300,6 +300,7 @@ class DatabaseManager:
         current_ticker_funds = {}  # ticker -> set of fund names
         prior_ticker_funds = {}    # ticker -> set of fund names
         all_new_positions = []     # For new positions spotlight
+        all_exited_positions = []  # For exited positions spotlight
 
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -427,6 +428,20 @@ class DatabaseManager:
                                 "weight": weight
                             })
 
+                    # Track exited positions for spotlight
+                    exited_keys = prev_keys - latest_keys
+                    for h in prev_holdings_list:
+                        key = h['ticker'] or h['cusip']
+                        if key in exited_keys:
+                            weight = (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0
+                            all_exited_positions.append({
+                                "ticker": h['ticker'],
+                                "issuer_name": h.get('issuer_name', 'Unknown'),
+                                "fund_name": fund['name'],
+                                "value": h['value'],
+                                "weight": weight
+                            })
+
                     for h in latest_holdings:
                         key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                         prev_h = prev_map.get(key)
@@ -458,11 +473,20 @@ class DatabaseManager:
                         # Track buying/selling activity per ticker
                         ticker_key = h['ticker'] or h['cusip']
                         if ticker_key not in summary["ticker_fund_activity"]:
-                            summary["ticker_fund_activity"][ticker_key] = {"buying": 0, "selling": 0, "ticker": h['ticker'], "issuer": h['issuer_name']}
+                            summary["ticker_fund_activity"][ticker_key] = {
+                                "buying": 0, 
+                                "selling": 0, 
+                                "ticker": h['ticker'], 
+                                "issuer": h['issuer_name'],
+                                "buying_funds": [],
+                                "selling_funds": []
+                            }
                         if val_change > 0:
                             summary["ticker_fund_activity"][ticker_key]["buying"] += 1
+                            summary["ticker_fund_activity"][ticker_key]["buying_funds"].append(fund['name'])
                         elif val_change < 0:
                             summary["ticker_fund_activity"][ticker_key]["selling"] += 1
+                            summary["ticker_fund_activity"][ticker_key]["selling_funds"].append(fund['name'])
 
                         # Track portfolio shifts (weight delta > 3% or < -3%)
                         if abs(weight_delta) >= 3.0:
@@ -516,6 +540,10 @@ class DatabaseManager:
             # New positions spotlight (top 10 by value)
             all_new_positions.sort(key=lambda x: x["value"], reverse=True)
             summary["new_positions"] = all_new_positions[:10]
+
+            # Exited positions spotlight (top 10 by value)
+            all_exited_positions.sort(key=lambda x: x["value"], reverse=True)
+            summary["exited_positions"] = all_exited_positions[:10]
 
             # Calculate period alignment status
             summary["fund_periods"] = sorted(list(all_latest_periods), reverse=True)

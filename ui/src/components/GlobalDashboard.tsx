@@ -80,7 +80,17 @@ interface TickerFundActivity {
         selling: number;
         ticker?: string;
         issuer?: string;
+        buying_funds?: string[];
+        selling_funds?: string[];
     };
+}
+
+interface ExitedPosition {
+    ticker?: string;
+    issuer_name: string;
+    fund_name: string;
+    value: number;
+    weight: number;
 }
 
 interface DashboardSummary {
@@ -94,6 +104,7 @@ interface DashboardSummary {
     kpis?: KPIs;
     crowding_signals?: CrowdingSignals;
     new_positions?: NewPosition[];
+    exited_positions?: ExitedPosition[];
     ticker_fund_activity?: TickerFundActivity;
 }
 
@@ -121,12 +132,41 @@ type MoversMode = 'dollar' | 'percent' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSelectFund }) => {
     const [moversMode, setMoversMode] = useState<MoversMode>('dollar');
+    const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
+    const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
+    const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
     const aumChangePercent = kpis && kpis.prior_aum > 0 ? ((aumChange / kpis.prior_aum) * 100).toFixed(1) : '0';
     const crowding = summary.crowding_signals;
     const newPositions = summary.new_positions || [];
+    const exitedPositions = summary.exited_positions || [];
     const tickerActivity = summary.ticker_fund_activity || {};
+    const fundHighlights = summary.fund_highlights || [];
+
+    const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string) => {
+        setMoverTooltip({ x: e.clientX, y: e.clientY, ticker });
+    };
+
+    const handleMoverTooltipLeave = () => {
+        setMoverTooltip(null);
+    };
+
+    const handleCrowdingTooltipEnter = (e: React.MouseEvent, ticker: string) => {
+        setCrowdingTooltip({ x: e.clientX, y: e.clientY, ticker });
+    };
+
+    const handleCrowdingTooltipLeave = () => {
+        setCrowdingTooltip(null);
+    };
+
+    const handleKpiTooltipEnter = (e: React.MouseEvent, type: string) => {
+        setKpiTooltip({ x: e.clientX, y: e.clientY, type });
+    };
+
+    const handleKpiTooltipLeave = () => {
+        setKpiTooltip(null);
+    };
 
     const getMoverDisplay = (mover: Mover) => {
         const ticker = mover.ticker || 'N/A';
@@ -179,21 +219,58 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
             {/* KPI Tiles */}
             {kpis && (
                 <div className="kpi-tiles-row">
-                    <div className="kpi-tile">
+                    {/* Tracked Funds */}
+                    <div
+                        className="kpi-tile has-tooltip"
+                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'funds')}
+                        onMouseLeave={handleKpiTooltipLeave}
+                    >
                         <div className="kpi-icon"><Briefcase size={18} /></div>
                         <div className="kpi-content">
                             <span className="kpi-value">{kpis.fund_count}</span>
                             <span className="kpi-label">Tracked Funds</span>
                         </div>
+                        {kpiTooltip && kpiTooltip.type === 'funds' && (
+                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 100, top: kpiTooltip.y + 20 }}>
+                                <div className="tooltip-title">Tracked Funds</div>
+                                {fundHighlights.map((fund, i) => (
+                                    <span key={i} className="fund-line">{fund.name}</span>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <div className="kpi-tile">
+                    {/* Total AUM */}
+                    <div
+                        className="kpi-tile has-tooltip"
+                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'aum')}
+                        onMouseLeave={handleKpiTooltipLeave}
+                    >
                         <div className="kpi-icon"><DollarSign size={18} /></div>
                         <div className="kpi-content">
                             <span className="kpi-value">{formatCurrency(kpis.total_aum)}</span>
                             <span className="kpi-label">Total AUM</span>
                         </div>
+                        {kpiTooltip && kpiTooltip.type === 'aum' && (
+                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
+                                <div className="tooltip-title">AUM by Fund</div>
+                                {fundHighlights.map((fund, i) => (
+                                    <div key={i} className="tooltip-fund-row">
+                                        <span className="fund-name">{fund.name}</span>
+                                        <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
+                                        <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <div className="kpi-tile">
+                    {/* AUM Change */}
+                    <div
+                        className="kpi-tile has-tooltip"
+                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'delta')}
+                        onMouseLeave={handleKpiTooltipLeave}
+                    >
                         <div className={`kpi-icon ${aumChange >= 0 ? 'positive' : 'negative'}`}>
                             {aumChange >= 0 ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
                         </div>
@@ -203,22 +280,74 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                             </span>
                             <span className="kpi-label">AUM Δ QoQ</span>
                         </div>
+                        {kpiTooltip && kpiTooltip.type === 'delta' && (
+                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
+                                <div className="tooltip-title">AUM Δ QoQ by Fund</div>
+                                {fundHighlights.map((fund, i) => (
+                                    <div key={i} className="tooltip-fund-row">
+                                        <span className="fund-name">{fund.name}</span>
+                                        <span className={`fund-change ${(fund.value_change_pct || 0) >= 0 ? 'positive' : 'negative'}`}>
+                                            {(fund.value_change_pct || 0) >= 0 ? '+' : ''}{(fund.value_change_pct || 0).toFixed(1)}%
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <div className="kpi-tile">
+                    {/* New Positions */}
+                    <div
+                        className="kpi-tile has-tooltip"
+                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'new')}
+                        onMouseLeave={handleKpiTooltipLeave}
+                    >
                         <div className="kpi-icon positive"><PlusCircle size={18} /></div>
                         <div className="kpi-content">
                             <span className="kpi-value positive">{kpis.new_positions}</span>
                             <span className="kpi-label">New Positions</span>
                         </div>
+                        {kpiTooltip && kpiTooltip.type === 'new' && newPositions.length > 0 && (
+                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
+                                <div className="tooltip-title">New Positions</div>
+                                {newPositions.slice(0, 8).map((pos, i) => (
+                                    <div key={i} className="tooltip-position-row">
+                                        <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
+                                        <span className="pos-fund">{pos.fund_name}</span>
+                                    </div>
+                                ))}
+                                {newPositions.length > 8 && (
+                                    <span className="tooltip-more">+{newPositions.length - 8} more</span>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <div className="kpi-tile">
+                    {/* Exited Positions */}
+                    <div
+                        className="kpi-tile has-tooltip"
+                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'exited')}
+                        onMouseLeave={handleKpiTooltipLeave}
+                    >
                         <div className="kpi-icon negative"><MinusCircle size={18} /></div>
                         <div className="kpi-content">
                             <span className="kpi-value negative">{kpis.exited_positions}</span>
                             <span className="kpi-label">Exited</span>
                         </div>
+                        {kpiTooltip && kpiTooltip.type === 'exited' && exitedPositions.length > 0 && (
+                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
+                                <div className="tooltip-title">Exited Positions</div>
+                                {exitedPositions.slice(0, 8).map((pos, i) => (
+                                    <div key={i} className="tooltip-position-row">
+                                        <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
+                                        <span className="pos-fund">{pos.fund_name}</span>
+                                    </div>
+                                ))}
+                                {exitedPositions.length > 8 && (
+                                    <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
+
             )}
 
             <div className="dashboard-grid">
@@ -353,19 +482,64 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                 .map((mover, i) => {
                                     const displayValue = moversMode === 'percent' ? (mover.pct_of_fund || 0) : mover.val_change;
                                     const isPositive = displayValue >= 0;
+
+                                    // For # mode, get fund activity info
+                                    const ticker = mover.ticker || '';
+                                    const activity = tickerActivity[ticker];
+                                    const allFunds = activity ? [...(activity.buying_funds || []), ...(activity.selling_funds || [])] : [];
+                                    const totalFundCount = allFunds.length;
+                                    const showTooltip = moversMode === 'funds' && totalFundCount > 1;
+                                    const buyingFunds = (activity?.buying_funds || []).join(', ') || 'None';
+                                    const sellingFunds = (activity?.selling_funds || []).join(', ') || 'None';
+
                                     return (
                                         <div key={i} className="mover-item">
                                             <div className="mover-info">
                                                 <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
-                                                <span className="mover-fund">{mover.fund_name}</span>
+                                                {!showTooltip && (
+                                                    <span className="mover-fund">{mover.fund_name}</span>
+                                                )}
                                             </div>
-                                            <div className={`mover-delta ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}>
+                                            <div
+                                                className={`mover-delta ${showTooltip ? 'has-tooltip' : ''} ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}
+                                                onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker) : undefined}
+                                                onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
+                                            >
                                                 {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                                                 {getMoverDisplay(mover)}
                                                 {moversMode === 'percent' && mover.curr_weight !== undefined && (
                                                     <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
                                                 )}
+                                                {showTooltip && moverTooltip && moverTooltip.ticker === ticker && (
+                                                    <span
+                                                        className="tooltip-content visible"
+                                                        style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
+                                                    >
+                                                        <span className="tooltip-row buying">
+                                                            <strong>Buying:</strong>
+                                                            {(activity?.buying_funds || []).length > 0 ? (
+                                                                (activity?.buying_funds || []).map((fund, idx) => (
+                                                                    <span key={idx} className="fund-line">{fund}</span>
+                                                                ))
+                                                            ) : (
+                                                                <span className="fund-line">None</span>
+                                                            )}
+                                                        </span>
+                                                        <span className="tooltip-row selling">
+                                                            <strong>Selling:</strong>
+                                                            {(activity?.selling_funds || []).length > 0 ? (
+                                                                (activity?.selling_funds || []).map((fund, idx) => (
+                                                                    <span key={idx} className="fund-line">{fund}</span>
+                                                                ))
+                                                            ) : (
+                                                                <span className="fund-line">None</span>
+                                                            )}
+                                                        </span>
+                                                    </span>
+                                                )}
+
                                             </div>
+
                                         </div>
                                     );
                                 })}
@@ -387,15 +561,36 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                 <div className="crowding-subsection">
                                     <div className="crowding-label">Most Widely Held</div>
                                     <div className="crowding-list">
-                                        {crowding.most_held.slice(0, 3).map((item, i) => (
-                                            <div key={i} className="crowding-item">
-                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
-                                                <span className="crowding-count">{item.fund_count} funds</span>
-                                            </div>
-                                        ))}
+                                        {crowding.most_held.slice(0, 3).map((item, i) => {
+                                            const itemTicker = item.ticker || 'N/A';
+                                            return (
+                                                <div key={i} className="crowding-item">
+                                                    <span className="crowding-ticker">{itemTicker}</span>
+                                                    <span
+                                                        className="crowding-count has-tooltip"
+                                                        onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker)}
+                                                        onMouseLeave={handleCrowdingTooltipLeave}
+                                                    >
+                                                        {item.fund_count} funds
+                                                        {crowdingTooltip && crowdingTooltip.ticker === itemTicker && item.funds && item.funds.length > 0 && (
+                                                            <span
+                                                                className="tooltip-content visible"
+                                                                style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15 }}
+                                                            >
+                                                                {item.funds.map((fund, idx) => (
+                                                                    <span key={idx} className="fund-line">{fund}</span>
+                                                                ))}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
+
+
 
                             {crowding.gaining_funds.length > 0 && (
                                 <div className="crowding-subsection">
@@ -431,10 +626,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                     {newPositions.length > 0 && (
                         <section className="dashboard-section compact">
                             <div className="section-header">
-                                <Sparkles className="section-icon-small" />
+                                <PlusCircle className="section-icon-small" style={{ color: '#10b981' }} />
                                 <div>
                                     <h3 className="section-title-small">New This Quarter</h3>
-                                    <p className="section-desc-small">First-time positions and initial weights</p>
+                                    <p className="section-desc-small">New positions and re-entries</p>
                                 </div>
                             </div>
 
@@ -445,14 +640,44 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                             <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
                                             <span className="new-position-fund">{pos.fund_name}</span>
                                         </div>
-                                        <div className="new-position-weight">
-                                            {pos.weight.toFixed(1)}%
+                                        <div className="new-position-stats">
+                                            <span className="new-position-value">{formatCurrency(pos.value)}</span>
+                                            <span className="new-position-weight">{pos.weight.toFixed(1)}%</span>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         </section>
                     )}
+
+                    {/* Exited Positions Spotlight */}
+                    {exitedPositions.length > 0 && (
+                        <section className="dashboard-section compact">
+                            <div className="section-header">
+                                <MinusCircle className="section-icon-small" style={{ color: '#ef4444' }} />
+                                <div>
+                                    <h3 className="section-title-small">Exited This Quarter</h3>
+                                    <p className="section-desc-small">Positions fully sold off</p>
+                                </div>
+                            </div>
+
+                            <div className="exited-positions-list scrollable">
+                                {exitedPositions.map((pos, i) => (
+                                    <div key={i} className="exited-position-item">
+                                        <div className="exited-position-info">
+                                            <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>
+                                            <span className="exited-position-fund">{pos.fund_name}</span>
+                                        </div>
+                                        <div className="exited-position-stats">
+                                            <span className="exited-position-value">{formatCurrency(pos.value)}</span>
+                                            <span className="exited-position-weight">-{pos.weight.toFixed(1)}%</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
                 </div>
             </div>
         </div>
