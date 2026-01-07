@@ -235,7 +235,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 100, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">Tracked Funds</div>
                                 {sortedFundsByAUM.map((fund, i) => (
-                                    <span key={i} className="fund-line">{fund.name}</span>
+                                    <div key={i} className="tooltip-fund-row two-col">
+                                        <span className="fund-name">{fund.name}</span>
+                                        <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
+                                    </div>
                                 ))}
                             </div>
                         )}

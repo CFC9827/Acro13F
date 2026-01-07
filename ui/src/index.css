@@ -2524,6 +2524,10 @@ body {
   border-bottom: 1px solid rgba(51, 65, 85, 0.3);
 }
 
+.kpi-tooltip .tooltip-fund-row.two-col {
+  grid-template-columns: 1fr 100px;
+}
+
 .kpi-tooltip .tooltip-fund-row:last-child {
   border-bottom: none;
 }
