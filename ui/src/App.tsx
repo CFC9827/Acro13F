@@ -582,6 +582,7 @@ function App() {
                                     setSelectedCik(cik);
                                     setView('table');
                                 }}
+                                allFunds={funds}
                             />
                         ) : selectedCik && view !== 'about' ? (
                             <div className="holdings-view">

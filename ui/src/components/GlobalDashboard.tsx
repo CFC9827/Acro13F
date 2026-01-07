@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -118,9 +118,16 @@ interface DashboardSummary {
     ticker_fund_activity?: TickerFundActivity;
 }
 
+interface Group {
+    id: number;
+    name: string;
+    member_ciks: string[];
+}
+
 interface GlobalDashboardProps {
     summary: DashboardSummary;
     onSelectFund: (cik: string) => void;
+    allFunds: { cik: string; name: string }[];
 }
 
 const formatCurrency = (value: number): string => {
@@ -149,7 +156,7 @@ const COLORS = [
     '#22d3ee', // Cyan 400
 ];
 
-const PerformanceComparisonChart: React.FC = () => {
+const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ groupId }) => {
     const [data, setData] = useState<{ chart_data: any[], funds: string[] } | null>(null);
     const [loading, setLoading] = useState(true);
     const [showBenchmark, setShowBenchmark] = useState(true);
@@ -175,8 +182,12 @@ const PerformanceComparisonChart: React.FC = () => {
 
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
             try {
-                const res = await fetch('/api/dashboard/performance');
+                const url = groupId
+                    ? `/api/dashboard/performance?group_id=${groupId}`
+                    : '/api/dashboard/performance';
+                const res = await fetch(url);
                 const result = await res.json();
                 setData(result);
                 if (result.funds) setSelectedFunds(result.funds);
@@ -193,7 +204,7 @@ const PerformanceComparisonChart: React.FC = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [groupId]);
 
     const fetchBenchmark = async (start: string, end: string) => {
         try {
@@ -521,13 +532,20 @@ const PerformanceComparisonChart: React.FC = () => {
 
 type MoversMode = 'dollar' | 'percent' | 'funds';
 
-export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSelectFund }) => {
+export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initialSummary, onSelectFund, allFunds }) => {
+    const [summary, setSummary] = useState<DashboardSummary>(initialSummary);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+    const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
     const [moversMode, setMoversMode] = useState<MoversMode>('dollar');
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
     const [newPosSort, setNewPosSort] = useState<'value' | 'weight'>('value');
     const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
+
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
     const aumChangePercent = kpis && kpis.prior_aum > 0 ? ((aumChange / kpis.prior_aum) * 100).toFixed(1) : '0';
@@ -600,6 +618,85 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
         }
     };
 
+    const fetchGroups = async () => {
+        try {
+            const res = await fetch('/api/dashboard/groups');
+            const data = await res.json();
+            setGroups(data);
+        } catch (err) {
+            console.error("Failed to fetch groups", err);
+        }
+    };
+
+    const fetchFilteredSummary = async (groupId: number | null) => {
+        setLoading(true);
+        try {
+            const url = groupId ? `/api/dashboard/summary?group_id=${groupId}` : '/api/dashboard/summary';
+            const res = await fetch(url);
+            const data = await res.json();
+            setSummary(data);
+        } catch (err) {
+            console.error("Failed to fetch filtered summary", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchGroups();
+    }, []);
+
+    useEffect(() => {
+        if (selectedGroupId !== null) {
+            fetchFilteredSummary(selectedGroupId);
+        }
+    }, [selectedGroupId]);
+
+    // Keep summary in sync with prop when no group selected
+    useEffect(() => {
+        if (selectedGroupId === null) {
+            setSummary(initialSummary);
+        }
+    }, [initialSummary, selectedGroupId]);
+
+    const handleCreateGroup = async () => {
+        if (!newGroupName.trim()) return;
+        try {
+            const res = await fetch('/api/dashboard/groups?name=' + encodeURIComponent(newGroupName), { method: 'POST' });
+            if (res.ok) {
+                setNewGroupName('');
+                fetchGroups();
+            }
+        } catch (err) {
+            console.error("Failed to create group", err);
+        }
+    };
+
+    const handleDeleteGroup = async (id: number) => {
+        if (window.confirm('Delete this group?')) {
+            try {
+                await fetch(`/api/dashboard/groups/${id}`, { method: 'DELETE' });
+                if (selectedGroupId === id) setSelectedGroupId(null);
+                fetchGroups();
+            } catch (err) {
+                console.error("Failed to delete group", err);
+            }
+        }
+    };
+
+    const toggleGroupMember = async (groupId: number, cik: string, isMember: boolean) => {
+        try {
+            const method = isMember ? 'DELETE' : 'POST';
+            const url = isMember
+                ? `/api/dashboard/groups/${groupId}/members/${cik}`
+                : `/api/dashboard/groups/${groupId}/members?cik=${cik}`;
+            await fetch(url, { method });
+            fetchGroups();
+        } catch (err) {
+            console.error("Failed to toggle group member", err);
+        }
+    };
+
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
@@ -619,6 +716,108 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         </p>
                     )
                 )}
+            </div>
+
+            {/* Group Selector Bar */}
+            <div className="group-selector-bar" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '20px',
+                padding: '6px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.05)',
+                overflowX: 'auto'
+            }}>
+                <button
+                    className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
+                    onClick={() => setSelectedGroupId(null)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: selectedGroupId === null ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                        color: selectedGroupId === null ? '#38bdf8' : '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <LayoutGrid size={14} />
+                    <span>All Funds</span>
+                </button>
+
+                {groups.map(g => {
+                    const isEmpty = g.member_ciks.length === 0;
+                    return (
+                        <button
+                            key={g.id}
+                            className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
+                            onClick={() => {
+                                if (isEmpty) {
+                                    setIsGroupModalOpen(true); // Open modal instead of selecting empty group
+                                } else {
+                                    setSelectedGroupId(g.id);
+                                }
+                            }}
+                            title={isEmpty ? 'Add funds to this group first' : `View ${g.name}`}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
+                                background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
+                                    isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                color: isEmpty ? '#ef4444' :
+                                    selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            <Folder size={14} />
+                            <span>{g.name}</span>
+                            <span style={{
+                                background: isEmpty ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                color: isEmpty ? '#ef4444' : undefined
+                            }}>{isEmpty ? '⚠️ 0' : g.member_ciks.length}</span>
+                        </button>
+                    );
+                })}
+
+                <button
+                    className="group-pill manage-btn"
+                    onClick={() => setIsGroupModalOpen(true)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255,255,255,0.1)',
+                        background: 'transparent',
+                        color: '#64748b',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        marginLeft: 'auto',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <FolderPlus size={14} />
+                    <span>Manage Groups</span>
+                </button>
             </div>
 
             {/* KPI Tiles */}
@@ -866,7 +1065,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         </div>
                     </section>
 
-                    <PerformanceComparisonChart />
+                    <PerformanceComparisonChart groupId={selectedGroupId} />
                 </div>
 
                 {/* Right Column: Movers, Shifts, Crowding, New Positions */}
@@ -1140,6 +1339,69 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
 
                 </div>
             </div>
+            {/* Group Management Modal */}
+            {isGroupModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsGroupModalOpen(false)}>
+                    <div className="modal-content group-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div>
+                                <h2>Manage Fund Groups</h2>
+                                <p>Group funds into folders for aggregated analysis</p>
+                            </div>
+                            <button className="close-btn" onClick={() => setIsGroupModalOpen(false)}>&times;</button>
+                        </div>
+
+                        <div className="modal-body">
+                            <div className="create-group-section">
+                                <input
+                                    type="text"
+                                    placeholder="New group name..."
+                                    value={newGroupName}
+                                    onChange={e => setNewGroupName(e.target.value)}
+                                    onKeyPress={e => e.key === 'Enter' && handleCreateGroup()}
+                                />
+                                <button className="add-group-btn" onClick={handleCreateGroup}>
+                                    <PlusCircle size={18} />
+                                    <span>Create Group</span>
+                                </button>
+                            </div>
+
+                            <div className="groups-list">
+                                {groups.map(group => (
+                                    <div key={group.id} className="group-item-config">
+                                        <div className="group-header-row">
+                                            <div className="group-title-info">
+                                                <Folder size={18} color="#38bdf8" />
+                                                <h3>{group.name}</h3>
+                                                <span className="member-count">{group.member_ciks.length} funds</span>
+                                            </div>
+                                            <button className="delete-group-icon" onClick={() => handleDeleteGroup(group.id)}>
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+
+                                        <div className="group-member-grid">
+                                            {allFunds.map(fund => {
+                                                const isMember = group.member_ciks.includes(fund.cik);
+                                                return (
+                                                    <div
+                                                        key={fund.cik}
+                                                        className={`fund-chip ${isMember ? 'active' : ''}`}
+                                                        onClick={() => toggleGroupMember(group.id, fund.cik, isMember)}
+                                                    >
+                                                        <span className="chip-name">{fund.name}</span>
+                                                        {isMember ? <MinusCircle size={12} /> : <PlusCircle size={12} />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

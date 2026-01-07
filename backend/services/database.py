@@ -110,6 +110,25 @@ class DatabaseManager:
                     UNIQUE(ticker, date)
                 )
             """)
+
+            # Fund groups
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_groups (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE
+                )
+            """)
+
+            # Group members
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_group_members (
+                    group_id INTEGER,
+                    cik TEXT,
+                    PRIMARY KEY (group_id, cik),
+                    FOREIGN KEY (group_id) REFERENCES fund_groups (id) ON DELETE CASCADE,
+                    FOREIGN KEY (cik) REFERENCES funds (cik) ON DELETE CASCADE
+                )
+            """)
             conn.commit()
 
     def save_fund(self, cik: str, name: str):
@@ -217,27 +236,69 @@ class DatabaseManager:
             conn.commit()
 
     def get_historical_holdings(self, cik: str) -> List[Dict]:
+        """
+        Get merged historical holdings for a fund.
+        
+        SEC amendments (13F-HR/A) only contain securities that need updating,
+        not the full portfolio. So we MERGE holdings across all filings per period:
+        - For each CUSIP, use the value from the MOST RECENT filing containing it
+        - This correctly applies amendment "patches" to the original filing
+        """
         cik = self.normalize_cik(cik)
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            # Get all holdings for this fund, joined with filing metadata for time/period
-            # Get all holdings for this fund, joined with filing metadata for time/period
-            # Also calculate percentage of portfolio for each holding dynamically
+            
+            # Get all holdings with filing metadata, ordered by filing_date
             cursor.execute("""
-                SELECT h.*, f.period_of_report, f.filing_date, f.cik,
-                       (h.value * 100.0 / total_vals.total_value) as percent_portfolio
+                SELECT h.*, f.period_of_report, f.filing_date, f.cik, f.accession_number as filing_accession
                 FROM holdings h
                 JOIN filings f ON h.accession_number = f.accession_number
-                JOIN (
-                    SELECT accession_number, SUM(value) as total_value
-                    FROM holdings
-                    GROUP BY accession_number
-                ) total_vals ON h.accession_number = total_vals.accession_number
                 WHERE f.cik = ?
-                ORDER BY f.period_of_report ASC
+                ORDER BY f.period_of_report ASC, f.filing_date ASC
             """, (cik,))
-            return [dict(row) for row in cursor.fetchall()]
+            all_holdings = [dict(row) for row in cursor.fetchall()]
+            
+            # Check which periods have amendments (multiple filings)
+            cursor.execute("""
+                SELECT period_of_report, COUNT(*) as filing_count
+                FROM filings WHERE cik = ?
+                GROUP BY period_of_report
+                HAVING filing_count > 1
+            """, (cik,))
+            amended_periods = {row[0] for row in cursor.fetchall()}
+            
+            # Merge holdings per period: for each CUSIP, keep only the latest filing's version
+            # Key: (period, cusip, put_call) -> holding data from most recent filing
+            merged = {}
+            for h in all_holdings:
+                period = h['period_of_report']
+                # Use cusip + put_call as key to distinguish stock vs options
+                key = (period, h['cusip'], h.get('put_call'))
+                
+                # Since we ordered by filing_date ASC, later entries overwrite earlier ones
+                # This means amendments (later filings) correctly override original values
+                merged[key] = h
+                
+                # Add amendment flag
+                merged[key]['has_amendment'] = period in amended_periods
+            
+            # Convert back to list, sorted by period
+            result = list(merged.values())
+            result.sort(key=lambda x: x['period_of_report'])
+            
+            # Recalculate percent_portfolio after merging
+            # Group by period and calculate totals
+            period_totals = {}
+            for h in result:
+                p = h['period_of_report']
+                period_totals[p] = period_totals.get(p, 0) + h['value']
+            
+            for h in result:
+                total = period_totals.get(h['period_of_report'], 1)
+                h['percent_portfolio'] = (h['value'] * 100.0 / total) if total > 0 else 0
+            
+            return result
 
     def get_filing_range(self, cik: str) -> Dict:
         cik = self.normalize_cik(cik)
@@ -266,9 +327,59 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
             """, data)
 
-    def get_dashboard_summary(self) -> Dict:
-        """Returns aggregated data across all funds for the global dashboard."""
-        all_funds = self.get_funds()
+    # --- Fund Grouping Methods ---
+
+    def create_group(self, name: str) -> int:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO fund_groups (name) VALUES (?)", (name,))
+            conn.commit()
+            return cursor.lastrowid
+
+    def delete_group(self, group_id: int):
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM fund_groups WHERE id = ?", (group_id,))
+            conn.commit()
+
+    def get_groups(self) -> List[Dict]:
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM fund_groups ORDER BY name")
+            groups = [dict(row) for row in cursor.fetchall()]
+            
+            for g in groups:
+                cursor.execute("SELECT cik FROM fund_group_members WHERE group_id = ?", (g['id'],))
+                g['member_ciks'] = [r[0] for r in cursor.fetchall()]
+            return groups
+
+    def add_fund_to_group(self, group_id: int, cik: str):
+        cik = self.normalize_cik(cik)
+        with self._get_connection() as conn:
+            conn.execute("INSERT OR IGNORE INTO fund_group_members (group_id, cik) VALUES (?, ?)", (group_id, cik))
+            conn.commit()
+
+    def remove_fund_from_group(self, group_id: int, cik: str):
+        cik = self.normalize_cik(cik)
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM fund_group_members WHERE group_id = ? AND cik = ?", (group_id, cik))
+            conn.commit()
+
+    def get_dashboard_summary(self, group_id: int = None) -> Dict:
+        """Returns aggregated data across all funds (or group) for the global dashboard."""
+        if group_id:
+            all_funds = []
+            with self._get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT f.* FROM funds f
+                    JOIN fund_group_members m ON f.cik = m.cik
+                    WHERE m.group_id = ?
+                """, (group_id,))
+                all_funds = [dict(row) for row in cursor.fetchall()]
+        else:
+            all_funds = self.get_funds()
         summary = {
             "fund_highlights": [],
             "big_movers": [], # Top absolute value changes
@@ -308,11 +419,18 @@ class DatabaseManager:
 
             for fund in all_funds:
                 cik = fund['cik']
-                # Get latest 2 filings
+                # Get latest 2 DISTINCT periods, using most recent filing for each
+                # (amendments have same period_of_report but later filing_date)
                 cursor.execute("""
-                    SELECT accession_number, period_of_report 
-                    FROM filings WHERE cik = ? 
-                    ORDER BY period_of_report DESC LIMIT 2
+                    SELECT accession_number, period_of_report, filing_date
+                    FROM (
+                        SELECT accession_number, period_of_report, filing_date,
+                               ROW_NUMBER() OVER (PARTITION BY period_of_report ORDER BY filing_date DESC) as rn
+                        FROM filings WHERE cik = ?
+                    )
+                    WHERE rn = 1
+                    ORDER BY period_of_report DESC
+                    LIMIT 2
                 """, (cik,))
                 filings = cursor.fetchall()
                 if not filings: continue
@@ -573,9 +691,21 @@ class DatabaseManager:
             summary["periods_aligned"] = len(all_latest_periods) <= 1
 
         return summary
-    def get_all_funds_performance(self) -> Dict:
-        """Calculates TWR performance for all funds over time for comparison."""
-        all_funds = self.get_funds()
+    def get_all_funds_performance(self, group_id: int = None) -> Dict:
+        """Calculates TWR performance for all funds (or group) over time for comparison."""
+        if group_id:
+            all_funds = []
+            with self._get_connection() as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT f.* FROM funds f
+                    JOIN fund_group_members m ON f.cik = m.cik
+                    WHERE m.group_id = ?
+                """, (group_id,))
+                all_funds = [dict(row) for row in cursor.fetchall()]
+        else:
+            all_funds = self.get_funds()
         performance_data = {} # cik -> data
         all_periods = set()
 

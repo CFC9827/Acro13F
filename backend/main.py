@@ -29,17 +29,56 @@ async def get_funds():
     return db.get_funds()
 
 @app.get("/dashboard/summary")
-async def get_dashboard_summary():
+async def get_dashboard_summary(group_id: int = None):
     try:
-        summary = db.get_dashboard_summary()
+        summary = db.get_dashboard_summary(group_id=group_id)
         return summary
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/dashboard/performance")
-async def get_dashboard_performance():
+async def get_dashboard_performance(group_id: int = None):
     try:
-        return db.get_all_funds_performance()
+        return db.get_all_funds_performance(group_id=group_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/dashboard/groups")
+async def get_groups():
+    try:
+        return db.get_groups()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/dashboard/groups")
+async def create_group(name: str):
+    try:
+        group_id = db.create_group(name)
+        return {"status": "success", "group_id": group_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/dashboard/groups/{id}")
+async def delete_group(id: int):
+    try:
+        db.delete_group(id)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/dashboard/groups/{id}/members")
+async def add_group_member(id: int, cik: str):
+    try:
+        db.add_fund_to_group(id, cik)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/dashboard/groups/{id}/members/{cik}")
+async def remove_group_member(id: int, cik: str):
+    try:
+        db.remove_fund_from_group(id, cik)
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

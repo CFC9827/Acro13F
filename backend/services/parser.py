@@ -63,23 +63,41 @@ class InfTableParser:
             })
 
         # Heuristic: Determine if values are in thousands or dollars
+        # SEC standard varies - some filings report in thousands, others in full dollars
+        # The form header indicates "(to the nearest dollar)" for full dollars or "(in thousands)" for thousands
         scale_by_1000 = True
         test_samples = [h for h in raw_holdings if h['shares'] > 100 and h['raw_value'] > 0]
         
-        if test_samples:
+        if len(test_samples) >= 3:
+            # With enough samples, use the expensive-price heuristic
             too_expensive_count = 0
-            # Check up to 50 samples
             for h in test_samples[:50]:
                 price_if_scaled = (h['raw_value'] * 1000) / h['shares']
-                # If avg price > $5,000/share, it's very likely already in dollars
                 if price_if_scaled > 5000:
                     too_expensive_count += 1
             
             if too_expensive_count / len(test_samples[:50]) > 0.3:
                 scale_by_1000 = False
-                logging.info(f"Scaling heuristic detected FULL DOLLARS (scale_by_1000=False).")
+                logging.info(f"Scaling heuristic detected FULL DOLLARS (scale_by_1000=False). Samples: {len(test_samples)}")
             else:
-                logging.info(f"Scaling heuristic detected THOUSANDS (scale_by_1000=True).")
+                logging.info(f"Scaling heuristic detected THOUSANDS (scale_by_1000=True). Samples: {len(test_samples)}")
+        else:
+            # Few samples (amendments) - check if raw values give reasonable prices
+            # Most stocks trade between $0.10 and $10,000/share
+            reasonable_without_scaling = True
+            for h in test_samples:
+                price_unscaled = h['raw_value'] / h['shares']
+                if price_unscaled < 0.10 or price_unscaled > 50000:
+                    reasonable_without_scaling = False
+                    break
+            
+            if test_samples and reasonable_without_scaling:
+                # Prices look reasonable without scaling - values are already in dollars
+                scale_by_1000 = False
+                logging.info(f"Few samples ({len(test_samples)}), prices look reasonable unscaled - using FULL DOLLARS")
+            else:
+                # Prices too low without scaling - need to multiply by 1000
+                logging.info(f"Few samples ({len(test_samples)}), defaulting to THOUSANDS")
             
         holdings = []
         for h in raw_holdings:
@@ -88,6 +106,15 @@ class InfTableParser:
             final_h['value'] = h['raw_value'] * 1000 if scale_by_1000 else h['raw_value']
             del final_h['raw_value']
             holdings.append(final_h)
+        
+        # Post-parse validation: check for anomalous prices
+        for h in holdings:
+            if h['shares'] > 0:
+                implied_price = h['value'] / h['shares']
+                if implied_price > 50000:
+                    logging.warning(f"ANOMALY DETECTED: {h['issuer_name']} has implied price ${implied_price:.2f}/share (value=${h['value']:,}, shares={h['shares']:,})")
+                elif implied_price < 0.01:
+                    logging.warning(f"ANOMALY DETECTED: {h['issuer_name']} has very low implied price ${implied_price:.4f}/share")
             
         return holdings
 

@@ -25,6 +25,7 @@ export interface HistoricalHolding {
     cik?: string;
     percent_portfolio?: number;
     put_call?: string;
+    has_amendment?: boolean;  // True if this period includes amendments (13F-HR/A)
 }
 
 interface PortfolioChartProps {

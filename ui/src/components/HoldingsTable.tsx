@@ -1107,7 +1107,17 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
         return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
     }, [history]);
 
+    // Track which quarters have amendments (13F-HR/A filings)
+    const amendedQuarters = useMemo(() => {
+        const amended = new Set<string>();
+        history.forEach(h => {
+            if (h.has_amendment) amended.add(h.period_of_report);
+        });
+        return amended;
+    }, [history]);
+
     const currentQuarterDate = sortedQuarters[quarterIndex] || '';
+    const currentQuarterHasAmendment = amendedQuarters.has(currentQuarterDate);
 
     // 2. Filter data for the selected quarter
     const currentQuarterData = useMemo(() => {
@@ -1525,8 +1535,28 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
         };
     }, [expandedTicker, history, quarterTotals, currentQuarterDate]);
 
-    const currentQuarterHolding = history.find(item => item.period_of_report === currentQuarterDate);
-    const globalEdgarUrl = currentQuarterHolding ? getEdgarUrl(currentQuarterHolding.cik, currentQuarterHolding.accession_number) : undefined;
+    // Identify all unique filings for the current quarter
+    const quarterFilings = useMemo(() => {
+        if (!currentQuarterData.length) return [];
+
+        const unique = new Map<string, string>(); // accession -> cik
+        currentQuarterData.forEach(h => {
+            if (h.accession_number && h.cik) {
+                unique.set(h.accession_number, h.cik);
+            }
+        });
+
+        // Sort accession numbers descending (approx. latest first)
+        const sortedAccessions = Array.from(unique.keys()).sort().reverse();
+
+        return sortedAccessions.map((acc, index) => ({
+            accession: acc,
+            cik: unique.get(acc),
+            url: getEdgarUrl(unique.get(acc), acc),
+            label: index === 0 && sortedAccessions.length > 1 ? '13F AMENDMENT' : '13F FILING',
+            isAmendment: index === 0 && sortedAccessions.length > 1
+        }));
+    }, [currentQuarterData]);
 
     const paginatedData = processedData.slice(
         (currentPage - 1) * itemsPerPage,
@@ -1602,41 +1632,43 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
 
                 <div className="table-actions-right">
                     {/* Quarter Navigation */}
-                    {globalEdgarUrl && (
+                    {/* Quarter Navigation */}
+                    {quarterFilings.map((filing) => (
                         <a
-                            href={globalEdgarUrl}
+                            key={filing.accession}
+                            href={filing.url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="view-13f-link"
-                            title="View SEC 13F Filing"
+                            title={`View SEC ${filing.label}`}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
                                 fontSize: '11px',
-                                color: '#38bdf8',
+                                color: filing.isAmendment ? '#fb923c' : '#38bdf8',
                                 textDecoration: 'none',
                                 padding: '4px 8px',
-                                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                                backgroundColor: filing.isAmendment ? 'rgba(251, 146, 60, 0.1)' : 'rgba(56, 189, 248, 0.1)',
                                 borderRadius: '4px',
                                 marginRight: '12px',
                                 fontWeight: 600,
-                                border: '1px solid rgba(56, 189, 248, 0.2)',
+                                border: `1px solid ${filing.isAmendment ? 'rgba(251, 146, 60, 0.2)' : 'rgba(56, 189, 248, 0.2)'}`,
                                 transition: 'all 0.2s'
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.2)';
-                                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.4)';
+                                e.currentTarget.style.backgroundColor = filing.isAmendment ? 'rgba(251, 146, 60, 0.2)' : 'rgba(56, 189, 248, 0.2)';
+                                e.currentTarget.style.borderColor = filing.isAmendment ? 'rgba(251, 146, 60, 0.4)' : 'rgba(56, 189, 248, 0.4)';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
-                                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.2)';
+                                e.currentTarget.style.backgroundColor = filing.isAmendment ? 'rgba(251, 146, 60, 0.1)' : 'rgba(56, 189, 248, 0.1)';
+                                e.currentTarget.style.borderColor = filing.isAmendment ? 'rgba(251, 146, 60, 0.2)' : 'rgba(56, 189, 248, 0.2)';
                             }}
                         >
                             <ExternalLink size={12} />
-                            13F FILING
+                            {filing.label}
                         </a>
-                    )}
+                    ))}
                     <div className="quarter-nav-controls" style={{ position: 'relative' }}>
                         <button
                             className="quarter-nav-btn"
@@ -1651,6 +1683,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                             style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                         >
                             {formatQuarterLabel(currentQuarterDate)}
+
                             <ChevronDown size={14} style={{ opacity: 0.6 }} />
                         </span>
 
@@ -1701,7 +1734,12 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                             }
                                         }}
                                     >
-                                        {formatQuarterLabel(q)}
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {formatQuarterLabel(q)}
+                                            {amendedQuarters.has(q) && (
+                                                <span style={{ fontSize: '9px', fontWeight: 700, color: '#fb923c' }}>A</span>
+                                            )}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -2221,14 +2259,46 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                     <td className="py-2 px-2 font-mono text-slate-400 whitespace-nowrap text-xs">
                                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                                             {isLatestPast ? (
-                                                                                                <span style={{ color: '#a855f7', fontWeight: 800 }}>
+                                                                                                <span style={{ color: '#a855f7', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                                                     {formatQuarterLabel(item.period_of_report)} NOW
+                                                                                                    {(item as any).has_amendment && (
+                                                                                                        <span
+                                                                                                            title="Amended Filing (13F-HR/A)"
+                                                                                                            style={{
+                                                                                                                fontSize: '8px',
+                                                                                                                fontWeight: 700,
+                                                                                                                color: '#fb923c',
+                                                                                                                backgroundColor: 'rgba(251, 146, 60, 0.15)',
+                                                                                                                padding: '1px 3px',
+                                                                                                                borderRadius: '2px',
+                                                                                                                border: '1px solid rgba(251, 146, 60, 0.3)',
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            A
+                                                                                                        </span>
+                                                                                                    )}
                                                                                                 </span>
                                                                                             ) : (
-                                                                                                <>
+                                                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                                                     {formatQuarterLabel(item.period_of_report)}
-                                                                                                    {isFuture && <span className="text-[8px] text-yellow-500 font-bold"> FUT</span>}
-                                                                                                </>
+                                                                                                    {(item as any).has_amendment && (
+                                                                                                        <span
+                                                                                                            title="Amended Filing (13F-HR/A)"
+                                                                                                            style={{
+                                                                                                                fontSize: '8px',
+                                                                                                                fontWeight: 700,
+                                                                                                                color: '#fb923c',
+                                                                                                                backgroundColor: 'rgba(251, 146, 60, 0.15)',
+                                                                                                                padding: '1px 3px',
+                                                                                                                borderRadius: '2px',
+                                                                                                                border: '1px solid rgba(251, 146, 60, 0.3)',
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            A
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                    {isFuture && <span className="text-[8px] text-yellow-500 font-bold ml-1"> FUT</span>}
+                                                                                                </span>
                                                                                             )}
                                                                                             {getEdgarUrl(item.cik, item.accession_number) && (
                                                                                                 <a
