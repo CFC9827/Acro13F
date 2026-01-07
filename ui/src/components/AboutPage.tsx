@@ -57,6 +57,34 @@ export const AboutPage: React.FC = () => {
                 </div>
 
                 <div style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '24px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#3b82f6' }}>
+                        <TrendingUp size={20} />
+                        Time-Weighted Return (TWR)
+                    </h2>
+                    <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '16px' }}>
+                        Used in the Global Comparison Chart. TWR eliminates the distorting effects on growth rates created by cash inflows and outflows, isolating the true investment performance of the manager.
+                    </p>
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', color: '#94a3b8' }}>1. Estimate Net Flow:</div>
+                        <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '8px', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace', color: '#cbd5e1' }}>
+                            Net Flow = Σ [(Shares_t - Shares_prev) × Price_t]
+                        </div>
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', color: '#94a3b8' }}>2. Calculate Period Return:</div>
+                        <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '8px', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace', color: '#cbd5e1' }}>
+                            R_period = (Total Value_t - Net Flow) / Total Value_prev - 1
+                        </div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', color: '#94a3b8' }}>3. Compound Cumulative Return:</div>
+                        <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '8px', borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace', color: '#cbd5e1' }}>
+                            Cumulative = [(1 + R1) × (1 + R2) × ... × (1 + Rn)] - 1
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '24px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#94a3b8' }}>
                         <BarChart3 size={20} />
                         Cap. Allocation (Net Spend)

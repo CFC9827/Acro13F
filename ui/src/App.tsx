@@ -386,22 +386,15 @@ function App() {
                 <header className="app-header">
                     <div className="logo">
                         <TrendingUp size={24} />
-                        <span>Abrams13F</span>
+                        <span style={{
+                            marginLeft: '8px',
+                            fontSize: '1.2rem',
+                            fontWeight: 700,
+                            color: '#f8fafc',
+                            letterSpacing: '-0.02em'
+                        }}>Abrams13F</span>
                     </div>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{
-                            fontSize: '0.8rem',
-                            fontWeight: 800,
-                            color: '#38bdf8',
-                            letterSpacing: '0.1em',
-                            padding: '4px 8px',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            borderRadius: '4px',
-                            background: 'rgba(56, 189, 248, 0.1)',
-                            marginRight: '8px'
-                        }}>
-                            ABRAMS13F
-                        </div>
                         <button
                             onClick={handleGlobalRefresh}
                             disabled={loading}

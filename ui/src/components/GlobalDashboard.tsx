@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -154,8 +154,24 @@ const PerformanceComparisonChart: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [showBenchmark, setShowBenchmark] = useState(true);
     const [benchmarkData, setBenchmarkData] = useState<any[]>([]);
-    const [timeRange, setTimeRange] = useState<'1Y' | '2Y' | '3Y' | '5Y' | 'MAX'>('MAX');
+    const [timeRange, setTimeRange] = useState<'2Q' | 'YTD' | '1Y' | '3Y' | '5Y' | '10Y' | 'CUSTOM' | 'MAX'>('1Y');
     const [selectedFunds, setSelectedFunds] = useState<string[]>([]);
+    const [customStart, setCustomStart] = useState<string>('');
+    const [customEnd, setCustomEnd] = useState<string>('');
+    const [showStartDropdown, setShowStartDropdown] = useState(false);
+    const [showEndDropdown, setShowEndDropdown] = useState(false);
+
+    const availableQuarters = useMemo(() => {
+        if (!data?.chart_data) return [];
+        return data.chart_data.map(d => d.period).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    }, [data]);
+
+    useEffect(() => {
+        if (availableQuarters.length > 0 && (!customStart || !customEnd)) {
+            setCustomStart(availableQuarters[Math.min(availableQuarters.length - 1, 4)]); // Default to last 4-5 quarters
+            setCustomEnd(availableQuarters[0]);
+        }
+    }, [availableQuarters, customStart, customEnd]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -193,31 +209,64 @@ const PerformanceComparisonChart: React.FC = () => {
         if (!data || !data.chart_data) return [];
 
         let filtered = [...data.chart_data];
-        if (timeRange !== 'MAX') {
-            const now = new Date();
-            let startLimit = new Date();
-            if (timeRange === '1Y') startLimit.setFullYear(now.getFullYear() - 1);
-            else if (timeRange === '2Y') startLimit.setFullYear(now.getFullYear() - 2);
-            else if (timeRange === '3Y') startLimit.setFullYear(now.getFullYear() - 3);
-            else if (timeRange === '5Y') startLimit.setFullYear(now.getFullYear() - 5);
+        const latestDateInAll = new Date(filtered[filtered.length - 1].period);
 
-            filtered = filtered.filter(d => new Date(d.period) >= startLimit);
+        if (timeRange !== 'MAX') {
+            if (timeRange === 'CUSTOM' && customStart && customEnd) {
+                const startDate = new Date(customStart);
+                const endDate = new Date(customEnd);
+                filtered = filtered.filter(d => {
+                    const dDate = new Date(d.period);
+                    return dDate >= startDate && dDate <= endDate;
+                });
+            } else {
+                let startLimit = new Date(latestDateInAll);
+                if (timeRange === '2Q') {
+                    startLimit.setMonth(latestDateInAll.getMonth() - 4);
+                } else if (timeRange === 'YTD') {
+                    startLimit = new Date(latestDateInAll.getFullYear(), 0, 1);
+                } else if (timeRange === '1Y') {
+                    startLimit.setFullYear(latestDateInAll.getFullYear() - 1);
+                    startLimit.setDate(startLimit.getDate() + 1);
+                } else if (timeRange === '3Y') {
+                    startLimit.setFullYear(latestDateInAll.getFullYear() - 3);
+                    startLimit.setDate(startLimit.getDate() + 1);
+                } else if (timeRange === '5Y') {
+                    startLimit.setFullYear(latestDateInAll.getFullYear() - 5);
+                    startLimit.setDate(startLimit.getDate() + 1);
+                } else if (timeRange === '10Y') {
+                    startLimit.setFullYear(latestDateInAll.getFullYear() - 10);
+                    startLimit.setDate(startLimit.getDate() + 1);
+                }
+                filtered = filtered.filter(d => new Date(d.period) >= startLimit);
+            }
         }
 
         if (filtered.length === 0) return [];
 
         const baseValues: { [key: string]: number } = {};
         data.funds.forEach(fund => {
-            baseValues[fund] = filtered[0][fund] ?? 0;
+            const idxInAll = data.chart_data.findIndex(d => d.period === filtered[0].period);
+            let val = filtered[0][fund];
+            if (val === null || val === undefined) {
+                // Search backwards in data.chart_data for the last known value
+                for (let i = idxInAll - 1; i >= 0; i--) {
+                    if (data.chart_data[i][fund] !== null && data.chart_data[i][fund] !== undefined) {
+                        val = data.chart_data[i][fund];
+                        break;
+                    }
+                }
+            }
+            baseValues[fund] = val ?? 0;
         });
 
-        let benchBase = 0;
+        let benchBase = 1;
         if (showBenchmark && benchmarkData.length > 0) {
             const firstDate = new Date(filtered[0].period).getTime();
             const closest = benchmarkData.reduce((prev, curr) => {
                 return Math.abs(new Date(curr.date).getTime() - firstDate) < Math.abs(new Date(prev.date).getTime() - firstDate) ? curr : prev;
             });
-            benchBase = closest.value;
+            benchBase = closest.value || 1;
         }
 
         return filtered.map(d => {
@@ -239,7 +288,7 @@ const PerformanceComparisonChart: React.FC = () => {
             }
             return row;
         });
-    }, [data, benchmarkData, showBenchmark, timeRange]);
+    }, [data, benchmarkData, showBenchmark, timeRange, customStart, customEnd]);
 
     const toggleFund = (fund: string) => {
         setSelectedFunds(prev =>
@@ -256,42 +305,117 @@ const PerformanceComparisonChart: React.FC = () => {
     if (!data || data.chart_data.length === 0) return null;
 
     return (
-        <section className="dashboard-section performance-section" style={{ marginTop: '20px' }}>
-            <div className="section-header">
-                <div className="section-icon-box" style={{ color: '#38bdf8' }}>
+        <section className="dashboard-section performance-section" style={{ marginTop: '20px', padding: '16px' }}>
+            <div className="section-header" style={{ marginBottom: timeRange === 'CUSTOM' ? '2px' : '8px', gap: '12px' }}>
+                <div className="section-icon-box" style={{ color: '#38bdf8', minWidth: '40px' }}>
                     <LineIcon size={20} />
                 </div>
-                <div style={{ flexGrow: 1 }}>
-                    <h3 className="section-title">Performance Comparison</h3>
-                    <p className="section-desc">Cumulative TWR across portfolios (Indexed to 0%)</p>
+                <div style={{ flexGrow: 1, minWidth: 0 }}>
+                    <h3 className="section-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '1.1rem' }}>Performance Comparison</h3>
+                    <p className="section-desc" style={{ fontSize: '0.85rem' }}>Cumulative TWR across portfolios (Indexed to 0%)</p>
                 </div>
-                <div className="header-controls" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div className="time-controls-group" style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        {(['1Y', '2Y', '3Y', '5Y', 'MAX'] as const).map(range => (
+                <div className="header-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="time-controls-group" style={{ display: 'flex', gap: '2px', background: 'rgba(255,255,255,0.03)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        {(['2Q', 'YTD', '1Y', '3Y', '5Y', '10Y', 'MAX', 'CUSTOM'] as const).map(range => (
                             <button
                                 key={range}
                                 className={`control-btn-mini ${timeRange === range ? 'active' : ''}`}
                                 onClick={() => setTimeRange(range)}
+                                style={{ padding: '4px 8px', fontSize: '10px' }}
                             >
                                 {range}
                             </button>
                         ))}
                     </div>
 
-                    <div className="toggle-group">
-                        <button
-                            className={`toggle-btn ${showBenchmark ? 'active' : ''}`}
-                            onClick={() => setShowBenchmark(!showBenchmark)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '32px' }}
-                        >
-                            <Activity size={14} />
-                            S&P 500
-                        </button>
-                    </div>
+                    <button
+                        className={`control-btn-mini ${showBenchmark ? 'active' : ''}`}
+                        onClick={() => setShowBenchmark(!showBenchmark)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: showBenchmark ? '#6366f1' : '#94a3b8',
+                            borderColor: showBenchmark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255,255,255,0.05)',
+                            background: showBenchmark ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                            borderRadius: '20px',
+                            padding: '4px 12px',
+                            whiteSpace: 'nowrap',
+                            minWidth: 'auto'
+                        }}
+                    >
+                        <Activity size={14} />
+                        <span style={{ fontSize: '10px', fontWeight: 600 }}>S&P 500</span>
+                    </button>
                 </div>
             </div>
 
-            <div className="comparison-chart-container" style={{ height: '400px', marginTop: '20px' }}>
+            {timeRange === 'CUSTOM' && (
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '12px',
+                    marginBottom: '6px',
+                    marginTop: '-4px', // Pull up significantly
+                    alignItems: 'center',
+                    paddingRight: '4px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>FROM</span>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="control-btn-mini"
+                                onClick={() => { setShowStartDropdown(!showStartDropdown); setShowEndDropdown(false); }}
+                                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px' }}
+                            >
+                                {formatQ(customStart)} <ChevronDown size={10} />
+                            </button>
+                            {showStartDropdown && (
+                                <div className="quarter-dropdown" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, background: '#1e293b', border: '1px solid #334155', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto', marginTop: '4px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}>
+                                    {availableQuarters.map(q => (
+                                        <div
+                                            key={q}
+                                            className="dropdown-item"
+                                            onClick={() => { setCustomStart(q); setShowStartDropdown(false); }}
+                                            style={{ padding: '8px 16px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                                        >
+                                            {formatQ(q)}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, letterSpacing: '0.05em' }}>TO</span>
+                        <div style={{ position: 'relative' }}>
+                            <button
+                                className="control-btn-mini"
+                                onClick={() => { setShowEndDropdown(!showEndDropdown); setShowStartDropdown(false); }}
+                                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 8px' }}
+                            >
+                                {formatQ(customEnd)} <ChevronDown size={10} />
+                            </button>
+                            {showEndDropdown && (
+                                <div className="quarter-dropdown" style={{ position: 'absolute', top: '100%', right: 0, zIndex: 100, background: '#1e293b', border: '1px solid #334155', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto', marginTop: '4px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}>
+                                    {availableQuarters.map(q => (
+                                        <div
+                                            key={q}
+                                            className="dropdown-item"
+                                            onClick={() => { setCustomEnd(q); setShowEndDropdown(false); }}
+                                            style={{ padding: '8px 16px', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                                        >
+                                            {formatQ(q)}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="comparison-chart-container" style={{ height: '400px', marginTop: '8px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={filteredAndIndexedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -651,9 +775,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                                 <h3 className="section-title">Fund Summaries</h3>
                                 <p className="section-desc">
                                     Top positions by reported market value
-                                    <span className="info-tooltip" title="Long equity positions per 13F. Excludes derivatives and short positions.">
-                                        <Info size={12} />
-                                    </span>
                                 </p>
                             </div>
                         </div>
