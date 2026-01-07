@@ -143,6 +143,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
     const exitedPositions = summary.exited_positions || [];
     const tickerActivity = summary.ticker_fund_activity || {};
     const fundHighlights = summary.fund_highlights || [];
+    const sortedFundsByAUM = [...fundHighlights].sort((a, b) => b.total_value - a.total_value);
 
     const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string) => {
         setMoverTooltip({ x: e.clientX, y: e.clientY, ticker });
@@ -233,7 +234,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'funds' && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 100, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">Tracked Funds</div>
-                                {fundHighlights.map((fund, i) => (
+                                {sortedFundsByAUM.map((fund, i) => (
                                     <span key={i} className="fund-line">{fund.name}</span>
                                 ))}
                             </div>
@@ -253,7 +254,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'aum' && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">AUM by Fund</div>
-                                {fundHighlights.map((fund, i) => (
+                                {sortedFundsByAUM.map((fund, i) => (
                                     <div key={i} className="tooltip-fund-row">
                                         <span className="fund-name">{fund.name}</span>
                                         <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
@@ -283,7 +284,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary, onSel
                         {kpiTooltip && kpiTooltip.type === 'delta' && (
                             <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
                                 <div className="tooltip-title">AUM Δ QoQ by Fund</div>
-                                {fundHighlights.map((fund, i) => (
+                                {sortedFundsByAUM.map((fund, i) => (
                                     <div key={i} className="tooltip-fund-row">
                                         <span className="fund-name">{fund.name}</span>
                                         <span className={`fund-change ${(fund.value_change_pct || 0) >= 0 ? 'positive' : 'negative'}`}>
