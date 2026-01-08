@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
@@ -9,6 +10,44 @@ import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
 import { calculateIRR } from './utils/performanceUtils'
+
+// Type for view states
+type ViewType = 'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary';
+
+// Parse URL path to extract view and CIK
+function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } {
+    const segments = pathname.split('/').filter(Boolean);
+
+    if (segments.length === 0) {
+        return { view: 'dashboard', cik: null };
+    }
+
+    if (segments[0] === 'about') {
+        return { view: 'about', cik: null };
+    }
+
+    if (segments[0] === 'fund' && segments[1]) {
+        const cik = segments[1];
+        const subView = segments[2] as ViewType | undefined;
+        if (subView && ['table', 'chart', 'performance'].includes(subView)) {
+            return { view: subView, cik };
+        }
+        return { view: 'summary', cik };
+    }
+
+    return { view: 'dashboard', cik: null };
+}
+
+// Build URL path from view and CIK
+function buildUrlPath(view: ViewType, cik: string | null): string {
+    if (view === 'dashboard') return '/';
+    if (view === 'about') return '/about';
+    if (cik) {
+        if (view === 'summary') return `/fund/${cik}`;
+        return `/fund/${cik}/${view}`;
+    }
+    return '/';
+}
 
 const getFundEdgarUrl = (cik?: string) => {
     if (!cik) return undefined;
@@ -66,8 +105,19 @@ const getColorForString = (str: string) => {
 };
 
 function App() {
+    const reactNavigate = useNavigate();
+    const location = useLocation();
+
+    // Derive view and selectedCik from URL
+    const { view, cik: selectedCik } = parseUrlPath(location.pathname);
+
+    // Navigation helper that updates URL (which triggers re-render with new view/cik)
+    const navigate = (newView: ViewType, newCik: string | null = null) => {
+        const path = buildUrlPath(newView, newCik);
+        reactNavigate(path);
+    };
+
     const [funds, setFunds] = useState<Fund[]>([])
-    const [selectedCik, setSelectedCik] = useState<string | null>(null)
     const [holdings, setHoldings] = useState<Holding[]>([])
 
     const formatQ = (dateStr: string) => {
@@ -81,7 +131,6 @@ function App() {
     const [refreshCik, setRefreshCik] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
-    const [view, setView] = useState<'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary'>('dashboard')
     const [dashboardSummary, setDashboardSummary] = useState<any>(null)
     const [timeRange, setTimeRange] = useState('1Y')
     const [offset, setOffset] = useState(0) // Number of quarters to offset from latest
@@ -137,7 +186,7 @@ function App() {
 
     useEffect(() => {
         if (selectedCik) {
-            setView('summary'); // Auto-switch to summary view when a specific fund is selected
+            // Note: View is already set via URL, just load data
             setLoading(true)
             setError(null)
             setLegacyInfo(null)
@@ -232,7 +281,7 @@ function App() {
                 const addedCount = result.newly_added?.length || 0
                 setRefreshCik('')
                 await fetchFunds()
-                setSelectedCik(result.cik || refreshCik)
+                navigate('summary', result.cik || refreshCik)
                 let msg = `Successfully added ${result.fund_name}. ${addedCount} historical filings processed.`
                 const skippedLegacy = result.skipped_legacy || 0
                 if (skippedLegacy > 0) {
@@ -322,7 +371,7 @@ function App() {
             const res = await fetch(`/api/funds/${cik}`, { method: 'DELETE' })
             if (res.ok) {
                 if (selectedCik === cik) {
-                    setSelectedCik(null)
+                    navigate('dashboard', null)
                     setHoldings([])
                     setHistory([])
                 }
@@ -418,7 +467,7 @@ function App() {
                             {loading ? 'Refreshing All...' : 'Refresh All Funds'}
                         </button>
                         <button
-                            onClick={() => setView('about')}
+                            onClick={() => navigate('about', null)}
                             className={`tab ${view === 'about' ? 'active' : ''}`}
                             style={{
                                 display: 'flex',
@@ -485,8 +534,7 @@ function App() {
                             <button
                                 className={`dashboard-nav-btn ${view === 'dashboard' ? 'active' : ''}`}
                                 onClick={() => {
-                                    setSelectedCik(null);
-                                    setView('dashboard');
+                                    navigate('dashboard', null);
                                 }}
                             >
                                 <LayoutGrid size={18} />
@@ -531,7 +579,7 @@ function App() {
                                         <li
                                             key={f.cik}
                                             className={selectedCik === f.cik ? 'active' : ''}
-                                            onClick={() => { setSelectedCik(f.cik); setView('summary'); }}
+                                            onClick={() => navigate('summary', f.cik)}
                                         >
                                             <div className="fund-info">
                                                 <span className="fund-name">{f.name}</span>
@@ -580,8 +628,7 @@ function App() {
                             <GlobalDashboard
                                 summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [] }}
                                 onSelectFund={(cik) => {
-                                    setSelectedCik(cik);
-                                    setView('summary');
+                                    navigate('summary', cik);
                                 }}
                                 allFunds={funds}
                             />
@@ -614,25 +661,25 @@ function App() {
                                         <div className="tab-divider"></div>
                                         <button
                                             className={view === 'summary' ? 'tab active' : 'tab'}
-                                            onClick={() => setView('summary')}
+                                            onClick={() => navigate('summary', selectedCik)}
                                         >
                                             <Activity size={16} /> Summary
                                         </button>
                                         <button
                                             className={view === 'table' ? 'tab active' : 'tab'}
-                                            onClick={() => setView('table')}
+                                            onClick={() => navigate('table', selectedCik)}
                                         >
                                             <LayoutGrid size={16} /> Table
                                         </button>
                                         <button
                                             className={`tab ${view === 'chart' ? 'active' : ''}`}
-                                            onClick={() => setView('chart')}
+                                            onClick={() => navigate('chart', selectedCik)}
                                         >
                                             <PieChart size={18} /> Composition
                                         </button>
                                         <button
                                             className={`tab ${view === 'performance' ? 'active' : ''}`}
-                                            onClick={() => setView('performance')}
+                                            onClick={() => navigate('performance', selectedCik)}
                                         >
                                             <TrendingUp size={18} /> Performance
                                         </button>
@@ -780,19 +827,19 @@ function App() {
                                         <div className="view-tabs">
                                             <button
                                                 className="tab"
-                                                onClick={() => setView('table')}
+                                                onClick={() => navigate('table', selectedCik)}
                                             >
                                                 <Layout size={16} /> Table
                                             </button>
                                             <button
                                                 className="tab"
-                                                onClick={() => setView('chart')}
+                                                onClick={() => navigate('chart', selectedCik)}
                                             >
                                                 <PieChart size={18} /> Composition
                                             </button>
                                             <button
                                                 className="tab"
-                                                onClick={() => setView('performance')}
+                                                onClick={() => navigate('performance', selectedCik)}
                                             >
                                                 <TrendingUp size={18} /> Performance
                                             </button>
