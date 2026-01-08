@@ -4,6 +4,7 @@ import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, 
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
 import { GlobalDashboard } from './components/GlobalDashboard'
+import { FundSummary } from './components/FundSummary'
 import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
@@ -80,7 +81,7 @@ function App() {
     const [refreshCik, setRefreshCik] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
-    const [view, setView] = useState<'table' | 'chart' | 'performance' | 'about' | 'dashboard'>('dashboard')
+    const [view, setView] = useState<'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary'>('dashboard')
     const [dashboardSummary, setDashboardSummary] = useState<any>(null)
     const [timeRange, setTimeRange] = useState('1Y')
     const [offset, setOffset] = useState(0) // Number of quarters to offset from latest
@@ -136,7 +137,7 @@ function App() {
 
     useEffect(() => {
         if (selectedCik) {
-            setView('table'); // Auto-switch to table view when a specific fund is selected
+            setView('summary'); // Auto-switch to summary view when a specific fund is selected
             setLoading(true)
             setError(null)
             setLegacyInfo(null)
@@ -530,7 +531,7 @@ function App() {
                                         <li
                                             key={f.cik}
                                             className={selectedCik === f.cik ? 'active' : ''}
-                                            onClick={() => { setSelectedCik(f.cik); if (view === 'about') setView('table'); }}
+                                            onClick={() => { setSelectedCik(f.cik); setView('summary'); }}
                                         >
                                             <div className="fund-info">
                                                 <span className="fund-name">{f.name}</span>
@@ -580,7 +581,7 @@ function App() {
                                 summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [] }}
                                 onSelectFund={(cik) => {
                                     setSelectedCik(cik);
-                                    setView('table');
+                                    setView('summary');
                                 }}
                                 allFunds={funds}
                             />
@@ -611,6 +612,12 @@ function App() {
                                             {loading ? 'Refreshing...' : 'Refresh Data'}
                                         </button>
                                         <div className="tab-divider"></div>
+                                        <button
+                                            className={view === 'summary' ? 'tab active' : 'tab'}
+                                            onClick={() => setView('summary')}
+                                        >
+                                            <Activity size={16} /> Summary
+                                        </button>
                                         <button
                                             className={view === 'table' ? 'tab active' : 'tab'}
                                             onClick={() => setView('table')}
@@ -745,6 +752,11 @@ function App() {
                                         offset={offset}
                                         onOffsetChange={setOffset}
                                     />
+                                ) : view === 'summary' ? (
+                                    <FundSummary
+                                        history={history}
+                                        fundName={funds.find(f => f.cik === selectedCik)?.name || 'Fund'}
+                                    />
                                 ) : view === 'performance' ? (
                                     <PerformanceChart
                                         data={history}
@@ -859,7 +871,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
             const startStr = new Date(sortedDates[0]).toISOString().slice(0, 10);
             const today = new Date().toISOString().slice(0, 10);
 
-            fetch(`http://localhost:8000/api/market/benchmark?start=${startStr}&end=${today}`)
+            fetch(`/api/market/benchmark?start=${startStr}&end=${today}`)
                 .then(r => r.json())
                 .then(data => {
                     if (Array.isArray(data)) setBenchmarkData(data);
@@ -868,7 +880,18 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
         }
     }, [showBenchmark, data]);
 
-    if (!data || data.length === 0) return null;
+    if (!data || data.length === 0) {
+        return (
+            <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '40px' }}>
+                <Activity size={48} style={{ color: '#64748b', opacity: 0.5 }} />
+                <div style={{ fontSize: '18px', fontWeight: 600, color: '#94a3b8' }}>No Performance Data Available</div>
+                <div style={{ fontSize: '14px', color: '#64748b', maxWidth: '400px', lineHeight: 1.5, textAlign: 'center' }}>
+                    We need at least two quarterly filings to calculate performance trends and IRR.
+                    Try fetching older filings to build a history.
+                </div>
+            </div>
+        );
+    }
 
     const { filteredData, stats } = useMemo(() => {
         // 1. Group holdings by period
@@ -938,12 +961,24 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
         let totalPnL = 0;
         let totalCommitted = 0;
 
+        // Find match for benchmark start
+        let benchStartVal: number | null = null;
+        if (showBenchmark && benchmarkData.length > 0) {
+            const startD = new Date(sortedPeriods[0]).getTime();
+            // Simple closest match
+            const closest = benchmarkData.reduce((prev, curr) => {
+                return (Math.abs(new Date(curr.date).getTime() - startD) < Math.abs(new Date(prev.date).getTime() - startD) ? curr : prev);
+            });
+            benchStartVal = closest ? closest.value : null;
+        }
+
         // Allow flexible type for chart data to include benchmark
         const chartData: any[] = [{
             period: sortedPeriods[0],
             return: 0,
             irr: 0,
-            benchmarkReturn: 0
+            benchmarkReturn: 0,
+            benchmarkRaw: benchStartVal || 0
         }];
 
         // Track cumulative TWR for selected tickers
@@ -969,17 +1004,6 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
         initialHoldings.forEach(h => initialValue += h.value);
         cashFlows.push(-initialValue);
         totalCommitted = initialValue;
-
-        // Find match for benchmark start
-        let benchStartVal: number | null = null;
-        if (showBenchmark && benchmarkData.length > 0) {
-            const startD = new Date(sortedPeriods[0]).getTime();
-            // Simple closest match
-            const closest = benchmarkData.reduce((prev, curr) => {
-                return (Math.abs(new Date(curr.date).getTime() - startD) < Math.abs(new Date(prev.date).getTime() - startD) ? curr : prev);
-            });
-            benchStartVal = closest ? closest.value : null;
-        }
 
         for (let i = 1; i < sortedPeriods.length; i++) {
             const currentPeriod = sortedPeriods[i];
@@ -1118,6 +1142,13 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                 return: cumulativeReturn,
                 irr: rollingIrr,
                 benchmarkReturn: benchRet,
+                benchmarkRaw: (benchStartVal !== null && showBenchmark) ? (() => {
+                    const currD = new Date(currentPeriod).getTime();
+                    const closest = benchmarkData.reduce((prev, curr) => {
+                        return (Math.abs(new Date(curr.date).getTime() - currD) < Math.abs(new Date(prev.date).getTime() - currD) ? curr : prev);
+                    });
+                    return closest ? closest.value : 0;
+                })() : 0,
                 ...periodTickerReturns
             });
         }
@@ -1152,13 +1183,14 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
         let finalChartData = chartData;
         if (finalChartData.length > 0) {
             const baseReturn = finalChartData[0].return;
-            const baseBench = finalChartData[0].benchmarkReturn || 0;
+            const validBenchPoints = finalChartData.filter(d => d.benchmarkRaw > 0);
+            const baseBenchRaw = validBenchPoints.length > 0 ? validBenchPoints[0].benchmarkRaw : 0;
 
             finalChartData = finalChartData.map(d => {
                 const updated: any = {
                     ...d,
                     return: (1 + d.return / 100) / (1 + baseReturn / 100) * 100 - 100,
-                    benchmarkReturn: showBenchmark ? ((1 + d.benchmarkReturn / 100) / (1 + baseBench / 100) * 100 - 100) : 0
+                    benchmarkReturn: (showBenchmark && baseBenchRaw > 0) ? ((d.benchmarkRaw / baseBenchRaw) - 1) * 100 : 0
                 };
                 selectedTickers.forEach(t => {
                     // Preserve null values - only re-index if value exists

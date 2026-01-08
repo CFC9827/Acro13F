@@ -98,6 +98,25 @@ export const AboutPage: React.FC = () => {
                 </div>
 
                 <div style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '24px' }}>
+                    <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#60a5fa' }}>
+                        <Activity size={20} />
+                        Est. Portfolio Turnover %
+                    </h2>
+                    <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '16px' }}>
+                        An estimate of how frequently the manager trades their portfolio. Because 13F filings are only quarterly snapshots, this metric serves as a <strong>proxy for activity</strong>.
+                    </p>
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', color: '#94a3b8' }}>Methodology:</div>
+                        <p style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.4, marginBottom: '8px' }}>
+                            We sum the absolute value of all position changes (buys and sells) to capture total rebalancing activity. We divide by 2 to normalize (preventing double-counting of typical buy-sell rotation) and then by the average AUM of the period.
+                        </p>
+                    </div>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.5)', padding: '12px', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace', color: '#94a3b8' }}>
+                        Turnover = (Σ |Value_t - Value_prev|) / 2 / Avg_AUM
+                    </div>
+                </div>
+
+                <div style={{ background: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(51, 65, 85, 0.5)', borderRadius: '12px', padding: '24px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#a855f7' }}>
                         <GitFork size={20} />
                         Automated Split Detection

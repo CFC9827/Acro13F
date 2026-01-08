@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List } from 'lucide-react';
 import {
     AreaChart,
     Area,
@@ -1150,6 +1150,19 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const previousTotalPortfolioValue = useMemo(() => {
         return previousQuarterData.reduce((sum, h) => sum + h.value, 0);
     }, [previousQuarterData]);
+
+    if (!history || history.length === 0) {
+        return (
+            <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '40px', padding: '40px' }}>
+                <List size={48} style={{ color: '#64748b', opacity: 0.5 }} />
+                <div style={{ fontSize: '18px', fontWeight: 600, color: '#94a3b8' }}>No Holdings Recorded</div>
+                <div style={{ fontSize: '14px', color: '#64748b', maxWidth: '400px', lineHeight: 1.5, textAlign: 'center' }}>
+                    We couldn't find any individual stock positions for this fund.
+                    This usually means the fund hasn't filed any 13F-HR forms with the SEC yet, or their filings are still being processed.
+                </div>
+            </div>
+        );
+    }
 
     // Build a set of current quarter position keys for quick lookup
     const currentQuarterKeys = useMemo(() => {

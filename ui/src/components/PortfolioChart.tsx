@@ -10,7 +10,7 @@ import {
     BarChart,
     Bar
 } from 'recharts';
-import { ChevronLeft, ChevronRight, CheckSquare, Square, ArrowUpDown, ArrowUp, ArrowDown, Search, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckSquare, Square, ArrowUpDown, ArrowUp, ArrowDown, Search, ChevronDown, PieChart } from 'lucide-react';
 import { calculateIRR } from '../utils/performanceUtils';
 
 export interface HistoricalHolding {
@@ -99,15 +99,15 @@ const CustomTooltip = ({ active, payload, label, allKeys }: any) => {
 
         return (
             <div className="custom-chart-tooltip" style={{
-                backgroundColor: '#0f172a',
-                border: '1px solid #334155',
-                borderRadius: '4px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '8px',
                 padding: '12px',
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                 minWidth: '220px',
                 zIndex: 2000
             }}>
-                <div style={{ color: '#94a3b8', fontWeight: 600, fontSize: '11px', marginBottom: '8px', borderBottom: '1px solid #1e293b', paddingBottom: '4px' }}>
+                <div style={{ color: '#334155', fontWeight: 600, fontSize: '11px', marginBottom: '8px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
                     Q{q} '{year} Position Values
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -119,18 +119,18 @@ const CustomTooltip = ({ active, payload, label, allKeys }: any) => {
                                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: item.color }}></div>
-                                        <span style={{ color: '#f8fafc' }}>{item.name}</span>
+                                        <span style={{ color: '#334155', fontWeight: 500 }}>{item.name}</span>
                                     </div>
-                                    <span style={{ color: '#94a3b8', fontWeight: 600, marginLeft: '12px' }}>
+                                    <span style={{ color: '#64748b', fontWeight: 600, marginLeft: '12px' }}>
                                         ${(item.value / 1e6).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M ({pct.toFixed(1)}%)
                                     </span>
                                 </div>
                             );
                         });
                     })()}
-                    <div style={{ borderTop: '1px solid #1e293b', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700 }}>
-                        <span style={{ color: '#f8fafc' }}>Total AUM</span>
-                        <span style={{ color: '#ffffff' }}>
+                    <div style={{ borderTop: '1px solid #f1f5f9', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 700 }}>
+                        <span style={{ color: '#334155' }}>Total AUM</span>
+                        <span style={{ color: '#10b981' }}>
                             ${(payload.reduce((acc: number, item: any) => acc + (item.value || 0), 0) / 1e6).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M
                         </span>
                     </div>
@@ -636,7 +636,18 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
         };
     }, [data, timeRange, offset, showIRR, customStartQuarter, customEndQuarter]);
 
-    if (!data.length) return <div className="loading-state">No historical data available.</div>;
+    if (!data.length) {
+        return (
+            <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '40px' }}>
+                <PieChart size={48} style={{ color: '#64748b', opacity: 0.5 }} />
+                <div style={{ fontSize: '18px', fontWeight: 600, color: '#94a3b8' }}>No Composition Data Found</div>
+                <div style={{ fontSize: '14px', color: '#64748b', maxWidth: '400px', lineHeight: 1.5, textAlign: 'center' }}>
+                    Historical composition requires processed filings.
+                    If this is a new fund, please wait for background processing or click "Refresh Data".
+                </div>
+            </div>
+        );
+    }
 
     const baseDateFormatted = useMemo(() => {
         if (!basePeriodDate) return 'N/A';
@@ -867,7 +878,12 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                                         tick={{ fill: '#94a3b8', fontSize: 11 }}
                                         tickFormatter={(val) => (val / 1e6).toFixed(0)}
                                     />
-                                    <Tooltip content={<CustomTooltip allKeys={allKeys} />} cursor={{ fill: '#1e293b', opacity: 0.5 }} />
+                                    <Tooltip
+                                        content={<CustomTooltip allKeys={allKeys} />}
+                                        cursor={{ fill: '#f1f5f9', opacity: 0.5 }}
+                                        position={{ y: 0 }}
+                                        wrapperStyle={{ outline: 'none', zIndex: 1000 }}
+                                    />
                                     {allKeys.map((key, index) => (
                                         <Bar
                                             key={key}
@@ -906,7 +922,12 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                                         tick={{ fill: '#94a3b8', fontSize: 11 }}
                                         tickFormatter={(val) => (val / 1e6).toFixed(0)}
                                     />
-                                    <Tooltip content={<CustomTooltip allKeys={allKeys} />} isAnimationActive={false} />
+                                    <Tooltip
+                                        content={<CustomTooltip allKeys={allKeys} />}
+                                        isAnimationActive={false}
+                                        position={{ y: 0 }}
+                                        wrapperStyle={{ outline: 'none', zIndex: 1000 }}
+                                    />
                                     {allKeys.map((key, index) => (
                                         <Area
                                             key={key}

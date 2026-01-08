@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg-dark: #0f172a;
   --bg-card: #1e293b;
   --text-main: #f8fafc;
@@ -865,10 +865,10 @@ body {
 .loading-state {
   padding: 60px;
   text-align: center;
-  color: #64748b;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
 .tab-divider {

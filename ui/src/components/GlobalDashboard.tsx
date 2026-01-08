@@ -718,689 +718,720 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 )}
             </div>
 
-            {/* Group Selector Bar */}
-            <div className="group-selector-bar" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '20px',
-                padding: '6px',
-                background: 'rgba(255,255,255,0.02)',
-                borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.05)',
-                overflowX: 'auto'
-            }}>
-                <button
-                    className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
-                    onClick={() => setSelectedGroupId(null)}
-                    style={{
+            {(!fundHighlights || fundHighlights.length === 0) ? (
+                <div className="dashboard-empty-state" style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '80px 20px',
+                    textAlign: 'center',
+                    background: 'rgba(255,255,255,0.02)',
+                    borderRadius: '24px',
+                    border: '1px dashed rgba(255,255,255,0.1)',
+                    margin: '20px 0'
+                }}>
+                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '24px', borderRadius: '50%', marginBottom: '24px' }}>
+                        <PlusCircle size={48} style={{ color: '#38bdf8' }} />
+                    </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#f8fafc', marginBottom: '12px' }}>Welcome to Stock Screener</h2>
+                    <p style={{ color: '#94a3b8', maxWidth: '500px', lineHeight: 1.6, marginBottom: '32px' }}>
+                        You haven't added any hedge funds to track yet. Start by searching for a fund CIK or name in the sidebar to build your custom dashboard.
+                    </p>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                        <div style={{ padding: '10px 20px', background: '#38bdf8', color: '#0f172a', borderRadius: '8px', fontWeight: 700, fontSize: '14px' }}>
+                            Search Funds in Sidebar
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <>
+
+                    {/* Group Selector Bar */}
+                    <div className="group-selector-bar" style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: selectedGroupId === null ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                        color: selectedGroupId === null ? '#38bdf8' : '#94a3b8',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap'
-                    }}
-                >
-                    <LayoutGrid size={14} />
-                    <span>All Funds</span>
-                </button>
-
-                {groups.map(g => {
-                    const isEmpty = g.member_ciks.length === 0;
-                    return (
+                        gap: '8px',
+                        marginBottom: '20px',
+                        padding: '6px',
+                        background: 'rgba(255,255,255,0.02)',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        overflowX: 'auto'
+                    }}>
                         <button
-                            key={g.id}
-                            className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
-                            onClick={() => {
-                                if (isEmpty) {
-                                    setIsGroupModalOpen(true); // Open modal instead of selecting empty group
-                                } else {
-                                    setSelectedGroupId(g.id);
-                                }
-                            }}
-                            title={isEmpty ? 'Add funds to this group first' : `View ${g.name}`}
+                            className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
+                            onClick={() => setSelectedGroupId(null)}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '6px',
                                 padding: '6px 12px',
                                 borderRadius: '8px',
-                                border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
-                                background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
-                                    isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                                color: isEmpty ? '#ef4444' :
-                                    selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
+                                border: 'none',
+                                background: selectedGroupId === null ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                                color: selectedGroupId === null ? '#38bdf8' : '#94a3b8',
                                 cursor: 'pointer',
                                 fontSize: '12px',
                                 fontWeight: 600,
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            <Folder size={14} />
-                            <span>{g.name}</span>
-                            <span style={{
-                                background: isEmpty ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.1)',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                color: isEmpty ? '#ef4444' : undefined
-                            }}>{isEmpty ? '⚠️ 0' : g.member_ciks.length}</span>
+                            <LayoutGrid size={14} />
+                            <span>All Funds</span>
                         </button>
-                    );
-                })}
 
-                <button
-                    className="group-pill manage-btn"
-                    onClick={() => setIsGroupModalOpen(true)}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        borderRadius: '8px',
-                        border: '1px dashed rgba(255,255,255,0.1)',
-                        background: 'transparent',
-                        color: '#64748b',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        marginLeft: 'auto',
-                        whiteSpace: 'nowrap'
-                    }}
-                >
-                    <FolderPlus size={14} />
-                    <span>Manage Groups</span>
-                </button>
-            </div>
-
-            {/* KPI Tiles */}
-            {kpis && (
-                <div className="kpi-tiles-row">
-                    {/* Tracked Funds */}
-                    <div
-                        className="kpi-tile has-tooltip"
-                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'funds')}
-                        onMouseLeave={handleKpiTooltipLeave}
-                    >
-                        <div className="kpi-icon"><Briefcase size={18} /></div>
-                        <div className="kpi-content">
-                            <span className="kpi-value">{kpis.fund_count}</span>
-                            <span className="kpi-label">Tracked Funds</span>
-                        </div>
-                        {kpiTooltip && kpiTooltip.type === 'funds' && (
-                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 100, top: kpiTooltip.y + 20 }}>
-                                <div className="tooltip-title">Tracked Funds</div>
-                                {sortedFundsByAUM.map((fund, i) => (
-                                    <div key={i} className="tooltip-fund-row two-col">
-                                        <span className="fund-name">{fund.name}</span>
-                                        <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    {/* Total AUM */}
-                    <div
-                        className="kpi-tile has-tooltip"
-                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'aum')}
-                        onMouseLeave={handleKpiTooltipLeave}
-                    >
-                        <div className="kpi-icon"><DollarSign size={18} /></div>
-                        <div className="kpi-content">
-                            <span className="kpi-value">{formatCurrency(kpis.total_aum)}</span>
-                            <span className="kpi-label">Total AUM</span>
-                        </div>
-                        {kpiTooltip && kpiTooltip.type === 'aum' && (
-                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
-                                <div className="tooltip-title">AUM by Fund</div>
-                                {sortedFundsByAUM.map((fund, i) => (
-                                    <div key={i} className="tooltip-fund-row">
-                                        <span className="fund-name">{fund.name}</span>
-                                        <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
-                                        <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`}>
-                                            {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    {/* AUM Change */}
-                    <div
-                        className="kpi-tile has-tooltip"
-                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'delta')}
-                        onMouseLeave={handleKpiTooltipLeave}
-                    >
-                        <div className={`kpi-icon ${aumChange >= 0 ? 'positive' : 'negative'}`}>
-                            {aumChange >= 0 ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
-                        </div>
-                        <div className="kpi-content">
-                            <span className={`kpi-value ${aumChange >= 0 ? 'positive' : 'negative'}`}>
-                                {aumChange >= 0 ? '+' : ''}{aumChangePercent}%
-                            </span>
-                            <span className="kpi-label">AUM Δ QoQ</span>
-                        </div>
-                        {kpiTooltip && kpiTooltip.type === 'delta' && (
-                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
-                                <div className="tooltip-title">AUM Δ QoQ by Fund</div>
-                                {sortedFundsByChange.map((fund, i) => (
-                                    <div key={i} className="tooltip-fund-row">
-                                        <span className="fund-name">{fund.name}</span>
-                                        <span className={`fund-change ${(fund.value_change_pct || 0) >= 0 ? 'positive' : 'negative'}`}>
-                                            {(fund.value_change_pct || 0) >= 0 ? '+' : ''}{(fund.value_change_pct || 0).toFixed(1)}%
-                                        </span>
-                                        <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`} style={{ fontWeight: 500, fontSize: '0.75rem' }}>
-                                            {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    {/* New Positions */}
-                    <div
-                        className="kpi-tile has-tooltip"
-                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'new')}
-                        onMouseLeave={handleKpiTooltipLeave}
-                    >
-                        <div className="kpi-icon positive"><PlusCircle size={18} /></div>
-                        <div className="kpi-content">
-                            <span className="kpi-value positive">{kpis.new_positions}</span>
-                            <span className="kpi-label">New Positions</span>
-                        </div>
-                        {kpiTooltip && kpiTooltip.type === 'new' && newPositions.length > 0 && (
-                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
-                                <div className="tooltip-title">New Positions</div>
-                                {weightSortedNew.slice(0, 8).map((pos, i) => (
-                                    <div key={i} className="tooltip-position-row">
-                                        <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
-                                        <span className="pos-fund">{pos.fund_name}</span>
-                                        <span className="pos-weight">+{pos.weight.toFixed(1)}%</span>
-                                    </div>
-                                ))}
-                                {newPositions.length > 8 && (
-                                    <span className="tooltip-more">+{newPositions.length - 8} more</span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    {/* Exited Positions */}
-                    <div
-                        className="kpi-tile has-tooltip"
-                        onMouseEnter={(e) => handleKpiTooltipEnter(e, 'exited')}
-                        onMouseLeave={handleKpiTooltipLeave}
-                    >
-                        <div className="kpi-icon negative"><MinusCircle size={18} /></div>
-                        <div className="kpi-content">
-                            <span className="kpi-value negative">{kpis.exited_positions}</span>
-                            <span className="kpi-label">Exited</span>
-                        </div>
-                        {kpiTooltip && kpiTooltip.type === 'exited' && exitedPositions.length > 0 && (
-                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
-                                <div className="tooltip-title">Exited Positions</div>
-                                {weightSortedExited.slice(0, 8).map((pos, i) => (
-                                    <div key={i} className="tooltip-position-row">
-                                        <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
-                                        <span className="pos-fund">{pos.fund_name}</span>
-                                        <span className="pos-weight negative">-{pos.weight.toFixed(1)}%</span>
-                                    </div>
-                                ))}
-                                {exitedPositions.length > 8 && (
-                                    <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-            )}
-
-            <div className="dashboard-grid">
-                {/* Left Column: Fund Highlights */}
-                <div className="dashboard-main">
-                    <section className="dashboard-section">
-                        <div className="section-header">
-                            <div className="section-icon-box">
-                                <LayoutGrid className="section-icon" />
-                            </div>
-                            <div>
-                                <h3 className="section-title">Fund Summaries</h3>
-                                <p className="section-desc">
-                                    Top positions by reported market value
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="fund-highlights-grid">
-                            {summary.fund_highlights.map((fund) => (
-                                <div
-                                    key={fund.cik}
-                                    className="fund-summary-card"
-                                    onClick={() => onSelectFund(fund.cik)}
+                        {groups.map(g => {
+                            const isEmpty = g.member_ciks.length === 0;
+                            return (
+                                <button
+                                    key={g.id}
+                                    className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
+                                    onClick={() => {
+                                        if (isEmpty) {
+                                            setIsGroupModalOpen(true); // Open modal instead of selecting empty group
+                                        } else {
+                                            setSelectedGroupId(g.id);
+                                        }
+                                    }}
+                                    title={isEmpty ? 'Add funds to this group first' : `View ${g.name}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
+                                        background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
+                                            isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                        color: isEmpty ? '#ef4444' :
+                                            selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
+                                        cursor: 'pointer',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap'
+                                    }}
                                 >
-                                    <div className="card-header">
-                                        <div className="fund-info">
-                                            <h4 className="fund-name">{fund.name}</h4>
-                                            <div className="fund-meta">
-                                                <span className="fund-period">{formatQ(fund.period)}</span>
-                                                {(fund.new_count !== undefined || fund.exit_count !== undefined) && (
-                                                    <div className="activity-badges">
-                                                        {(fund.new_count || 0) > 0 && <span className="badge new">{fund.new_count} New</span>}
-                                                        {(fund.exit_count || 0) > 0 && <span className="badge exited">{fund.exit_count} Exit</span>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="fund-aum-block">
-                                            <div className="fund-value">{formatCurrency(fund.total_value)}</div>
-                                            {fund.value_change !== undefined && fund.value_change !== 0 && (
-                                                <div className={`fund-change ${fund.value_change >= 0 ? 'positive' : 'negative'}`}>
-                                                    {fund.value_change >= 0 ? '↑' : '↓'} {fund.value_change_pct?.toFixed(1)}%
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <Folder size={14} />
+                                    <span>{g.name}</span>
+                                    <span style={{
+                                        background: isEmpty ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.1)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
+                                        color: isEmpty ? '#ef4444' : undefined
+                                    }}>{isEmpty ? '⚠️ 0' : g.member_ciks.length}</span>
+                                </button>
+                            );
+                        })}
 
-                                    <div className="fund-stats-row">
-                                        <div className="fund-stat">
-                                            <span className="stat-value">{fund.position_count || '—'}</span>
-                                            <span className="stat-label">positions</span>
-                                        </div>
-                                        <div className="fund-stat">
-                                            <span className="stat-value">
-                                                {fund.concentration?.toFixed(0) || '—'}%
-                                                {fund.concentration_change !== undefined && fund.concentration_change !== 0 && (
-                                                    <span className={`stat-trend ${fund.concentration_change >= 0 ? 'positive' : 'negative'}`}>
-                                                        {fund.concentration_change >= 0 ? '↑' : '↓'}{Math.abs(fund.concentration_change).toFixed(0)}%
-                                                    </span>
-                                                )}
-                                            </span>
-                                            <span className="stat-label">top 3</span>
-                                        </div>
-                                    </div>
+                        <button
+                            className="group-pill manage-btn"
+                            onClick={() => setIsGroupModalOpen(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                border: '1px dashed rgba(255,255,255,0.1)',
+                                background: 'transparent',
+                                color: '#64748b',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                marginLeft: 'auto',
+                                whiteSpace: 'nowrap'
+                            }}
+                        >
+                            <FolderPlus size={14} />
+                            <span>Manage Groups</span>
+                        </button>
+                    </div>
 
-                                    <div className="top-holdings-list">
-                                        {fund.top_holdings.map((h, i) => (
-                                            <div key={i} className="mini-holding">
-                                                <div className="holding-ticker">{h.ticker || h.issuer_name.slice(0, 4)}</div>
-                                                <div className="holding-bar-container">
-                                                    <div
-                                                        className="holding-bar"
-                                                        style={{ width: `${(h.value / fund.total_value) * 100}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="holding-val">{formatCurrency(h.value)}</div>
-                                                <div className="holding-weight-col">
-                                                    <span className="holding-weight">{h.weight?.toFixed(1)}%</span>
-                                                    <span className={`holding-change ${(h.weight_change ?? 0) >= 0 ? 'positive' : 'negative'}`}>
-                                                        ({(h.weight_change ?? 0) >= 0 ? '+' : ''}{(h.weight_change ?? 0).toFixed(1)}%)
-                                                    </span>
-                                                </div>
+                    {/* KPI Tiles */}
+                    {kpis && (
+                        <div className="kpi-tiles-row">
+                            {/* Tracked Funds */}
+                            <div
+                                className="kpi-tile has-tooltip"
+                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'funds')}
+                                onMouseLeave={handleKpiTooltipLeave}
+                            >
+                                <div className="kpi-icon"><Briefcase size={18} /></div>
+                                <div className="kpi-content">
+                                    <span className="kpi-value">{kpis.fund_count}</span>
+                                    <span className="kpi-label">Tracked Funds</span>
+                                </div>
+                                {kpiTooltip && kpiTooltip.type === 'funds' && (
+                                    <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 100, top: kpiTooltip.y + 20 }}>
+                                        <div className="tooltip-title">Tracked Funds</div>
+                                        {sortedFundsByAUM.map((fund, i) => (
+                                            <div key={i} className="tooltip-fund-row two-col">
+                                                <span className="fund-name">{fund.name}</span>
+                                                <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
                                             </div>
                                         ))}
                                     </div>
+                                )}
+                            </div>
+                            {/* Total AUM */}
+                            <div
+                                className="kpi-tile has-tooltip"
+                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'aum')}
+                                onMouseLeave={handleKpiTooltipLeave}
+                            >
+                                <div className="kpi-icon"><DollarSign size={18} /></div>
+                                <div className="kpi-content">
+                                    <span className="kpi-value">{formatCurrency(kpis.total_aum)}</span>
+                                    <span className="kpi-label">Total AUM</span>
+                                </div>
+                                {kpiTooltip && kpiTooltip.type === 'aum' && (
+                                    <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
+                                        <div className="tooltip-title">AUM by Fund</div>
+                                        {sortedFundsByAUM.map((fund, i) => (
+                                            <div key={i} className="tooltip-fund-row">
+                                                <span className="fund-name">{fund.name}</span>
+                                                <span className="fund-aum">{formatCurrency(fund.total_value)}</span>
+                                                <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`}>
+                                                    {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {/* AUM Change */}
+                            <div
+                                className="kpi-tile has-tooltip"
+                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'delta')}
+                                onMouseLeave={handleKpiTooltipLeave}
+                            >
+                                <div className={`kpi-icon ${aumChange >= 0 ? 'positive' : 'negative'}`}>
+                                    {aumChange >= 0 ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
+                                </div>
+                                <div className="kpi-content">
+                                    <span className={`kpi-value ${aumChange >= 0 ? 'positive' : 'negative'}`}>
+                                        {aumChange >= 0 ? '+' : ''}{aumChangePercent}%
+                                    </span>
+                                    <span className="kpi-label">AUM Δ QoQ</span>
+                                </div>
+                                {kpiTooltip && kpiTooltip.type === 'delta' && (
+                                    <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 150, top: kpiTooltip.y + 20 }}>
+                                        <div className="tooltip-title">AUM Δ QoQ by Fund</div>
+                                        {sortedFundsByChange.map((fund, i) => (
+                                            <div key={i} className="tooltip-fund-row">
+                                                <span className="fund-name">{fund.name}</span>
+                                                <span className={`fund-change ${(fund.value_change_pct || 0) >= 0 ? 'positive' : 'negative'}`}>
+                                                    {(fund.value_change_pct || 0) >= 0 ? '+' : ''}{(fund.value_change_pct || 0).toFixed(1)}%
+                                                </span>
+                                                <span className={`fund-change ${(fund.value_change || 0) >= 0 ? 'positive' : 'negative'}`} style={{ fontWeight: 500, fontSize: '0.75rem' }}>
+                                                    {(fund.value_change || 0) >= 0 ? '+' : ''}{formatCurrency(fund.value_change || 0)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            {/* New Positions */}
+                            <div
+                                className="kpi-tile has-tooltip"
+                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'new')}
+                                onMouseLeave={handleKpiTooltipLeave}
+                            >
+                                <div className="kpi-icon positive"><PlusCircle size={18} /></div>
+                                <div className="kpi-content">
+                                    <span className="kpi-value positive">{kpis.new_positions}</span>
+                                    <span className="kpi-label">New Positions</span>
+                                </div>
+                                {kpiTooltip && kpiTooltip.type === 'new' && newPositions.length > 0 && (
+                                    <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
+                                        <div className="tooltip-title">New Positions</div>
+                                        {weightSortedNew.slice(0, 8).map((pos, i) => (
+                                            <div key={i} className="tooltip-position-row">
+                                                <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
+                                                <span className="pos-fund">{pos.fund_name}</span>
+                                                <span className="pos-weight">+{pos.weight.toFixed(1)}%</span>
+                                            </div>
+                                        ))}
+                                        {newPositions.length > 8 && (
+                                            <span className="tooltip-more">+{newPositions.length - 8} more</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            {/* Exited Positions */}
+                            <div
+                                className="kpi-tile has-tooltip"
+                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'exited')}
+                                onMouseLeave={handleKpiTooltipLeave}
+                            >
+                                <div className="kpi-icon negative"><MinusCircle size={18} /></div>
+                                <div className="kpi-content">
+                                    <span className="kpi-value negative">{kpis.exited_positions}</span>
+                                    <span className="kpi-label">Exited</span>
+                                </div>
+                                {kpiTooltip && kpiTooltip.type === 'exited' && exitedPositions.length > 0 && (
+                                    <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 200, top: kpiTooltip.y + 20 }}>
+                                        <div className="tooltip-title">Exited Positions</div>
+                                        {weightSortedExited.slice(0, 8).map((pos, i) => (
+                                            <div key={i} className="tooltip-position-row">
+                                                <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
+                                                <span className="pos-fund">{pos.fund_name}</span>
+                                                <span className="pos-weight negative">-{pos.weight.toFixed(1)}%</span>
+                                            </div>
+                                        ))}
+                                        {exitedPositions.length > 8 && (
+                                            <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-                                    {fund.top_add && (
-                                        <div className="top-add-banner">
-                                            <Sparkles size={12} className="sparkle-icon" />
-                                            <span className="add-label">TOP ADD:</span>
-                                            <span className="add-ticker">{fund.top_add.ticker || fund.top_add.issuer_name.slice(0, 4)}</span>
-                                            <span className="add-delta positive">+{fund.top_add.weight_change.toFixed(1)}%</span>
-                                        </div>
-                                    )}
+                    )}
 
-                                    <div className="card-footer">
-                                        <span>View Full Portfolio</span>
-                                        <ChevronRight size={14} />
+                    <div className="dashboard-grid">
+                        {/* Left Column: Fund Highlights */}
+                        <div className="dashboard-main">
+                            <section className="dashboard-section">
+                                <div className="section-header">
+                                    <div className="section-icon-box">
+                                        <LayoutGrid className="section-icon" />
+                                    </div>
+                                    <div>
+                                        <h3 className="section-title">Fund Summaries</h3>
+                                        <p className="section-desc">
+                                            Top positions by reported market value
+                                        </p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                    </section>
 
-                    <PerformanceComparisonChart groupId={selectedGroupId} />
-                </div>
-
-                {/* Right Column: Movers, Shifts, Crowding, New Positions */}
-                <div className="dashboard-sidebar">
-                    {/* Big Movers with Toggle */}
-                    <section className="dashboard-section compact">
-                        <div className="section-header">
-                            <TrendingUp className="section-icon-small" />
-                            <div>
-                                <h3 className="section-title-small">Big Movers</h3>
-                                <p className="section-desc-small">{getMoverDescription()}</p>
-                            </div>
-                            <div className="toggle-group">
-                                <button
-                                    className={`toggle-btn ${moversMode === 'dollar' ? 'active' : ''}`}
-                                    onClick={() => setMoversMode('dollar')}
-                                    title="Dollar change"
-                                >$</button>
-                                <button
-                                    className={`toggle-btn ${moversMode === 'percent' ? 'active' : ''}`}
-                                    onClick={() => setMoversMode('percent')}
-                                    title="Percent of fund"
-                                >%</button>
-                                <button
-                                    className={`toggle-btn ${moversMode === 'funds' ? 'active' : ''}`}
-                                    onClick={() => setMoversMode('funds')}
-                                    title="Fund count"
-                                >#</button>
-                            </div>
-                        </div>
-
-                        <div className="movers-list scrollable">
-                            {[...summary.big_movers]
-                                .sort((a, b) => {
-                                    if (moversMode === 'percent') {
-                                        return Math.abs(b.pct_of_fund || 0) - Math.abs(a.pct_of_fund || 0);
-                                    }
-                                    if (moversMode === 'funds') {
-                                        const tickerA = a.ticker || '';
-                                        const tickerB = b.ticker || '';
-                                        const actA = tickerActivity[tickerA];
-                                        const actB = tickerActivity[tickerB];
-                                        const countA = actA ? actA.buying + actA.selling : 0;
-                                        const countB = actB ? actB.buying + actB.selling : 0;
-                                        return countB - countA;
-                                    }
-                                    return Math.abs(b.val_change) - Math.abs(a.val_change);
-                                })
-                                .map((mover, i) => {
-                                    const displayValue = moversMode === 'percent' ? (mover.pct_of_fund || 0) : mover.val_change;
-                                    const isPositive = displayValue >= 0;
-
-                                    // For # mode, get fund activity info
-                                    const ticker = mover.ticker || '';
-                                    const activity = tickerActivity[ticker];
-                                    const allFunds = activity ? [...(activity.buying_funds || []), ...(activity.selling_funds || [])] : [];
-                                    const totalFundCount = allFunds.length;
-                                    const showTooltip = moversMode === 'funds' && totalFundCount > 1;
-                                    const buyingFunds = (activity?.buying_funds || []).join(', ') || 'None';
-                                    const sellingFunds = (activity?.selling_funds || []).join(', ') || 'None';
-
-                                    return (
-                                        <div key={i} className="mover-item">
-                                            <div className="mover-info">
-                                                <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
-                                                {!showTooltip && (
-                                                    <span className="mover-fund">{mover.fund_name}</span>
-                                                )}
-                                            </div>
-                                            <div
-                                                className={`mover-delta ${showTooltip ? 'has-tooltip' : ''} ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}
-                                                onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker) : undefined}
-                                                onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
-                                            >
-                                                {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-                                                {getMoverDisplay(mover)}
-                                                {moversMode === 'percent' && mover.curr_weight !== undefined && (
-                                                    <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
-                                                )}
-                                                {showTooltip && moverTooltip && moverTooltip.ticker === ticker && (
-                                                    <span
-                                                        className="tooltip-content visible"
-                                                        style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
-                                                    >
-                                                        <span className="tooltip-row buying">
-                                                            <strong>Buying:</strong>
-                                                            {(activity?.buying_funds || []).length > 0 ? (
-                                                                (activity?.buying_funds || []).map((fund, idx) => (
-                                                                    <span key={idx} className="fund-line">{fund}</span>
-                                                                ))
-                                                            ) : (
-                                                                <span className="fund-line">None</span>
-                                                            )}
-                                                        </span>
-                                                        <span className="tooltip-row selling">
-                                                            <strong>Selling:</strong>
-                                                            {(activity?.selling_funds || []).length > 0 ? (
-                                                                (activity?.selling_funds || []).map((fund, idx) => (
-                                                                    <span key={idx} className="fund-line">{fund}</span>
-                                                                ))
-                                                            ) : (
-                                                                <span className="fund-line">None</span>
-                                                            )}
-                                                        </span>
-                                                    </span>
-                                                )}
-
+                                <div className="fund-highlights-grid">
+                                    {summary.fund_highlights.map((fund) => (
+                                        <div
+                                            key={fund.cik}
+                                            className="fund-summary-card"
+                                            onClick={() => onSelectFund(fund.cik)}
+                                        >
+                                            <div className="card-header">
+                                                <div className="fund-info">
+                                                    <h4 className="fund-name">{fund.name}</h4>
+                                                    <div className="fund-meta">
+                                                        <span className="fund-period">{formatQ(fund.period)}</span>
+                                                        {(fund.new_count !== undefined || fund.exit_count !== undefined) && (
+                                                            <div className="activity-badges">
+                                                                {(fund.new_count || 0) > 0 && <span className="badge new">{fund.new_count} New</span>}
+                                                                {(fund.exit_count || 0) > 0 && <span className="badge exited">{fund.exit_count} Exit</span>}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="fund-aum-block">
+                                                    <div className="fund-value">{formatCurrency(fund.total_value)}</div>
+                                                    {fund.value_change !== undefined && fund.value_change !== 0 && (
+                                                        <div className={`fund-change ${fund.value_change >= 0 ? 'positive' : 'negative'}`}>
+                                                            {fund.value_change >= 0 ? '↑' : '↓'} {fund.value_change_pct?.toFixed(1)}%
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    </section>
-
-                    {/* Crowding Signals */}
-                    {crowding && (crowding.most_held.length > 0 || crowding.gaining_funds.length > 0) && (
-                        <section className="dashboard-section compact">
-                            <div className="section-header">
-                                <Users className="section-icon-small" />
-                                <div>
-                                    <h3 className="section-title-small">Crowding Signals</h3>
-                                    <p className="section-desc-small">Stocks held by multiple funds</p>
-                                </div>
-                            </div>
-
-                            {crowding.most_held.length > 0 && (
-                                <div className="crowding-subsection">
-                                    <div className="crowding-label">Most Widely Held</div>
-                                    <div className="crowding-list">
-                                        {crowding.most_held.slice(0, 3).map((item, i) => {
-                                            const itemTicker = item.ticker || 'N/A';
-                                            return (
-                                                <div key={i} className="crowding-item">
-                                                    <span className="crowding-ticker">{itemTicker}</span>
-                                                    <span
-                                                        className="crowding-count has-tooltip"
-                                                        onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker)}
-                                                        onMouseLeave={handleCrowdingTooltipLeave}
-                                                    >
-                                                        {item.fund_count} funds
-                                                        {crowdingTooltip && crowdingTooltip.ticker === itemTicker && item.funds && item.funds.length > 0 && (
-                                                            <span
-                                                                className="tooltip-content visible"
-                                                                style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15 }}
-                                                            >
-                                                                {item.funds.map((fund, idx) => (
-                                                                    <span key={idx} className="fund-line">{fund}</span>
-                                                                ))}
+                                            <div className="fund-stats-row">
+                                                <div className="fund-stat">
+                                                    <span className="stat-value">{fund.position_count || '—'}</span>
+                                                    <span className="stat-label">positions</span>
+                                                </div>
+                                                <div className="fund-stat">
+                                                    <span className="stat-value">
+                                                        {fund.concentration?.toFixed(0) || '—'}%
+                                                        {fund.concentration_change !== undefined && fund.concentration_change !== 0 && (
+                                                            <span className={`stat-trend ${fund.concentration_change >= 0 ? 'positive' : 'negative'}`}>
+                                                                {fund.concentration_change >= 0 ? '↑' : '↓'}{Math.abs(fund.concentration_change).toFixed(0)}%
                                                             </span>
                                                         )}
                                                     </span>
+                                                    <span className="stat-label">top 3</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="top-holdings-list">
+                                                {fund.top_holdings.map((h, i) => (
+                                                    <div key={i} className="mini-holding">
+                                                        <div className="holding-ticker">{h.ticker || h.issuer_name.slice(0, 4)}</div>
+                                                        <div className="holding-bar-container">
+                                                            <div
+                                                                className="holding-bar"
+                                                                style={{ width: `${(h.value / fund.total_value) * 100}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <div className="holding-val">{formatCurrency(h.value)}</div>
+                                                        <div className="holding-weight-col">
+                                                            <span className="holding-weight">{h.weight?.toFixed(1)}%</span>
+                                                            <span className={`holding-change ${(h.weight_change ?? 0) >= 0 ? 'positive' : 'negative'}`}>
+                                                                ({(h.weight_change ?? 0) >= 0 ? '+' : ''}{(h.weight_change ?? 0).toFixed(1)}%)
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {fund.top_add && (
+                                                <div className="top-add-banner">
+                                                    <Sparkles size={12} className="sparkle-icon" />
+                                                    <span className="add-label">TOP ADD:</span>
+                                                    <span className="add-ticker">{fund.top_add.ticker || fund.top_add.issuer_name.slice(0, 4)}</span>
+                                                    <span className="add-delta positive">+{fund.top_add.weight_change.toFixed(1)}%</span>
+                                                </div>
+                                            )}
+
+                                            <div className="card-footer">
+                                                <span>View Full Portfolio</span>
+                                                <ChevronRight size={14} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            <PerformanceComparisonChart groupId={selectedGroupId} />
+                        </div>
+
+                        {/* Right Column: Movers, Shifts, Crowding, New Positions */}
+                        <div className="dashboard-sidebar">
+                            {/* Big Movers with Toggle */}
+                            <section className="dashboard-section compact">
+                                <div className="section-header">
+                                    <TrendingUp className="section-icon-small" />
+                                    <div>
+                                        <h3 className="section-title-small">Big Movers</h3>
+                                        <p className="section-desc-small">{getMoverDescription()}</p>
+                                    </div>
+                                    <div className="toggle-group">
+                                        <button
+                                            className={`toggle-btn ${moversMode === 'dollar' ? 'active' : ''}`}
+                                            onClick={() => setMoversMode('dollar')}
+                                            title="Dollar change"
+                                        >$</button>
+                                        <button
+                                            className={`toggle-btn ${moversMode === 'percent' ? 'active' : ''}`}
+                                            onClick={() => setMoversMode('percent')}
+                                            title="Percent of fund"
+                                        >%</button>
+                                        <button
+                                            className={`toggle-btn ${moversMode === 'funds' ? 'active' : ''}`}
+                                            onClick={() => setMoversMode('funds')}
+                                            title="Fund count"
+                                        >#</button>
+                                    </div>
+                                </div>
+
+                                <div className="movers-list scrollable">
+                                    {[...summary.big_movers]
+                                        .sort((a, b) => {
+                                            if (moversMode === 'percent') {
+                                                return Math.abs(b.pct_of_fund || 0) - Math.abs(a.pct_of_fund || 0);
+                                            }
+                                            if (moversMode === 'funds') {
+                                                const tickerA = a.ticker || '';
+                                                const tickerB = b.ticker || '';
+                                                const actA = tickerActivity[tickerA];
+                                                const actB = tickerActivity[tickerB];
+                                                const countA = actA ? actA.buying + actA.selling : 0;
+                                                const countB = actB ? actB.buying + actB.selling : 0;
+                                                return countB - countA;
+                                            }
+                                            return Math.abs(b.val_change) - Math.abs(a.val_change);
+                                        })
+                                        .map((mover, i) => {
+                                            const displayValue = moversMode === 'percent' ? (mover.pct_of_fund || 0) : mover.val_change;
+                                            const isPositive = displayValue >= 0;
+
+                                            // For # mode, get fund activity info
+                                            const ticker = mover.ticker || '';
+                                            const activity = tickerActivity[ticker];
+                                            const allFunds = activity ? [...(activity.buying_funds || []), ...(activity.selling_funds || [])] : [];
+                                            const totalFundCount = allFunds.length;
+                                            const showTooltip = moversMode === 'funds' && totalFundCount > 1;
+                                            const buyingFunds = (activity?.buying_funds || []).join(', ') || 'None';
+                                            const sellingFunds = (activity?.selling_funds || []).join(', ') || 'None';
+
+                                            return (
+                                                <div key={i} className="mover-item">
+                                                    <div className="mover-info">
+                                                        <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
+                                                        {!showTooltip && (
+                                                            <span className="mover-fund">{mover.fund_name}</span>
+                                                        )}
+                                                    </div>
+                                                    <div
+                                                        className={`mover-delta ${showTooltip ? 'has-tooltip' : ''} ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}
+                                                        onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker) : undefined}
+                                                        onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
+                                                    >
+                                                        {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                                                        {getMoverDisplay(mover)}
+                                                        {moversMode === 'percent' && mover.curr_weight !== undefined && (
+                                                            <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
+                                                        )}
+                                                        {showTooltip && moverTooltip && moverTooltip.ticker === ticker && (
+                                                            <span
+                                                                className="tooltip-content visible"
+                                                                style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
+                                                            >
+                                                                <span className="tooltip-row buying">
+                                                                    <strong>Buying:</strong>
+                                                                    {(activity?.buying_funds || []).length > 0 ? (
+                                                                        (activity?.buying_funds || []).map((fund, idx) => (
+                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="fund-line">None</span>
+                                                                    )}
+                                                                </span>
+                                                                <span className="tooltip-row selling">
+                                                                    <strong>Selling:</strong>
+                                                                    {(activity?.selling_funds || []).length > 0 ? (
+                                                                        (activity?.selling_funds || []).map((fund, idx) => (
+                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="fund-line">None</span>
+                                                                    )}
+                                                                </span>
+                                                            </span>
+                                                        )}
+
+                                                    </div>
+
                                                 </div>
                                             );
                                         })}
-                                    </div>
                                 </div>
-                            )}
+                            </section>
 
+                            {/* Crowding Signals */}
+                            {crowding && (crowding.most_held.length > 0 || crowding.gaining_funds.length > 0) && (
+                                <section className="dashboard-section compact">
+                                    <div className="section-header">
+                                        <Users className="section-icon-small" />
+                                        <div>
+                                            <h3 className="section-title-small">Crowding Signals</h3>
+                                            <p className="section-desc-small">Stocks held by multiple funds</p>
+                                        </div>
+                                    </div>
 
-
-                            {crowding.gaining_funds.length > 0 && (
-                                <div className="crowding-subsection">
-                                    <div className="crowding-label">↑ Fund Count</div>
-                                    <div className="crowding-list">
-                                        {crowding.gaining_funds.slice(0, 3).map((item, i) => (
-                                            <div key={i} className="crowding-item">
-                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
-                                                <span className="crowding-change positive">+{item.change}</span>
+                                    {crowding.most_held.length > 0 && (
+                                        <div className="crowding-subsection">
+                                            <div className="crowding-label">Most Widely Held</div>
+                                            <div className="crowding-list">
+                                                {crowding.most_held.slice(0, 3).map((item, i) => {
+                                                    const itemTicker = item.ticker || 'N/A';
+                                                    return (
+                                                        <div key={i} className="crowding-item">
+                                                            <span className="crowding-ticker">{itemTicker}</span>
+                                                            <span
+                                                                className="crowding-count has-tooltip"
+                                                                onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker)}
+                                                                onMouseLeave={handleCrowdingTooltipLeave}
+                                                            >
+                                                                {item.fund_count} funds
+                                                                {crowdingTooltip && crowdingTooltip.ticker === itemTicker && item.funds && item.funds.length > 0 && (
+                                                                    <span
+                                                                        className="tooltip-content visible"
+                                                                        style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15 }}
+                                                                    >
+                                                                        {item.funds.map((fund, idx) => (
+                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                        ))}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {crowding.losing_funds.length > 0 && (
-                                <div className="crowding-subsection">
-                                    <div className="crowding-label">↓ Fund Count</div>
-                                    <div className="crowding-list">
-                                        {crowding.losing_funds.slice(0, 3).map((item, i) => (
-                                            <div key={i} className="crowding-item">
-                                                <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
-                                                <span className="crowding-change negative">{item.change}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </section>
-                    )}
-
-                    {/* New Positions Spotlight */}
-                    {newPositions.length > 0 && (
-                        <section className="dashboard-section compact">
-                            <div className="section-header">
-                                <PlusCircle className="section-icon-small" style={{ color: '#10b981' }} />
-                                <div>
-                                    <h3 className="section-title-small">New This Quarter</h3>
-                                    <p className="section-desc-small">New positions and re-entries</p>
-                                </div>
-                                <div className="toggle-group">
-                                    <button
-                                        className={`toggle-btn ${newPosSort === 'value' ? 'active' : ''}`}
-                                        onClick={() => setNewPosSort('value')}
-                                        title="Sort by dollar value"
-                                    >$</button>
-                                    <button
-                                        className={`toggle-btn ${newPosSort === 'weight' ? 'active' : ''}`}
-                                        onClick={() => setNewPosSort('weight')}
-                                        title="Sort by portfolio %"
-                                    >%</button>
-                                </div>
-                            </div>
-
-                            <div className="new-positions-list scrollable">
-                                {displayNewPositions.map((pos, i) => (
-                                    <div key={i} className="new-position-item">
-                                        <div className="new-position-info">
-                                            <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
-                                            <span className="new-position-fund">{pos.fund_name}</span>
                                         </div>
-                                        <div className="new-position-stats">
-                                            <span className="new-position-value">{formatCurrency(pos.value)}</span>
-                                            <span className="new-position-weight">{pos.weight.toFixed(1)}%</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                                    )}
 
-                    {/* Exited Positions Spotlight */}
-                    {exitedPositions.length > 0 && (
-                        <section className="dashboard-section compact">
-                            <div className="section-header">
-                                <MinusCircle className="section-icon-small" style={{ color: '#ef4444' }} />
-                                <div>
-                                    <h3 className="section-title-small">Exited This Quarter</h3>
-                                    <p className="section-desc-small">Positions fully sold off</p>
-                                </div>
-                                <div className="toggle-group">
-                                    <button
-                                        className={`toggle-btn ${exitPosSort === 'value' ? 'active' : ''}`}
-                                        onClick={() => setExitPosSort('value')}
-                                        title="Sort by dollar value"
-                                    >$</button>
-                                    <button
-                                        className={`toggle-btn ${exitPosSort === 'weight' ? 'active' : ''}`}
-                                        onClick={() => setExitPosSort('weight')}
-                                        title="Sort by portfolio %"
-                                    >%</button>
-                                </div>
-                            </div>
 
-                            <div className="exited-positions-list scrollable">
-                                {displayExitedPositions.map((pos, i) => (
-                                    <div key={i} className="exited-position-item">
-                                        <div className="exited-position-info">
-                                            <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>
-                                            <span className="exited-position-fund">{pos.fund_name}</span>
-                                        </div>
-                                        <div className="exited-position-stats">
-                                            <span className="exited-position-value">{formatCurrency(pos.value)}</span>
-                                            <span className="exited-position-weight">-{pos.weight.toFixed(1)}%</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
-                    )}
 
-                </div>
-            </div>
-            {/* Group Management Modal */}
-            {isGroupModalOpen && (
-                <div className="modal-overlay" onClick={() => setIsGroupModalOpen(false)}>
-                    <div className="modal-content group-modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <div>
-                                <h2>Manage Fund Groups</h2>
-                                <p>Group funds into folders for aggregated analysis</p>
-                            </div>
-                            <button className="close-btn" onClick={() => setIsGroupModalOpen(false)}>&times;</button>
-                        </div>
-
-                        <div className="modal-body">
-                            <div className="create-group-section">
-                                <input
-                                    type="text"
-                                    placeholder="New group name..."
-                                    value={newGroupName}
-                                    onChange={e => setNewGroupName(e.target.value)}
-                                    onKeyPress={e => e.key === 'Enter' && handleCreateGroup()}
-                                />
-                                <button className="add-group-btn" onClick={handleCreateGroup}>
-                                    <PlusCircle size={18} />
-                                    <span>Create Group</span>
-                                </button>
-                            </div>
-
-                            <div className="groups-list">
-                                {groups.map(group => (
-                                    <div key={group.id} className="group-item-config">
-                                        <div className="group-header-row">
-                                            <div className="group-title-info">
-                                                <Folder size={18} color="#38bdf8" />
-                                                <h3>{group.name}</h3>
-                                                <span className="member-count">{group.member_ciks.length} funds</span>
-                                            </div>
-                                            <button className="delete-group-icon" onClick={() => handleDeleteGroup(group.id)}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-
-                                        <div className="group-member-grid">
-                                            {allFunds.map(fund => {
-                                                const isMember = group.member_ciks.includes(fund.cik);
-                                                return (
-                                                    <div
-                                                        key={fund.cik}
-                                                        className={`fund-chip ${isMember ? 'active' : ''}`}
-                                                        onClick={() => toggleGroupMember(group.id, fund.cik, isMember)}
-                                                    >
-                                                        <span className="chip-name">{fund.name}</span>
-                                                        {isMember ? <MinusCircle size={12} /> : <PlusCircle size={12} />}
+                                    {crowding.gaining_funds.length > 0 && (
+                                        <div className="crowding-subsection">
+                                            <div className="crowding-label">↑ Fund Count</div>
+                                            <div className="crowding-list">
+                                                {crowding.gaining_funds.slice(0, 3).map((item, i) => (
+                                                    <div key={i} className="crowding-item">
+                                                        <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                        <span className="crowding-change positive">+{item.change}</span>
                                                     </div>
-                                                );
-                                            })}
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {crowding.losing_funds.length > 0 && (
+                                        <div className="crowding-subsection">
+                                            <div className="crowding-label">↓ Fund Count</div>
+                                            <div className="crowding-list">
+                                                {crowding.losing_funds.slice(0, 3).map((item, i) => (
+                                                    <div key={i} className="crowding-item">
+                                                        <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                        <span className="crowding-change negative">{item.change}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+
+                            {/* New Positions Spotlight */}
+                            {newPositions.length > 0 && (
+                                <section className="dashboard-section compact">
+                                    <div className="section-header">
+                                        <PlusCircle className="section-icon-small" style={{ color: '#10b981' }} />
+                                        <div>
+                                            <h3 className="section-title-small">New This Quarter</h3>
+                                            <p className="section-desc-small">New positions and re-entries</p>
+                                        </div>
+                                        <div className="toggle-group">
+                                            <button
+                                                className={`toggle-btn ${newPosSort === 'value' ? 'active' : ''}`}
+                                                onClick={() => setNewPosSort('value')}
+                                                title="Sort by dollar value"
+                                            >$</button>
+                                            <button
+                                                className={`toggle-btn ${newPosSort === 'weight' ? 'active' : ''}`}
+                                                onClick={() => setNewPosSort('weight')}
+                                                title="Sort by portfolio %"
+                                            >%</button>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+
+                                    <div className="new-positions-list scrollable">
+                                        {displayNewPositions.map((pos, i) => (
+                                            <div key={i} className="new-position-item">
+                                                <div className="new-position-info">
+                                                    <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
+                                                    <span className="new-position-fund">{pos.fund_name}</span>
+                                                </div>
+                                                <div className="new-position-stats">
+                                                    <span className="new-position-value">{formatCurrency(pos.value)}</span>
+                                                    <span className="new-position-weight">{pos.weight.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* Exited Positions Spotlight */}
+                            {exitedPositions.length > 0 && (
+                                <section className="dashboard-section compact">
+                                    <div className="section-header">
+                                        <MinusCircle className="section-icon-small" style={{ color: '#ef4444' }} />
+                                        <div>
+                                            <h3 className="section-title-small">Exited This Quarter</h3>
+                                            <p className="section-desc-small">Positions fully sold off</p>
+                                        </div>
+                                        <div className="toggle-group">
+                                            <button
+                                                className={`toggle-btn ${exitPosSort === 'value' ? 'active' : ''}`}
+                                                onClick={() => setExitPosSort('value')}
+                                                title="Sort by dollar value"
+                                            >$</button>
+                                            <button
+                                                className={`toggle-btn ${exitPosSort === 'weight' ? 'active' : ''}`}
+                                                onClick={() => setExitPosSort('weight')}
+                                                title="Sort by portfolio %"
+                                            >%</button>
+                                        </div>
+                                    </div>
+
+                                    <div className="exited-positions-list scrollable">
+                                        {displayExitedPositions.map((pos, i) => (
+                                            <div key={i} className="exited-position-item">
+                                                <div className="exited-position-info">
+                                                    <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>
+                                                    <span className="exited-position-fund">{pos.fund_name}</span>
+                                                </div>
+                                                <div className="exited-position-stats">
+                                                    <span className="exited-position-value">{formatCurrency(pos.value)}</span>
+                                                    <span className="exited-position-weight">-{pos.weight.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+
                         </div>
                     </div>
-                </div>
+                    {/* Group Management Modal */}
+                    {isGroupModalOpen && (
+                        <div className="modal-overlay" onClick={() => setIsGroupModalOpen(false)}>
+                            <div className="modal-content group-modal" onClick={e => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <div>
+                                        <h2>Manage Fund Groups</h2>
+                                        <p>Group funds into folders for aggregated analysis</p>
+                                    </div>
+                                    <button className="close-btn" onClick={() => setIsGroupModalOpen(false)}>&times;</button>
+                                </div>
+
+                                <div className="modal-body">
+                                    <div className="create-group-section">
+                                        <input
+                                            type="text"
+                                            placeholder="New group name..."
+                                            value={newGroupName}
+                                            onChange={e => setNewGroupName(e.target.value)}
+                                            onKeyPress={e => e.key === 'Enter' && handleCreateGroup()}
+                                        />
+                                        <button className="add-group-btn" onClick={handleCreateGroup}>
+                                            <PlusCircle size={18} />
+                                            <span>Create Group</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="groups-list">
+                                        {groups.map(group => (
+                                            <div key={group.id} className="group-item-config">
+                                                <div className="group-header-row">
+                                                    <div className="group-title-info">
+                                                        <Folder size={18} color="#38bdf8" />
+                                                        <h3>{group.name}</h3>
+                                                        <span className="member-count">{group.member_ciks.length} funds</span>
+                                                    </div>
+                                                    <button className="delete-group-icon" onClick={() => handleDeleteGroup(group.id)}>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+
+                                                <div className="group-member-grid">
+                                                    {allFunds.map(fund => {
+                                                        const isMember = group.member_ciks.includes(fund.cik);
+                                                        return (
+                                                            <div
+                                                                key={fund.cik}
+                                                                className={`fund-chip ${isMember ? 'active' : ''}`}
+                                                                onClick={() => toggleGroupMember(group.id, fund.cik, isMember)}
+                                                            >
+                                                                <span className="chip-name">{fund.name}</span>
+                                                                {isMember ? <MinusCircle size={12} /> : <PlusCircle size={12} />}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
