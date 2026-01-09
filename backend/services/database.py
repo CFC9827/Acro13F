@@ -241,7 +241,8 @@ class DatabaseManager:
         
         SEC amendments (13F-HR/A) only contain securities that need updating,
         not the full portfolio. So we MERGE holdings across all filings per period:
-        - For each CUSIP, use the value from the MOST RECENT filing containing it
+        - First, AGGREGATE holdings by CUSIP within each filing (sum shares/values)
+        - Then, for each CUSIP, use the value from the MOST RECENT filing containing it
         - This correctly applies amendment "patches" to the original filing
         """
         cik = self.normalize_cik(cik)
@@ -268,12 +269,26 @@ class DatabaseManager:
             """, (cik,))
             amended_periods = {row[0] for row in cursor.fetchall()}
             
-            # Merge holdings per period: for each CUSIP, keep only the latest filing's version
+            # Step 1: Aggregate holdings by CUSIP within each filing
+            # Key: (accession_number, cusip, put_call) -> aggregated holding
+            filing_aggregated = {}
+            for h in all_holdings:
+                acc = h['accession_number']
+                key = (acc, h['cusip'], h.get('put_call'))
+                
+                if key not in filing_aggregated:
+                    # First occurrence - copy the holding
+                    filing_aggregated[key] = h.copy()
+                else:
+                    # Same CUSIP in same filing - SUM shares and values
+                    filing_aggregated[key]['shares'] += h['shares']
+                    filing_aggregated[key]['value'] += h['value']
+            
+            # Step 2: Apply "latest filing wins" logic per period
             # Key: (period, cusip, put_call) -> holding data from most recent filing
             merged = {}
-            for h in all_holdings:
+            for h in filing_aggregated.values():
                 period = h['period_of_report']
-                # Use cusip + put_call as key to distinguish stock vs options
                 key = (period, h['cusip'], h.get('put_call'))
                 
                 # Since we ordered by filing_date ASC, later entries overwrite earlier ones
@@ -367,6 +382,19 @@ class DatabaseManager:
 
     def get_dashboard_summary(self, group_id: int = None) -> Dict:
         """Returns aggregated data across all funds (or group) for the global dashboard."""
+        
+        def aggregate_holdings(holdings: List[Dict]) -> List[Dict]:
+            """Aggregate holdings by CUSIP (sum shares and values for same security)."""
+            aggregated = {}
+            for h in holdings:
+                key = (h.get('cusip'), h.get('put_call'))
+                if key not in aggregated:
+                    aggregated[key] = h.copy()
+                else:
+                    aggregated[key]['shares'] += h['shares']
+                    aggregated[key]['value'] += h['value']
+            return list(aggregated.values())
+        
         if group_id:
             all_funds = []
             with self._get_connection() as conn:
@@ -449,9 +477,10 @@ class DatabaseManager:
                 if summary["prior_period"] is None and prev_period:
                     summary["prior_period"] = prev_period
 
-                # Get holdings for latest
+                # Get holdings for latest (aggregated by CUSIP)
                 cursor.execute("SELECT issuer_name, ticker, cusip, shares, value, put_call FROM holdings WHERE accession_number = ?", (latest_acc,))
-                latest_holdings = [dict(h) for h in cursor.fetchall()]
+                latest_holdings_raw = [dict(h) for h in cursor.fetchall()]
+                latest_holdings = aggregate_holdings(latest_holdings_raw)
                 total_value = sum(h['value'] for h in latest_holdings)
                 summary["kpis"]["total_aum"] += total_value
 
@@ -499,8 +528,9 @@ class DatabaseManager:
 
                 # If we have a previous filing, calculate movers and shifts
                 if prev_acc:
-                    cursor.execute("SELECT ticker, cusip, shares, value, put_call FROM holdings WHERE accession_number = ?", (prev_acc,))
-                    prev_holdings_list = [dict(h) for h in cursor.fetchall()]
+                    cursor.execute("SELECT issuer_name, ticker, cusip, shares, value, put_call FROM holdings WHERE accession_number = ?", (prev_acc,))
+                    prev_holdings_raw = [dict(h) for h in cursor.fetchall()]
+                    prev_holdings_list = aggregate_holdings(prev_holdings_raw)
                     prev_total_value = sum(h['value'] for h in prev_holdings_list)
                     summary["kpis"]["prior_aum"] += prev_total_value
                     

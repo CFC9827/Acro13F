@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -101,6 +101,16 @@ interface ExitedPosition {
     fund_name: string;
     value: number;
     weight: number;
+}
+
+interface SwoopOpportunity {
+    ticker?: string;
+    issuer_name: string;
+    dropPct: number;
+    weight: number;
+    currentPrice: number;
+    prevPrice: number;
+    fund_name: string;
 }
 
 interface DashboardSummary {
@@ -545,6 +555,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
     const [newPosSort, setNewPosSort] = useState<'value' | 'weight'>('value');
     const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
+    const [swoopTooltip, setSwoopTooltip] = useState<{ x: number, y: number } | null>(null);
+    const [fundHistories, setFundHistories] = useState<{ [cik: string]: any[] }>({});
 
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
@@ -590,6 +602,109 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const handleKpiTooltipLeave = () => {
         setKpiTooltip(null);
     };
+
+    const handleSwoopTooltipEnter = (e: React.MouseEvent) => {
+        setSwoopTooltip({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleSwoopTooltipLeave = () => {
+        setSwoopTooltip(null);
+    };
+
+    // Fetch history data for all funds to calculate swoop opportunities
+    useEffect(() => {
+        const fetchAllHistories = async () => {
+            const histories: { [cik: string]: any[] } = {};
+            for (const fund of fundHighlights) {
+                try {
+                    const res = await fetch(`/api/funds/${fund.cik}/history`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        histories[fund.cik] = data;
+                    }
+                } catch (err) {
+                    console.error(`Failed to fetch history for ${fund.cik}`, err);
+                }
+            }
+            setFundHistories(histories);
+        };
+        if (fundHighlights.length > 0) {
+            fetchAllHistories();
+        }
+    }, [fundHighlights]);
+
+    // Calculate aggregated Swoop Opportunities across all funds using implied price methodology
+    const swoopOpportunities = useMemo((): SwoopOpportunity[] => {
+        const candidates: SwoopOpportunity[] = [];
+
+        fundHighlights.forEach(fund => {
+            const history = fundHistories[fund.cik];
+            if (!history || history.length === 0) return;
+
+            // Get unique periods sorted desc
+            const uniquePeriods = Array.from(new Set(history.map((h: any) => h.period_of_report)))
+                .sort((a: any, b: any) => new Date(b).getTime() - new Date(a).getTime());
+
+            if (uniquePeriods.length < 2) return; // Need at least 2 periods
+
+            const latestPeriod = uniquePeriods[0];
+            const priorPeriod = uniquePeriods[1];
+
+            const currentHoldings = history.filter((h: any) => h.period_of_report === latestPeriod);
+            const priorHoldings = history.filter((h: any) => h.period_of_report === priorPeriod);
+
+            // Calculate AUMs
+            const aum = currentHoldings.reduce((sum: number, h: any) => sum + h.value, 0);
+            const priorAum = priorHoldings.reduce((sum: number, h: any) => sum + h.value, 0);
+
+            const priorHoldingsMap = new Map(priorHoldings.map((h: any) => [h.cusip, h]));
+
+            currentHoldings.forEach((curr: any) => {
+                const prev = priorHoldingsMap.get(curr.cusip) as any;
+                if (!prev) return; // Only check existing positions
+
+                const weight = aum > 0 ? (curr.value / aum) * 100 : 0;
+
+                // High Conviction Threshold (>3%)
+                if (weight > 3.0) {
+                    const currentPrice = curr.shares > 0 ? curr.value / curr.shares : 0;
+                    const prevPrice = prev.shares > 0 ? prev.value / prev.shares : 0;
+
+                    if (currentPrice > 0 && prevPrice > 0) {
+                        const priceChange = (currentPrice - prevPrice) / prevPrice;
+
+                        // Split Detection Heuristic: Price drop >30% AND Shares Incr >30% -> Likely Split
+                        const isLikelySplit = priceChange < -0.3 && (curr.shares / prev.shares > 1.3);
+
+                        // Price drop >10% and not a split
+                        if (!isLikelySplit && priceChange < -0.10) {
+                            candidates.push({
+                                ticker: curr.ticker,
+                                issuer_name: curr.issuer_name,
+                                dropPct: priceChange * 100,
+                                weight: weight,
+                                currentPrice,
+                                prevPrice,
+                                fund_name: fund.name
+                            });
+                        }
+                    }
+                }
+            });
+        });
+
+        // Sort by biggest drop first (most negative) and remove duplicates by ticker
+        const seen = new Set<string>();
+        return candidates
+            .sort((a, b) => a.dropPct - b.dropPct)
+            .filter(item => {
+                const key = item.ticker || item.issuer_name;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            })
+            .slice(0, 5);
+    }, [fundHighlights, fundHistories]);
 
     const getMoverDisplay = (mover: Mover) => {
         const ticker = mover.ticker || 'N/A';
@@ -1365,6 +1480,67 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     </div>
                                 </section>
                             )}
+
+                            {/* Swoop Opportunities */}
+                            <section className="dashboard-section compact" style={{ overflow: 'hidden' }}>
+                                <div className="section-header">
+                                    <AlertCircle className="section-icon-small" style={{ color: '#eab308' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <h3 className="section-title-small">Swoop Opps</h3>
+                                        <Info
+                                            size={14}
+                                            style={{ color: '#64748b', cursor: 'help' }}
+                                            onMouseEnter={handleSwoopTooltipEnter}
+                                            onMouseLeave={handleSwoopTooltipLeave}
+                                        />
+                                        {swoopTooltip && (
+                                            <div className="kpi-tooltip" style={{
+                                                left: swoopTooltip.x > window.innerWidth - 320 ? 'auto' : swoopTooltip.x + 15,
+                                                right: swoopTooltip.x > window.innerWidth - 320 ? window.innerWidth - swoopTooltip.x + 15 : 'auto',
+                                                top: swoopTooltip.y + 15,
+                                                maxWidth: '280px',
+                                                fontSize: '11px',
+                                                color: '#cbd5e1',
+                                                lineHeight: 1.5,
+                                                zIndex: 1000
+                                            }}>
+                                                <div className="tooltip-title">Swoop Opportunities</div>
+                                                <p>High-conviction positions (&gt;3% portfolio weight) where the implied share price has dropped &gt;10% quarter-over-quarter.</p>
+                                                <p style={{ marginTop: '8px', color: '#94a3b8' }}>These represent potential buying opportunities where funds are holding through price weakness. Stock splits are filtered out using a price/share change heuristic.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <p className="section-desc-small" style={{ marginLeft: '28px', marginTop: '-4px' }}>Conviction (&gt;3%) share price dips</p>
+                                <div className="swoop-list scrollable" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                                    {swoopOpportunities.length > 0 ? (
+                                        swoopOpportunities.map((op, i) => (
+                                            <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
+                                                <div className="mover-info">
+                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || 'N/A'}</div>
+                                                    <div className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
+                                                        {op.fund_name}
+                                                    </div>
+                                                </div>
+                                                <div className="mover-delta" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                                                        <span style={{ fontSize: '9px', color: '#64748b', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price</span>
+                                                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{op.dropPct.toFixed(1)}%</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'baseline', marginTop: '1px' }}>
+                                                        <span style={{ fontSize: '9px', color: '#64748b', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Weight</span>
+                                                        <span style={{ fontSize: '11px', color: '#64748b' }}>{op.weight.toFixed(1)}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div style={{ padding: '12px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', textAlign: 'center' }}>
+                                            No high conviction dips found this quarter.
+                                        </div>
+                                    )}
+                                </div>
+                            </section>
 
                         </div>
                     </div>
