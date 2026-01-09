@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -111,6 +111,12 @@ interface SwoopOpportunity {
     currentPrice: number;
     prevPrice: number;
     fund_name: string;
+}
+
+interface SectorItem {
+    sector: string;
+    value: number;
+    weight: number;
 }
 
 interface DashboardSummary {
@@ -557,6 +563,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
     const [swoopTooltip, setSwoopTooltip] = useState<{ x: number, y: number } | null>(null);
     const [fundHistories, setFundHistories] = useState<{ [cik: string]: any[] }>({});
+    const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
 
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
@@ -773,6 +780,26 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             setSummary(initialSummary);
         }
     }, [initialSummary, selectedGroupId]);
+
+    // Fetch sector allocation data
+    useEffect(() => {
+        const fetchSectorAllocation = async () => {
+            try {
+                const url = selectedGroupId
+                    ? `/api/sectors/allocation?group_id=${selectedGroupId}`
+                    : '/api/sectors/allocation';
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    setSectorAllocation(data.allocation || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch sector allocation", err);
+            }
+        };
+        fetchSectorAllocation();
+    }, [selectedGroupId, summary]);
+
 
     const handleCreateGroup = async () => {
         if (!newGroupName.trim()) return;
@@ -1541,6 +1568,42 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     )}
                                 </div>
                             </section>
+
+                            {/* Sector Allocation */}
+                            {sectorAllocation.length > 0 && (
+                                <section className="dashboard-section compact">
+                                    <div className="section-header">
+                                        <PieChart className="section-icon-small" style={{ color: '#8b5cf6' }} />
+                                        <div>
+                                            <h3 className="section-title-small">Sector Allocation</h3>
+                                            <p className="section-desc-small">Aggregated across all funds</p>
+                                        </div>
+                                    </div>
+                                    <div className="sector-bars" style={{ padding: '8px 0' }}>
+                                        {sectorAllocation.slice(0, 8).map((item, i) => (
+                                            <div key={i} style={{ marginBottom: '6px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' }}>
+                                                    <span style={{ color: '#94a3b8' }}>{item.sector}</span>
+                                                    <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{item.weight.toFixed(1)}%</span>
+                                                </div>
+                                                <div style={{
+                                                    background: '#1e293b',
+                                                    borderRadius: '2px',
+                                                    height: '6px',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        width: `${Math.min(item.weight, 100)}%`,
+                                                        height: '100%',
+                                                        background: `hsl(${260 - i * 20}, 70%, 60%)`,
+                                                        borderRadius: '2px'
+                                                    }} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
                         </div>
                     </div>

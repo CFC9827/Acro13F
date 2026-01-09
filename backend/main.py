@@ -4,6 +4,7 @@ from services.database import DatabaseManager
 from services.orchestrator import Orchestrator
 from services.benchmark import get_benchmark_data
 from services.prices import get_historical_prices
+from services.sector_mapper import SectorMapper
 import os
 
 app = FastAPI(title="Stock Screener API")
@@ -19,6 +20,7 @@ app.add_middleware(
 # Initialize database and orchestrator
 db = DatabaseManager()
 orch = Orchestrator(db)
+sector_mapper = SectorMapper()
 
 @app.get("/")
 async def root():
@@ -144,6 +146,53 @@ async def get_ticker_prices(ticker: str, start: str = None):
     try:
         prices = get_historical_prices(ticker, db, start)
         return prices
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sectors/update")
+async def update_sectors():
+    """Backfill sector data for all holdings that are missing sectors."""
+    try:
+        updated_count = db.backfill_sectors(sector_mapper.get_sector)
+        return {
+            "status": "success",
+            "updated": updated_count,
+            "cached_total": sector_mapper.get_cached_count()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sectors/allocation")
+async def get_sector_allocation(group_id: int = None):
+    """Get aggregated sector allocation across all funds (or a group)."""
+    try:
+        summary = db.get_dashboard_summary(group_id=group_id)
+        
+        # Aggregate sector weights from all fund holdings
+        sector_totals = {}
+        total_value = 0
+        
+        for fund in summary.get("fund_highlights", []):
+            cik = fund.get("cik")
+            if not cik:
+                continue
+            holdings = db.get_latest_holdings(cik)
+            for h in holdings:
+                sector = h.get("sector") or sector_mapper.get_sector(h.get("ticker", ""))
+                value = h.get("value", 0)
+                sector_totals[sector] = sector_totals.get(sector, 0) + value
+                total_value += value
+        
+        # Convert to percentages
+        allocation = []
+        for sector, value in sorted(sector_totals.items(), key=lambda x: -x[1]):
+            allocation.append({
+                "sector": sector,
+                "value": value,
+                "weight": (value * 100 / total_value) if total_value > 0 else 0
+            })
+        
+        return {"allocation": allocation, "total_value": total_value}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -14,6 +14,7 @@ class DatabaseManager:
         self._migrate_ciks()
         self._migrate_put_call()
         self._normalize_put_call_casing()
+        self._migrate_sector()
 
     def _get_connection(self):
         return sqlite3.connect(self.db_path)
@@ -57,6 +58,16 @@ class DatabaseManager:
             columns = [row[1] for row in cursor.fetchall()]
             if 'put_call' in columns:
                 cursor.execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
+                conn.commit()
+
+    def _migrate_sector(self):
+        """Add sector column to holdings table if it doesn't exist."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(holdings)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'sector' not in columns:
+                cursor.execute("ALTER TABLE holdings ADD COLUMN sector TEXT")
                 conn.commit()
 
     def _init_db(self):
@@ -187,6 +198,26 @@ class DatabaseManager:
             
             if updates:
                 cursor.executemany("UPDATE holdings SET ticker = ? WHERE cusip = ? AND (ticker IS NULL OR ticker = '')", updates)
+                conn.commit()
+            return len(updates)
+
+    def backfill_sectors(self, mapper_func) -> int:
+        """Retroactively maps NULL sectors using the provided mapper function."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Get distinct tickers that need sector mapping
+            cursor.execute("SELECT DISTINCT ticker FROM holdings WHERE ticker IS NOT NULL AND ticker != '' AND (sector IS NULL OR sector = '')")
+            missing_tickers = cursor.fetchall()
+            
+            updates = []
+            for (ticker,) in missing_tickers:
+                if not ticker: continue
+                sector = mapper_func(ticker)
+                if sector:
+                    updates.append((sector, ticker))
+            
+            if updates:
+                cursor.executemany("UPDATE holdings SET sector = ? WHERE ticker = ? AND (sector IS NULL OR sector = '')", updates)
                 conn.commit()
             return len(updates)
 
