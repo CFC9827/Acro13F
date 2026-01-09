@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
@@ -635,8 +636,14 @@ function App() {
                         ) : selectedCik && view !== 'about' ? (
                             <div className="holdings-view">
                                 <div className="view-header">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <h2>Holdings for {funds.find(f => f.cik === selectedCik)?.name}</h2>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flexShrink: 1 }}>
+                                        <h2 style={{
+                                            maxWidth: '450px',
+                                            margin: 0,
+                                            lineHeight: 1.3
+                                        }}>
+                                            Holdings for {funds.find(f => f.cik === selectedCik)?.name}
+                                        </h2>
                                         {selectedCik && (
                                             <a
                                                 href={getFundEdgarUrl(selectedCik)}
@@ -644,6 +651,7 @@ function App() {
                                                 rel="noopener noreferrer"
                                                 className="sec-link-btn"
                                                 title="View on SEC EDGAR"
+                                                style={{ flexShrink: 0 }}
                                             >
                                                 <ExternalLink size={18} />
                                             </a>
@@ -872,12 +880,42 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
     const [benchmarkData, setBenchmarkData] = useState<BenchmarkData[]>([]);
     const [selectedTickers, setSelectedTickers] = useState<Set<string>>(new Set());
     const [linkToPortfolio, setLinkToPortfolio] = useState(false);
+    const [metricTooltip, setMetricTooltip] = useState<{ key: string; x: number; y: number } | null>(null);
+    const [showMethodologyTooltip, setShowMethodologyTooltip] = useState<{ x: number; y: number } | null>(null);
 
     // Custom date range state
     const [customStartQuarter, setCustomStartQuarter] = useState<string>('');
     const [customEndQuarter, setCustomEndQuarter] = useState<string>('');
     const [showStartDropdown, setShowStartDropdown] = useState(false);
     const [showEndDropdown, setShowEndDropdown] = useState(false);
+
+    // Metric explanations for tooltips
+    const metricExplanations: { [key: string]: { title: string; description: string; formula?: string } } = {
+        twr: {
+            title: "Time-Weighted Return (TWR)",
+            description: "Measures the compound rate of growth independent of cash flows. It isolates genuine investment performance by removing the impact of deposits and withdrawals, making it ideal for comparing manager skill.",
+            formula: "TWR = Π(1 + Rₜ) - 1"
+        },
+        irr: {
+            title: "Annualized Internal Rate of Return",
+            description: "The discount rate that makes the net present value of all cash flows equal to zero. Unlike TWR, IRR accounts for the timing and size of cash flows, reflecting your actual dollar-weighted experience.",
+            formula: "NPV = Σ CFₜ/(1+IRR)ᵗ = 0"
+        },
+        roi: {
+            title: "Return on Investment (ROI)",
+            description: "Simple ratio of total profit relative to total capital ever invested. Shows how much wealth was created per dollar committed, expressed as both a multiple (e.g., 1.16x) and percentage.",
+            formula: "ROI = Total PnL / Total Committed"
+        },
+        pnl: {
+            title: "Estimated Price P&L",
+            description: "Measures wealth generated purely from price appreciation on held positions. Calculated as (Ending Price - Starting Price) × Shares Held. Does not include dividends or trading profits.",
+            formula: "PnL = Σ (P₂ - P₁) × Shares"
+        },
+        committed: {
+            title: "Total Committed Capital",
+            description: "The cumulative amount of cash ever deployed into the portfolio. Includes initial investment plus all subsequent purchases. Shows the total capital that was put at risk over time.",
+        }
+    };
 
     // Helper to format quarter
     const formatQuarter = (dateStr: string) => {
@@ -972,13 +1010,19 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
             cutoffDate = new Date(latestDate.getFullYear(), 0, 1);
         } else if (timeRange === 'CUSTOM' || timeRange === 'MAX') {
             cutoffDate = new Date(0); // CUSTOM and MAX show all data
+        } else if (timeRange.endsWith('Q')) {
+            // Quarter-based range (e.g., "2Q" = show 2 quarters of data)
+            // To show N quarters, go back (N-1) quarters from latest period
+            const quarters = parseInt(timeRange);
+            cutoffDate = new Date(latestDate);
+            cutoffDate.setMonth(cutoffDate.getMonth() - ((quarters - 1) * 3));
         } else {
             const years = parseInt(timeRange);
             cutoffDate = new Date(latestDate);
             cutoffDate.setFullYear(cutoffDate.getFullYear() - years);
         }
 
-        // Filter periods: Must be > cutoff AND <= latestPeriodInWindow
+        // Filter periods: Must be within the time window
         const sortedPeriods = sortedPeriodsFull.filter((p, idx) => {
             const d = new Date(p);
 
@@ -989,7 +1033,14 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                 return d >= startDate && d <= endDate;
             }
 
-            return d > cutoffDate && idx <= endIndex;
+            // For quarter-based ranges, use index directly (N quarters = N periods)
+            if (timeRange.endsWith('Q')) {
+                const quarters = parseInt(timeRange);
+                const startIdx = Math.max(0, endIndex - quarters + 1);
+                return idx >= startIdx && idx <= endIndex;
+            }
+
+            return d >= cutoffDate && idx <= endIndex;
         });
 
         if (sortedPeriods.length < 2) return { filteredData: [], stats: { totalReturn: 0, irr: 0, benchmarkTotal: null, benchmarkIrr: null, totalPnL: 0, totalCommitted: 0, portfolioRoi: 0 } };
@@ -1315,67 +1366,44 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
     return (
         <div className="portfolio-dashboard-v2">
             <div className="performance-summary-grid">
+                {/* TIME-WEIGHTED RETURN */}
                 <div className="summary-card">
-                    <div className="summary-label">Time-Weighted Return</div>
-
-                    {/* Primary Portfolio Return */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <div className="summary-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Time-Weighted Return
+                        <Info size={14} style={{ color: '#94a3b8', cursor: 'help' }} onMouseEnter={(e) => setMetricTooltip({ key: 'twr', x: e.clientX, y: e.clientY })} onMouseLeave={() => setMetricTooltip(null)} />
+                    </div>
+                    <div>
                         <div className={`summary-value ${stats.totalReturn >= 0 ? 'positive' : 'negative'}`}>
                             {stats.totalReturn >= 0 ? '+' : ''}{stats.totalReturn.toFixed(2)}%
                         </div>
-                        {stats.benchmarkTotal === null && <span style={{ fontSize: '12px', color: '#94a3b8' }}>Portfolio</span>}
+                        {stats.benchmarkTotal === null && <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Portfolio</div>}
                     </div>
-
-                    {/* S&P 500 Secondary Return */}
                     {stats.benchmarkTotal !== null && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            marginTop: '4px',
-                            paddingTop: '4px',
-                            borderTop: '1px solid #f1f5f9'
-                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
                             <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1' }}>S&P 500:</span>
-                            <span style={{
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                color: '#6366f1'
-                            }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#6366f1' }}>
                                 {stats.benchmarkTotal >= 0 ? '+' : ''}{typeof stats.benchmarkTotal === 'number' ? stats.benchmarkTotal.toFixed(2) : '0.00'}%
                             </span>
                         </div>
                     )}
-
                     <div className="summary-subtext" style={{ marginTop: '8px' }}>Investment skill (ignores cash flows)</div>
                 </div>
-                <div className="summary-card">
-                    <div className="summary-label">Annualized IRR</div>
 
-                    {/* Primary Portfolio IRR */}
+                {/* ANNUALIZED IRR */}
+                <div className="summary-card">
+                    <div className="summary-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Annualized IRR
+                        <Info size={14} style={{ color: '#94a3b8', cursor: 'help' }} onMouseEnter={(e) => setMetricTooltip({ key: 'irr', x: e.clientX, y: e.clientY })} onMouseLeave={() => setMetricTooltip(null)} />
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                         <div className={`summary-value ${stats.irr >= 0 ? 'positive' : 'negative'}`}>
                             {stats.irr >= 0 ? '+' : ''}{stats.irr.toFixed(2)}%
                         </div>
                     </div>
-
-                    {/* S&P 500 Secondary IRR */}
                     {stats.benchmarkIrr !== null && (
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            width: '100%',
-                            fontSize: '12px',
-                            marginTop: '4px',
-                            paddingTop: '4px',
-                            borderTop: '1px solid #f1f5f9'
-                        }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', fontSize: '12px', marginTop: '4px', paddingTop: '4px', borderTop: '1px solid #f1f5f9' }}>
                             <span style={{ fontSize: '11px', fontWeight: 700, color: '#6366f1' }}>S&P 500:</span>
-                            <span style={{
-                                fontSize: '14px',
-                                fontWeight: 700,
-                                color: '#6366f1'
-                            }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#6366f1' }}>
                                 {stats.benchmarkIrr >= 0 ? '+' : ''}{typeof stats.benchmarkIrr === 'number' ? stats.benchmarkIrr.toFixed(2) : '0.00'}%
                             </span>
                         </div>
@@ -1383,8 +1411,12 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                     <div className="summary-subtext" style={{ marginTop: '8px' }}>Internal Rate of Return</div>
                 </div>
 
+                {/* EST. ROI % */}
                 <div className="summary-card">
-                    <div className="summary-label">Est. ROI %</div>
+                    <div className="summary-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Est. ROI %
+                        <Info size={14} style={{ color: '#94a3b8', cursor: 'help' }} onMouseEnter={(e) => setMetricTooltip({ key: 'roi', x: e.clientX, y: e.clientY })} onMouseLeave={() => setMetricTooltip(null)} />
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                         <div className={`summary-value ${stats.portfolioRoi >= 0 ? 'positive' : 'negative'}`}>
                             <span style={{ fontSize: '14px', fontWeight: 500, opacity: 0.7, marginRight: '4px' }}>
@@ -1396,27 +1428,66 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                     <div className="summary-subtext" style={{ marginTop: '8px' }}>Return on Committed Capital</div>
                 </div>
 
+                {/* EST. PNL (PRICE) */}
                 <div className="summary-card">
-                    <div className="summary-label">Est. PnL (Price)</div>
+                    <div className="summary-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Est. PnL (Price)
+                        <Info size={14} style={{ color: '#94a3b8', cursor: 'help' }} onMouseEnter={(e) => setMetricTooltip({ key: 'pnl', x: e.clientX, y: e.clientY })} onMouseLeave={() => setMetricTooltip(null)} />
+                    </div>
                     <div className={`summary-value ${stats.totalPnL >= 0 ? 'positive' : 'negative'}`}>
                         {stats.totalPnL >= 0 ? '+' : ''}{formatCurrency(stats.totalPnL)}
                     </div>
                     <div className="summary-subtext" style={{ marginTop: '8px' }}>Wealth from holding assets</div>
                 </div>
 
+                {/* TOTAL COMMITTED */}
                 <div className="summary-card">
-                    <div className="summary-label">Total Committed</div>
-                    <div className="summary-value" style={{ color: '#e2e8f0' }}>
+                    <div className="summary-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Total Committed
+                        <Info size={14} style={{ color: '#94a3b8', cursor: 'help' }} onMouseEnter={(e) => setMetricTooltip({ key: 'committed', x: e.clientX, y: e.clientY })} onMouseLeave={() => setMetricTooltip(null)} />
+                    </div>
+                    <div className="summary-value" style={{ color: '#64748b' }}>
                         {formatCurrency(stats.totalCommitted)}
                     </div>
                     <div className="summary-subtext" style={{ marginTop: '8px' }}>Total cash ever put at risk</div>
                 </div>
             </div>
 
+            {/* Metric Tooltip Portal */}
+            {metricTooltip && createPortal(
+                <div
+                    className="kpi-tooltip"
+                    style={{
+                        left: metricTooltip.x > window.innerWidth - 320 ? 'auto' : metricTooltip.x + 15,
+                        right: metricTooltip.x > window.innerWidth - 320 ? window.innerWidth - metricTooltip.x + 15 : 'auto',
+                        top: metricTooltip.y + 20
+                    }}
+                >
+                    <div className="tooltip-title">{metricExplanations[metricTooltip.key].title}</div>
+                    <div style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.5 }}>
+                        {metricExplanations[metricTooltip.key].description}
+                    </div>
+                    {metricExplanations[metricTooltip.key].formula && (
+                        <div style={{ marginTop: '10px', fontFamily: 'monospace', color: '#94a3b8', fontSize: '11px' }}>
+                            {metricExplanations[metricTooltip.key].formula}
+                        </div>
+                    )}
+                </div>,
+                document.body
+            )}
+
             <div className="chart-panel-v2" style={{ height: '500px', position: 'relative' }}>
                 <div className="chart-header-v2">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className="chart-title-v2">Compound Performance Index</div>
+                        <div className="chart-title-v2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            Compound Performance Index
+                            <Info
+                                size={16}
+                                style={{ color: '#94a3b8', cursor: 'help' }}
+                                onMouseEnter={(e) => setShowMethodologyTooltip({ x: e.clientX, y: e.clientY })}
+                                onMouseLeave={() => setShowMethodologyTooltip(null)}
+                            />
+                        </div>
                         <button
                             className={`quarter-nav-btn ${showBenchmark ? 'active' : ''}`}
                             onClick={() => setShowBenchmark(!showBenchmark)}
@@ -1452,6 +1523,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                             {linkToPortfolio ? 'Unlink Stocks' : 'Link to Portfolio'}
                         </button>
                     </div>
+                    <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 16px' }}></div>
                     <div className="time-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <div className="nav-arrows" style={{ display: 'flex', gap: '4px', marginRight: '8px' }}>
                             <button className="time-btn" onClick={() => {
@@ -1781,14 +1853,32 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                     </ResponsiveContainer>
                 </div>
             </div>
-            <div style={{ marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 8, fontSize: '13px', color: '#64748b', border: '1px solid #edf2f7' }}>
-                <TrendingUp size={16} style={{ verticalAlign: 'middle', marginRight: 8, color: '#10b981' }} />
-                <strong>Methodology:</strong> This chart displays the <strong>Time-Weighted Return (TWR)</strong>, which isolates the manager's investment skill by filtering out the impact of external capital flows (deposits/withdrawals).
-                <br /><br />
-                The summary cards calculate <strong>Est. PnL</strong> as wealth generated by price movement and <strong>Est. ROI %</strong> as the return relative to the <strong>Total Committed Capital</strong> (all purchases since inception).
-                <br /><br />
-                <em>Note: This is a hypothetical return based on public 13F filings. It does not account for intra-quarter trading, short positions, dividends, or management fees. See the <strong>About</strong> section for deep-dive methodology.</em>
-            </div>
+            {/* Methodology Tooltip Portal */}
+            {showMethodologyTooltip && createPortal(
+                <div
+                    className="kpi-tooltip"
+                    style={{
+                        left: showMethodologyTooltip.x > window.innerWidth - 400 ? 'auto' : showMethodologyTooltip.x + 15,
+                        right: showMethodologyTooltip.x > window.innerWidth - 400 ? window.innerWidth - showMethodologyTooltip.x + 15 : 'auto',
+                        top: showMethodologyTooltip.y + 20,
+                        maxWidth: '380px'
+                    }}
+                >
+                    <div className="tooltip-title">Performance Methodology</div>
+                    <div style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
+                        The chart shows <strong style={{ color: '#e2e8f0' }}>Time-Weighted Return (TWR)</strong>, which measures investment skill independent of cash flows.
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '11px', lineHeight: 1.5, marginBottom: '10px', borderTop: '1px solid #334155', paddingTop: '10px' }}>
+                        <strong style={{ color: '#cbd5e1' }}>Est. PnL</strong> = Wealth from price changes<br />
+                        <strong style={{ color: '#cbd5e1' }}>Est. ROI %</strong> = Return vs committed capital<br />
+                        <strong style={{ color: '#cbd5e1' }}>IRR</strong> = Dollar-weighted annualized return
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '10px', fontStyle: 'italic' }}>
+                        Based on 13F filings. Excludes intra-quarter trades, shorts, dividends, and fees.
+                    </div>
+                </div>,
+                document.body
+            )}
 
             {/* Holdings Table with IRR for Performance View */}
             <PortfolioChart

@@ -131,7 +131,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                 });
 
                 // Swoop Check (Price Logic)
-                if (curr.weight > 2.0) { // High Conviction Threshold
+                if (curr.weight > 3.0) { // High Conviction Threshold
                     const currentPrice = curr.shares > 0 ? curr.value / curr.shares : 0;
                     const prevPrice = prev.shares > 0 ? prev.value / prev.shares : 0;
 
@@ -549,11 +549,22 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                     <section className="dashboard-section compact" style={{ overflow: 'hidden' }}>
                         <div className="section-header">
                             <AlertCircle className="section-icon-small" style={{ color: '#eab308' }} />
-                            <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <h3 className="section-title-small">Swoop Opps</h3>
-                                <p className="section-desc-small">Conviction (&gt;2%) share price dips</p>
+                                <Info
+                                    size={14}
+                                    style={{ color: '#64748b', cursor: 'help' }}
+                                    onMouseEnter={(e) => handleMouseEnter(e, 'Swoop Opportunities', (
+                                        <div style={{ maxWidth: '280px', fontSize: '11px', color: '#cbd5e1', lineHeight: 1.5 }}>
+                                            <p>High-conviction positions (&gt;3% portfolio weight) where the implied share price has dropped &gt;10% quarter-over-quarter.</p>
+                                            <p style={{ marginTop: '8px', color: '#94a3b8' }}>These represent potential buying opportunities where funds are holding through price weakness. Stock splits are filtered out using a price/share change heuristic.</p>
+                                        </div>
+                                    ))}
+                                    onMouseLeave={handleMouseLeave}
+                                />
                             </div>
                         </div>
+                        <p className="section-desc-small" style={{ marginLeft: '28px', marginTop: '-4px' }}>Conviction (&gt;3%) share price dips</p>
                         <div className="swoop-list scrollable" style={{ maxHeight: '180px', overflowY: 'auto' }}>
                             {swoopOpportunities.length > 0 ? (
                                 swoopOpportunities.slice(0, 5).map((op, i) => (
