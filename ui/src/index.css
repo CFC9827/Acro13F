@@ -613,7 +613,7 @@ body {
 .history-popover {
   position: absolute;
   bottom: 100%;
-  left: 0;
+  left: 200px;
   z-index: 1000;
   background: #0f172a;
   border: 1px solid #334155;

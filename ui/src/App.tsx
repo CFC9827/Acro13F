@@ -871,6 +871,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
     const [showBenchmark, setShowBenchmark] = useState(false);
     const [benchmarkData, setBenchmarkData] = useState<BenchmarkData[]>([]);
     const [selectedTickers, setSelectedTickers] = useState<Set<string>>(new Set());
+    const [linkToPortfolio, setLinkToPortfolio] = useState(false);
 
     // Custom date range state
     const [customStartQuarter, setCustomStartQuarter] = useState<string>('');
@@ -1233,7 +1234,10 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
             const validBenchPoints = finalChartData.filter(d => d.benchmarkRaw > 0);
             const baseBenchRaw = validBenchPoints.length > 0 ? validBenchPoints[0].benchmarkRaw : 0;
 
-            finalChartData = finalChartData.map(d => {
+            // First pass: Calculate re-indexed returns and find entry points for each ticker
+            const tickerEntryIndices: { [ticker: string]: number } = {};
+
+            finalChartData = finalChartData.map((d, idx) => {
                 const updated: any = {
                     ...d,
                     return: (1 + d.return / 100) / (1 + baseReturn / 100) * 100 - 100,
@@ -1244,12 +1248,39 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                     if (d[t] === null || d[t] === undefined) {
                         updated[t] = null;
                     } else {
+                        // Track when this ticker first appears
+                        if (tickerEntryIndices[t] === undefined) {
+                            tickerEntryIndices[t] = idx;
+                        }
                         const baseTick = chartData[0][t] ?? 0;
                         updated[t] = (1 + d[t] / 100) / (1 + baseTick / 100) * 100 - 100;
                     }
                 });
                 return updated;
             });
+
+            // Second pass: If linking to portfolio, offset tickers by portfolio value at their entry point
+            // Also store original values for tooltip display
+            if (linkToPortfolio) {
+                finalChartData = finalChartData.map((d, idx) => {
+                    const updated = { ...d };
+                    selectedTickers.forEach(t => {
+                        if (d[t] !== null && d[t] !== undefined) {
+                            // Store original value for tooltip
+                            updated[`${t}_original`] = d[t];
+
+                            const entryIdx = tickerEntryIndices[t] ?? 0;
+                            // Only add offset if stock didn't exist at T0
+                            if (entryIdx > 0) {
+                                const portfolioAtEntry = finalChartData[entryIdx].return;
+                                updated[t] = d[t] + portfolioAtEntry;
+                            }
+                            // If entryIdx === 0, stock existed at T0, no offset needed
+                        }
+                    });
+                    return updated;
+                });
+            }
         }
 
         // Final metrics at the last data point
@@ -1277,7 +1308,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
         };
 
         return { filteredData: finalChartData, stats };
-    }, [data, timeRange, offset, showBenchmark, benchmarkData, selectedTickers, customStartQuarter, customEndQuarter]);
+    }, [data, timeRange, offset, showBenchmark, benchmarkData, selectedTickers, customStartQuarter, customEndQuarter, linkToPortfolio]);
 
     // Don't return null - let the chart render but be empty
 
@@ -1399,6 +1430,26 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                         >
                             <Activity size={14} style={{ marginRight: 6 }} />
                             {showBenchmark ? 'Hide S&P 500' : 'Compare S&P 500'}
+                        </button>
+                        <button
+                            className={`quarter-nav-btn ${linkToPortfolio ? 'active' : ''}`}
+                            onClick={() => selectedTickers.size > 0 && setLinkToPortfolio(!linkToPortfolio)}
+                            disabled={selectedTickers.size === 0}
+                            style={{
+                                fontSize: '13px',
+                                border: '1px solid #e2e8f0',
+                                color: selectedTickers.size === 0 ? '#cbd5e1' : (linkToPortfolio ? '#f59e0b' : '#64748b'),
+                                background: linkToPortfolio ? '#fffbeb' : 'transparent',
+                                borderColor: linkToPortfolio ? '#fcd34d' : '#e2e8f0',
+                                cursor: selectedTickers.size === 0 ? 'not-allowed' : 'pointer',
+                                opacity: selectedTickers.size === 0 ? 0.6 : 1
+                            }}
+                            title={selectedTickers.size === 0
+                                ? "Select stocks from the table below to enable this feature"
+                                : "When enabled, stock lines start at the portfolio's return value instead of 0%"}
+                        >
+                            <TrendingUp size={14} style={{ marginRight: 6 }} />
+                            {linkToPortfolio ? 'Unlink Stocks' : 'Link to Portfolio'}
                         </button>
                     </div>
                     <div className="time-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1663,14 +1714,21 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
 
                                                 {tickerItems.length > 0 && (
                                                     <div style={{ marginTop: 4, borderTop: '1px solid #f1f5f9', paddingTop: 4 }}>
-                                                        {tickerItems.map(item => (
-                                                            <div key={item.dataKey as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px', gap: '8px' }}>
-                                                                <span style={{ color: item.color, fontSize: '11px', fontWeight: 600, maxWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.dataKey}:</span>
-                                                                <span style={{ fontWeight: 600, fontSize: '11px', color: (item.value as number) >= 0 ? '#10b981' : '#ef4444' }}>
-                                                                    {(item.value as number) >= 0 ? '+' : ''}{(item.value as number).toFixed(2)}%
-                                                                </span>
-                                                            </div>
-                                                        ))}
+                                                        {tickerItems.map(item => {
+                                                            // Use original value if available (when linked), otherwise use displayed value
+                                                            const originalKey = `${item.dataKey}_original`;
+                                                            const displayValue = item.payload[originalKey] !== undefined
+                                                                ? item.payload[originalKey]
+                                                                : (item.value as number);
+                                                            return (
+                                                                <div key={item.dataKey as string} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px', gap: '8px' }}>
+                                                                    <span style={{ color: item.color, fontSize: '11px', fontWeight: 600, maxWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.dataKey}:</span>
+                                                                    <span style={{ fontWeight: 600, fontSize: '11px', color: displayValue >= 0 ? '#10b981' : '#ef4444' }}>
+                                                                        {displayValue >= 0 ? '+' : ''}{displayValue.toFixed(2)}%
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
 
