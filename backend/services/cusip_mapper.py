@@ -13,12 +13,15 @@ class CUSIPMapper:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         self.csv_path = csv_path or os.path.join(base_dir, "data", "CUSIP.csv")
+        self.manual_csv_path = os.path.join(base_dir, "data", "manual_cusip.csv")
         self.cache_path = cache_path or os.path.join(base_dir, "data", "cusip_cache.json")
         self.mappings: Dict[str, str] = {}
         
-        # Load core mappings from CSV first
+        # 1. Load core mappings from CSV
         self._load_csv()
-        # Overlay user/dynamic cache
+        # 2. Load manual overrides (primary priority)
+        self._load_manual_csv()
+        # 3. Overlay user/dynamic cache
         self._load_cache()
         
         # Static overrides for verified accuracy
@@ -62,6 +65,25 @@ class CUSIPMapper:
                     self.mappings.update(cache_data)
             except:
                 pass
+
+    def _load_manual_csv(self):
+        """Loads mappings from the manual overrides file."""
+        if not os.path.exists(self.manual_csv_path):
+            return
+            
+        try:
+            with open(self.manual_csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    cusip = row.get('cusip', '').strip().upper()
+                    symbol = row.get('symbol', '').strip().upper()
+                    if cusip and symbol:
+                        if len(cusip) == 8:
+                            cusip = "0" + cusip
+                        self.mappings[cusip] = symbol
+        except Exception as e:
+            import logging
+            logging.error(f"Error loading Manual CUSIP CSV: {e}")
 
     def get_ticker(self, cusip: str) -> Optional[str]:
         """Returns the ticker for a given CUSIP."""

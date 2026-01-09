@@ -252,7 +252,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 <div style={{ marginBottom: '8px' }}>
                                     <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>NEW ({newPositions.length})</div>
                                     {newPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker} style={{ fontSize: '11px', color: '#e2e8f0' }}>+ {p.ticker}</div>
+                                        <div key={p.ticker || p.issuer_name || p.cusip} style={{ fontSize: '11px', color: '#e2e8f0' }}>+ {p.ticker || p.issuer_name || p.cusip}</div>
                                     ))}
                                     {newPositions.length > 5 && (
                                         <span className="tooltip-more">+{newPositions.length - 5} more</span>
@@ -263,7 +263,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 <div>
                                     <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 700, marginBottom: '4px' }}>EXITED ({exitedPositions.length})</div>
                                     {exitedPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker} style={{ fontSize: '11px', color: '#94a3b8' }}>- {p.ticker}</div>
+                                        <div key={p.ticker || p.cusip} style={{ fontSize: '11px', color: '#94a3b8' }}>- {p.ticker || p.issuer_name || p.cusip}</div>
                                     ))}
                                     {exitedPositions.length > 5 && (
                                         <span className="tooltip-more">+{exitedPositions.length - 5} more</span>
@@ -323,9 +323,9 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                     onMouseEnter={(e) => handleMouseEnter(e, 'New Positions', (
                         <div>
                             {newPositions.slice(0, 8).map(p => (
-                                <div key={p.ticker || p.issuer_name} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
                                     <span className="pos-ticker">{p.ticker || 'N/A'}</span>
-                                    <span className="pos-fund">{p.issuer_name}</span>
+                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
                                     <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
                                         <span className="pos-weight">{p.weight.toFixed(1)}%</span>
@@ -360,12 +360,12 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                     onMouseEnter={(e) => handleMouseEnter(e, 'Exited Positions', (
                         <div>
                             {exitedPositions.slice(0, 8).map(p => (
-                                <div key={p.ticker || p.issuer_name} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
                                     <span className="pos-ticker">{p.ticker || 'N/A'}</span>
-                                    <span className="pos-fund">{p.issuer_name}</span>
+                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
                                     <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
-                                        <span className="pos-weight negative">-{p.weight.toFixed(1)}%</span>
+                                        <span className="pos-weight negative">{p.weight.toFixed(1)}%</span>
                                     </div>
                                 </div>
                             ))}
