@@ -2,8 +2,8 @@
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    width: 111.11vw;
+    height: 111.11vh;
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;

@@ -892,7 +892,7 @@ function App() {
                                 )}
 
                                 {loading ? (
-                                    <div className="loading">
+                                    <div className="loading-state">
                                         <RefreshCw className="spin" style={{ marginBottom: 16 }} />
                                         <div>{loadingMessage || "Loading data..."}</div>
                                     </div>
