@@ -32,7 +32,16 @@ export const AboutPage: React.FC = () => {
             {/* 1. What is this generally? */}
             <div style={{ marginBottom: '64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                    <div style={{
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
                         <Info className="text-blue-400" size={24} />
                     </div>
                     <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Investment Thesis & Methodology</h2>
@@ -68,7 +77,16 @@ export const AboutPage: React.FC = () => {
             {/* 2. Feature List */}
             <div style={{ marginBottom: '64px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                    <div style={{
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
                         <Layers className="text-emerald-400" size={24} />
                     </div>
                     <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Core Features</h2>
@@ -95,7 +113,16 @@ export const AboutPage: React.FC = () => {
             {/* 3. Mechanisms & Math */}
             <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                    <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '10px', borderRadius: '12px' }}>
+                    <div style={{
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
                         <Activity className="text-amber-400" size={24} />
                     </div>
                     <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Mechanisms & Methodology</h2>
