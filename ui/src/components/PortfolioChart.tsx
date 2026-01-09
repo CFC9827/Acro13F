@@ -1308,6 +1308,28 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                     </table>
                 </div>
             </div>
+            {/* Anchored Copyright Notice */}
+            <footer style={{
+                marginTop: 'auto',
+                paddingTop: '60px',
+                paddingBottom: '40px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                opacity: 0.3
+            }}>
+                <div style={{ width: '40px', height: '1px', background: 'rgba(255, 255, 255, 0.1)', marginBottom: '24px' }}></div>
+                <p style={{
+                    fontSize: '10px',
+                    color: '#94a3b8',
+                    letterSpacing: '0.2em',
+                    margin: 0,
+                    fontWeight: 600,
+                    textTransform: 'uppercase'
+                }}>
+                    © JONAH ABRAMS - ALL RIGHTS RESERVED
+                </p>
+            </footer>
         </div>
     );
 };

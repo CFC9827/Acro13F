@@ -430,6 +430,84 @@ function App() {
         }
     }
 
+    const handleBatchAddFunds = async (ciks: string[]) => {
+        if (!ciks || ciks.length === 0) return;
+        setLoading(true);
+        setError(null);
+        setNotification(null);
+
+        let addedCount = 0;
+        let skippedLegacyCount = 0;
+        let totalNewFilings = 0;
+        let errors: string[] = [];
+        const newFundsList: Fund[] = [];
+
+        try {
+            for (let i = 0; i < ciks.length; i++) {
+                const cik = ciks[i];
+                setLoadingMessage(`Adding fund ${i + 1} of ${ciks.length} (CIK: ${cik})...`);
+
+                try {
+                    const res = await fetch(`/api/funds/${cik}/refresh`, { method: 'POST' });
+                    if (res.ok) {
+                        const result = await res.json();
+                        addedCount++;
+                        totalNewFilings += (result.newly_added?.length || 0);
+                        skippedLegacyCount += (result.skipped_legacy || 0);
+                        if (result.cik && result.fund_name) {
+                            newFundsList.push({ cik: result.cik, name: result.fund_name });
+                        }
+                    } else {
+                        const err = await res.json();
+                        errors.push(`Failed to add ${cik}: ${err.detail || 'Unknown error'}`);
+                    }
+                } catch (e) {
+                    errors.push(`Network error for CIK ${cik}`);
+                }
+            }
+
+            // Optimistically update funds state immediately
+            if (newFundsList.length > 0) {
+                setFunds(prev => {
+                    const existingCiks = new Set(prev.map(f => f.cik));
+                    const uniqueNewFunds = newFundsList.filter(f => !existingCiks.has(f.cik));
+                    return [...prev, ...uniqueNewFunds];
+                });
+            }
+
+            await fetchFunds();
+            if (addedCount > 0) {
+                // Force refresh dashboard data to show new tiles
+                await fetchDashboardSummary();
+            }
+
+            if (addedCount > 0 && ciks.length === 1) {
+                navigate('summary', ciks[0]);
+            } else if (addedCount > 0) {
+                navigate('dashboard', null);
+            }
+
+            let msg = `Batch complete: Added ${addedCount} of ${ciks.length} funds.`;
+            if (totalNewFilings > 0) msg += ` Processed ${totalNewFilings} filings.`;
+            if (skippedLegacyCount > 0) msg += ` Skipped ${skippedLegacyCount} legacy filings.`;
+            if (errors.length > 0) {
+                msg += ` Errors: ${errors.length} failed.`;
+                console.error("Batch add errors:", errors);
+            }
+
+            setNotification({
+                message: msg,
+                type: addedCount > 0 ? 'success' : 'info'
+            });
+
+        } catch (err) {
+            setError("Critical error during batch process");
+        } finally {
+            setLoading(false);
+            setLoadingMessage("");
+        }
+    }
+
     return (
         <>
             {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
@@ -608,6 +686,7 @@ function App() {
                             setRefreshCik(cik);
                             handleRefresh(cik);
                         }}
+                        onSelectCiks={(ciks) => handleBatchAddFunds(ciks)}
                     />
 
                     <section className="content">
@@ -622,6 +701,24 @@ function App() {
                             <div className={`notification-banner ${notification.type}`}>
                                 <TrendingUp size={18} />
                                 <span>{notification.message}</span>
+                            </div>
+                        )}
+
+                        {loading && loadingMessage && (
+                            <div className="loading-banner" style={{
+                                background: 'rgba(16, 185, 129, 0.1)',
+                                border: '1px solid #10b981',
+                                color: '#10b981',
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                marginBottom: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                animation: 'fadeIn 0.3s ease-in-out'
+                            }}>
+                                <RefreshCw className="spin" size={18} />
+                                <span style={{ fontWeight: 500 }}>{loadingMessage}</span>
                             </div>
                         )}
 
@@ -642,7 +739,7 @@ function App() {
                                             margin: 0,
                                             lineHeight: 1.3
                                         }}>
-                                            Holdings for {funds.find(f => f.cik === selectedCik)?.name}
+                                            Holdings for {funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name}
                                         </h2>
                                         {selectedCik && (
                                             <a
@@ -810,7 +907,7 @@ function App() {
                                 ) : view === 'summary' ? (
                                     <FundSummary
                                         history={history}
-                                        fundName={funds.find(f => f.cik === selectedCik)?.name || 'Fund'}
+                                        fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
                                     />
                                 ) : view === 'performance' ? (
                                     <PerformanceChart
@@ -823,7 +920,7 @@ function App() {
                                 ) : (
                                     <HoldingsTable
                                         history={history}
-                                        fundName={funds.find(f => f.cik === selectedCik)?.name || 'Hedge Fund Portfolio'}
+                                        fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Hedge Fund Portfolio'}
                                     />
                                 )}
                             </div>
@@ -1386,7 +1483,6 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                             </span>
                         </div>
                     )}
-                    <div className="summary-subtext" style={{ marginTop: '8px' }}>Investment skill (ignores cash flows)</div>
                 </div>
 
                 {/* ANNUALIZED IRR */}
@@ -1894,6 +1990,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                 customStart={customStartQuarter}
                 customEnd={customEndQuarter}
             />
+            {/* Footer removed to avoid duplication as PortfolioChart already includes it */}
         </div>
     );
 }

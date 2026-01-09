@@ -955,7 +955,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         background: 'rgba(255,255,255,0.02)',
                         borderRadius: '12px',
                         border: '1px solid rgba(255,255,255,0.05)',
-                        overflowX: 'auto'
                     }}>
                         <button
                             className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
@@ -972,7 +971,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 cursor: 'pointer',
                                 fontSize: '12px',
                                 fontWeight: 600,
-                                whiteSpace: 'nowrap'
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0
                             }}
                         >
                             <LayoutGrid size={14} />
@@ -995,7 +995,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        position: 'relative'
+                                        position: 'relative',
+                                        flexShrink: 0
                                     }}
                                 >
                                     <button
@@ -1046,12 +1047,14 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 borderRadius: '8px',
                                 border: '1px dashed rgba(255,255,255,0.1)',
                                 background: 'transparent',
-                                color: '#64748b',
+                                color: '#94a3b8',
                                 cursor: 'pointer',
                                 fontSize: '12px',
-                                fontWeight: 500,
-                                marginLeft: 'auto',
-                                whiteSpace: 'nowrap'
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.05em',
+                                flexShrink: 0,
+                                whiteSpace: 'nowrap',
+                                marginLeft: 'auto'
                             }}
                         >
                             <FolderPlus size={14} />
@@ -1753,7 +1756,30 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </div>
                     )}
                 </>
-            )}
+            )
+            }
+            {/* Anchored Copyright Notice */}
+            <footer style={{
+                marginTop: 'auto',
+                paddingTop: '60px',
+                paddingBottom: '40px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                opacity: 0.3
+            }}>
+                <div style={{ width: '40px', height: '1px', background: 'rgba(255, 255, 255, 0.1)', marginBottom: '24px' }}></div>
+                <p style={{
+                    fontSize: '10px',
+                    color: '#94a3b8',
+                    letterSpacing: '0.2em',
+                    margin: 0,
+                    fontWeight: 600,
+                    textTransform: 'uppercase'
+                }}>
+                    © JONAH ABRAMS - ALL RIGHTS RESERVED
+                </p>
+            </footer>
         </div>
     );
 };

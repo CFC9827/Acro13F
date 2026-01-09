@@ -42,6 +42,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
                     <div className="progress-fill"></div>
                 </div>
                 <p className="legal-text">POWERED BY SEC EDGAR DATA</p>
+                <p className="legal-text" style={{ marginTop: '4px', opacity: 0.8 }}>© JONAH ABRAMS - ALL RIGHTS RESERVED</p>
             </div>
         </div>
     );
