@@ -1553,23 +1553,31 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
         if (!currentQuarterData.length) return [];
 
         const unique = new Map<string, string>(); // accession -> cik
+        let periodHasAmendment = false;
+
         currentQuarterData.forEach(h => {
             if (h.accession_number && h.cik) {
                 unique.set(h.accession_number, h.cik);
+            }
+            // Check if any holding has the has_amendment flag
+            if ((h as any).has_amendment) {
+                periodHasAmendment = true;
             }
         });
 
         // Sort accession numbers descending (approx. latest first)
         const sortedAccessions = Array.from(unique.keys()).sort().reverse();
 
-        return sortedAccessions.map((acc, index) => ({
+        return sortedAccessions.map((acc) => ({
             accession: acc,
             cik: unique.get(acc),
             url: getEdgarUrl(unique.get(acc), acc),
-            label: index === 0 && sortedAccessions.length > 1 ? '13F AMENDMENT' : '13F FILING',
-            isAmendment: index === 0 && sortedAccessions.length > 1
+            // Show as amendment if the period has amendments (even if only one accession shown)
+            label: periodHasAmendment ? '13F AMENDMENT' : '13F FILING',
+            isAmendment: periodHasAmendment
         }));
     }, [currentQuarterData]);
+
 
     const paginatedData = processedData.slice(
         (currentPage - 1) * itemsPerPage,
