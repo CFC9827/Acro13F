@@ -1552,31 +1552,40 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const quarterFilings = useMemo(() => {
         if (!currentQuarterData.length) return [];
 
-        const unique = new Map<string, string>(); // accession -> cik
-        let periodHasAmendment = false;
+        // Get period_filings from the first holding (all holdings in the same period share the same period_filings)
+        const firstHolding = currentQuarterData[0] as any;
+        const periodFilingsData = firstHolding?.period_filings || [];
+        const cik = firstHolding?.cik;
 
+        // If we have period_filings from the API, use it
+        if (periodFilingsData.length > 0 && cik) {
+            return periodFilingsData.map((f: { accession_number: string; is_amendment: boolean }) => ({
+                accession: f.accession_number,
+                cik: cik,
+                url: getEdgarUrl(cik, f.accession_number),
+                label: f.is_amendment ? '13F AMENDMENT' : '13F FILING',
+                isAmendment: f.is_amendment
+            }));
+        }
+
+        // Fallback to old logic if period_filings not available
+        const unique = new Map<string, string>(); // accession -> cik
         currentQuarterData.forEach(h => {
             if (h.accession_number && h.cik) {
                 unique.set(h.accession_number, h.cik);
             }
-            // Check if any holding has the has_amendment flag
-            if ((h as any).has_amendment) {
-                periodHasAmendment = true;
-            }
         });
 
-        // Sort accession numbers descending (approx. latest first)
         const sortedAccessions = Array.from(unique.keys()).sort().reverse();
-
         return sortedAccessions.map((acc) => ({
             accession: acc,
             cik: unique.get(acc),
             url: getEdgarUrl(unique.get(acc), acc),
-            // Show as amendment if the period has amendments (even if only one accession shown)
-            label: periodHasAmendment ? '13F AMENDMENT' : '13F FILING',
-            isAmendment: periodHasAmendment
+            label: '13F FILING',
+            isAmendment: false
         }));
     }, [currentQuarterData]);
+
 
 
     const paginatedData = processedData.slice(

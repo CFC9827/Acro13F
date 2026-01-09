@@ -346,6 +346,16 @@ class DatabaseManager:
                         # Partial amendment - use both, merge by CUSIP
                         period_active_filings[period] = {f['accession_number'] for f in filings}
             
+            # Build a map of all filings per period (for UI to show links to all)
+            period_all_filings = {}
+            for period, filings in period_filings.items():
+                # Sort by filing_date descending so amendment comes first
+                sorted_filings = sorted(filings, key=lambda x: x['filing_date'], reverse=True)
+                period_all_filings[period] = [
+                    {'accession_number': f['accession_number'], 'is_amendment': i == 0 and len(sorted_filings) > 1}
+                    for i, f in enumerate(sorted_filings)
+                ]
+            
             # Filter holdings to only active filings
             active_holdings = []
             for h in all_holdings:
@@ -379,8 +389,9 @@ class DatabaseManager:
                 # This means amendments (later filings) correctly override original values
                 merged[key] = h
                 
-                # Add amendment flag
+                # Add amendment flag and all filings for this period
                 merged[key]['has_amendment'] = period in amended_periods
+                merged[key]['period_filings'] = period_all_filings.get(period, [])
             
             # Convert back to list, sorted by period
             result = list(merged.values())
