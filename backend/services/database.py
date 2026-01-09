@@ -15,6 +15,7 @@ class DatabaseManager:
         self._migrate_put_call()
         self._normalize_put_call_casing()
         self._migrate_sector()
+        self._migrate_group_sort_order()
 
     def _get_connection(self):
         return sqlite3.connect(self.db_path)
@@ -68,6 +69,16 @@ class DatabaseManager:
             columns = [row[1] for row in cursor.fetchall()]
             if 'sector' not in columns:
                 cursor.execute("ALTER TABLE holdings ADD COLUMN sector TEXT")
+                conn.commit()
+
+    def _migrate_group_sort_order(self):
+        """Add sort_order column to fund_groups table if it doesn't exist."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(fund_groups)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'sort_order' not in columns:
+                cursor.execute("ALTER TABLE fund_groups ADD COLUMN sort_order INTEGER DEFAULT 0")
                 conn.commit()
 
     def _init_db(self):
@@ -126,7 +137,8 @@ class DatabaseManager:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS fund_groups (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE
+                    name TEXT UNIQUE,
+                    sort_order INTEGER DEFAULT 0
                 )
             """)
 
@@ -378,7 +390,12 @@ class DatabaseManager:
     def create_group(self, name: str) -> int:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO fund_groups (name) VALUES (?)", (name,))
+            # Find current minimum sort_order to place new group at the top
+            cursor.execute("SELECT MIN(sort_order) FROM fund_groups")
+            min_order = cursor.fetchone()[0]
+            new_order = (min_order - 1) if min_order is not None else 0
+            
+            cursor.execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?)", (name, new_order))
             conn.commit()
             return cursor.lastrowid
 
@@ -387,17 +404,24 @@ class DatabaseManager:
             conn.execute("DELETE FROM fund_groups WHERE id = ?", (group_id,))
             conn.commit()
 
-    def get_groups(self) -> List[Dict]:
+    def get_groups(self):
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM fund_groups ORDER BY name")
+            cursor.execute("SELECT * FROM fund_groups ORDER BY sort_order ASC, id ASC")
             groups = [dict(row) for row in cursor.fetchall()]
             
             for g in groups:
                 cursor.execute("SELECT cik FROM fund_group_members WHERE group_id = ?", (g['id'],))
-                g['member_ciks'] = [r[0] for r in cursor.fetchall()]
+                g['member_ciks'] = [row[0] for row in cursor.fetchall()]
             return groups
+
+    def reorder_groups(self, orders: Dict[int, int]):
+        """Updates the sort_order for multiple groups. orders is {group_id: sort_order}."""
+        with self._get_connection() as conn:
+            for group_id, sort_order in orders.items():
+                conn.execute("UPDATE fund_groups SET sort_order = ? WHERE id = ?", (sort_order, group_id))
+            conn.commit()
 
     def add_fund_to_group(self, group_id: int, cik: str):
         cik = self.normalize_cik(cik)

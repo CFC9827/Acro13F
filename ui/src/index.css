@@ -2721,6 +2721,33 @@ body {
   text-align: center;
 }
 
+/* Drag and Drop Fund Groups */
+.group-pill-container {
+  cursor: grab;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.group-pill-container.dragging {
+  cursor: grabbing;
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.drag-handle {
+  color: #94a3b8;
+  cursor: grab;
+  margin-right: -2px;
+  transition: color 0.2s;
+}
+
+.group-pill:hover .drag-handle {
+  color: #38bdf8;
+}
+
+.group-pill-container:active {
+  cursor: grabbing;
+}
+
 @media (max-width: 1024px) {
   .dashboard-grid {
     grid-template-columns: 1fr;

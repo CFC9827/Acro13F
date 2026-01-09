@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -564,6 +564,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [swoopTooltip, setSwoopTooltip] = useState<{ x: number, y: number } | null>(null);
     const [fundHistories, setFundHistories] = useState<{ [cik: string]: any[] }>({});
     const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
+    const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
 
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
@@ -616,6 +617,58 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const handleSwoopTooltipLeave = () => {
         setSwoopTooltip(null);
+    };
+
+    const handleDragStart = (e: React.DragEvent, groupId: number) => {
+        setDraggedGroupId(groupId);
+        e.dataTransfer.setData('text/plain', groupId.toString());
+        e.dataTransfer.effectAllowed = 'move';
+
+        // Add a slight delay to allow the drag image to be created before we change the opacity
+        setTimeout(() => {
+            const el = e.target as HTMLElement;
+            el.style.opacity = '0.4';
+        }, 0);
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        setDraggedGroupId(null);
+        const el = e.target as HTMLElement;
+        el.style.opacity = '1';
+    };
+
+    const handleDragOver = (e: React.DragEvent, targetGroupId: number) => {
+        e.preventDefault();
+        if (draggedGroupId === null || draggedGroupId === targetGroupId) return;
+
+        // Use functional update to ensure we use the latest groups state
+        setGroups(prevGroups => {
+            const dragIndex = prevGroups.findIndex(g => g.id === draggedGroupId);
+            const targetIndex = prevGroups.findIndex(g => g.id === targetGroupId);
+
+            if (dragIndex === -1 || targetIndex === -1) return prevGroups;
+
+            const newGroups = [...prevGroups];
+            const [draggedItem] = newGroups.splice(dragIndex, 1);
+            newGroups.splice(targetIndex, 0, draggedItem);
+            return newGroups;
+        });
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        const orders: { [key: number]: number } = {};
+        groups.forEach((g, index) => { orders[g.id] = index; });
+
+        try {
+            await fetch('/api/dashboard/groups/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orders)
+            });
+        } catch (err) {
+            console.error("Failed to save group order", err);
+        }
     };
 
     // Fetch history data for all funds to calculate swoop opportunities
@@ -811,6 +864,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             }
         } catch (err) {
             console.error("Failed to create group", err);
+            alert("Failed to create group. The name might already exist.");
         }
     };
 
@@ -822,6 +876,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 fetchGroups();
             } catch (err) {
                 console.error("Failed to delete group", err);
+                alert("Failed to delete group.");
             }
         }
     };
@@ -925,45 +980,57 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                         {groups.map(g => {
                             const isEmpty = g.member_ciks.length === 0;
+                            const isBeingDragged = draggedGroupId === g.id;
+
                             return (
-                                <button
+                                <div
                                     key={g.id}
-                                    className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
-                                    onClick={() => {
-                                        if (isEmpty) {
-                                            setIsGroupModalOpen(true); // Open modal instead of selecting empty group
-                                        } else {
-                                            setSelectedGroupId(g.id);
-                                        }
-                                    }}
-                                    title={isEmpty ? 'Add funds to this group first' : `View ${g.name}`}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, g.id)}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={(e) => handleDragOver(e, g.id)}
+                                    onDrop={handleDrop}
+                                    className={`group-pill-container ${isBeingDragged ? 'dragging' : ''}`}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '6px 12px',
-                                        borderRadius: '8px',
-                                        border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
-                                        background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
-                                            isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                                        color: isEmpty ? '#ef4444' :
-                                            selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        whiteSpace: 'nowrap'
+                                        position: 'relative'
                                     }}
                                 >
-                                    <Folder size={14} />
-                                    <span>{g.name}</span>
-                                    <span style={{
-                                        background: isEmpty ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255,255,255,0.1)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '10px',
-                                        color: isEmpty ? '#ef4444' : undefined
-                                    }}>{isEmpty ? '⚠️ 0' : g.member_ciks.length}</span>
-                                </button>
+                                    <button
+                                        className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
+                                        onClick={() => {
+                                            if (isEmpty) {
+                                                setIsGroupModalOpen(true);
+                                            } else {
+                                                setSelectedGroupId(g.id);
+                                            }
+                                        }}
+                                        title={isEmpty ? 'Add funds to this group first' : `View ${g.name} (Drag to reorder)`}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '6px 12px',
+                                            borderRadius: '8px',
+                                            border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
+                                            background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
+                                                isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                            color: isEmpty ? '#ef4444' :
+                                                selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            whiteSpace: 'nowrap',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <GripVertical size={12} style={{ opacity: 0.5 }} className="drag-handle" />
+                                        <Folder size={14} />
+                                        <span>{g.name}</span>
+                                        {!isEmpty && <span style={{ opacity: 0.5, fontSize: '10px' }}>{g.member_ciks.length}</span>}
+                                    </button>
+                                </div>
                             );
                         })}
 

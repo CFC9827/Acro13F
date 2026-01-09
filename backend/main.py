@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Dict
 from services.database import DatabaseManager
 from services.orchestrator import Orchestrator
 from services.benchmark import get_benchmark_data
@@ -49,6 +50,14 @@ async def get_dashboard_performance(group_id: int = None):
 async def get_groups():
     try:
         return db.get_groups()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/dashboard/groups/reorder")
+async def reorder_groups(orders: Dict[int, int]):
+    try:
+        db.reorder_groups(orders)
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
