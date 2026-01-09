@@ -68,12 +68,13 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-main);
   line-height: 1.5;
+  zoom: 0.9;
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 111.11vh;
 }
 
 .app-header {
@@ -148,6 +149,8 @@ body {
   flex-direction: column;
   min-height: 100%;
   flex: 1;
+  width: 100%;
+  max-width: none;
 }
 
 .sidebar {
@@ -597,6 +600,36 @@ body {
   font-size: 0.85em;
   margin-left: 6px;
   font-weight: 500;
+}
+
+
+
+/* Dashboard Layout Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  width: 100%;
+}
+
+.dashboard-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .delta-add {
