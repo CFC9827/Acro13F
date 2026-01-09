@@ -56,12 +56,13 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
         exitedPositions,
         movers,
         topHoldings,
-        swoopOpportunities
+        swoopOpportunities,
+        sectorAllocation
     } = useMemo(() => {
         if (!history || history.length === 0) {
             return {
                 latestPeriod: '', priorPeriod: '', currentHoldings: [],
-                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: []
+                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: [], sectorAllocation: []
             };
         }
 
@@ -185,6 +186,16 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
         // Final Sorts
         const swoopOpportunities = swoopCandidates.sort((a, b) => a.dropPct - b.dropPct); // Biggest drop first (most negative)
 
+        // Calculate Sector Allocation
+        const sectorTotals: { [key: string]: number } = {};
+        currentHoldings.forEach(h => {
+            const sector = (h as any).sector || 'Unknown';
+            sectorTotals[sector] = (sectorTotals[sector] || 0) + h.value;
+        });
+        const sectorAllocation = Object.entries(sectorTotals)
+            .map(([sector, value]) => ({ sector, value, weight: (value / aum) * 100 }))
+            .sort((a, b) => b.weight - a.weight);
+
         return {
             latestPeriod,
             priorPeriod,
@@ -195,7 +206,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
             exitedPositions: exitedPositions.sort((a, b) => b.value - a.value),
             movers: movers.sort((a, b) => Math.abs(b.val_change) - Math.abs(a.val_change)),
             topHoldings,
-            swoopOpportunities
+            swoopOpportunities,
+            sectorAllocation
         };
     }, [history]);
 
@@ -594,6 +606,42 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                             )}
                         </div>
                     </section>
+
+                    {/* Sector Allocation */}
+                    {sectorAllocation.length > 0 && (
+                        <section className="dashboard-section compact">
+                            <div className="section-header">
+                                <PieChart className="section-icon-small" style={{ color: '#8b5cf6' }} />
+                                <div>
+                                    <h3 className="section-title-small">Sector Allocation</h3>
+                                    <p className="section-desc-small">Portfolio breakdown</p>
+                                </div>
+                            </div>
+                            <div className="sector-bars" style={{ padding: '8px 0' }}>
+                                {sectorAllocation.slice(0, 8).map((item, i) => (
+                                    <div key={i} style={{ marginBottom: '6px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' }}>
+                                            <span style={{ color: '#94a3b8' }}>{item.sector}</span>
+                                            <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{item.weight.toFixed(1)}%</span>
+                                        </div>
+                                        <div style={{
+                                            background: '#1e293b',
+                                            borderRadius: '2px',
+                                            height: '6px',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{
+                                                width: `${Math.min(item.weight, 100)}%`,
+                                                height: '100%',
+                                                background: `hsl(${260 - i * 20}, 70%, 60%)`,
+                                                borderRadius: '2px'
+                                            }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
 
                     {/* KEY METRICS (Bottom of Sidebar) */}
                     <section className="dashboard-section compact">
