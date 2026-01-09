@@ -282,11 +282,12 @@ class DatabaseManager:
         """
         Get merged historical holdings for a fund.
         
-        SEC amendments (13F-HR/A) only contain securities that need updating,
-        not the full portfolio. So we MERGE holdings across all filings per period:
-        - First, AGGREGATE holdings by CUSIP within each filing (sum shares/values)
-        - Then, for each CUSIP, use the value from the MOST RECENT filing containing it
-        - This correctly applies amendment "patches" to the original filing
+        SEC amendments (13F-HR/A) can be:
+        1. Full Restatement - Completely replaces the original filing
+        2. Partial Amendment - Only updates specific positions
+        
+        Heuristic: If amendment has >= 50% of original's position count, treat as full restatement
+        and use ONLY the amendment data. Otherwise, merge by CUSIP (latest value wins).
         """
         cik = self.normalize_cik(cik)
         with self._get_connection() as conn:
@@ -303,19 +304,59 @@ class DatabaseManager:
             """, (cik,))
             all_holdings = [dict(row) for row in cursor.fetchall()]
             
-            # Check which periods have amendments (multiple filings)
+            # Get filing info grouped by period to detect amendments
             cursor.execute("""
-                SELECT period_of_report, COUNT(*) as filing_count
-                FROM filings WHERE cik = ?
-                GROUP BY period_of_report
-                HAVING filing_count > 1
+                SELECT period_of_report, accession_number, filing_date,
+                       (SELECT COUNT(*) FROM holdings WHERE accession_number = f.accession_number) as holding_count
+                FROM filings f
+                WHERE cik = ?
+                ORDER BY period_of_report ASC, filing_date ASC
             """, (cik,))
-            amended_periods = {row[0] for row in cursor.fetchall()}
+            period_filings = {}
+            for row in cursor.fetchall():
+                period = row[0]
+                if period not in period_filings:
+                    period_filings[period] = []
+                period_filings[period].append({
+                    'accession_number': row[1],
+                    'filing_date': row[2],
+                    'holding_count': row[3]
+                })
+            
+            # Determine which filings to use for each period
+            # If a period has multiple filings, check if amendment is a full restatement
+            period_active_filings = {}
+            amended_periods = set()
+            for period, filings in period_filings.items():
+                if len(filings) == 1:
+                    # Single filing - use it
+                    period_active_filings[period] = {filings[0]['accession_number']}
+                else:
+                    # Multiple filings (amendment exists)
+                    amended_periods.add(period)
+                    original = filings[0]
+                    latest = filings[-1]
+                    
+                    # Heuristic: If amendment has >= 50% of original's positions, it's a full restatement
+                    # Use ONLY the latest filing (ignore original completely)
+                    if latest['holding_count'] >= original['holding_count'] * 0.5:
+                        # Full restatement - use only the latest
+                        period_active_filings[period] = {latest['accession_number']}
+                    else:
+                        # Partial amendment - use both, merge by CUSIP
+                        period_active_filings[period] = {f['accession_number'] for f in filings}
+            
+            # Filter holdings to only active filings
+            active_holdings = []
+            for h in all_holdings:
+                period = h['period_of_report']
+                if h['accession_number'] in period_active_filings.get(period, set()):
+                    active_holdings.append(h)
             
             # Step 1: Aggregate holdings by CUSIP within each filing
             # Key: (accession_number, cusip, put_call) -> aggregated holding
             filing_aggregated = {}
-            for h in all_holdings:
+            for h in active_holdings:
                 acc = h['accession_number']
                 key = (acc, h['cusip'], h.get('put_call'))
                 
@@ -327,7 +368,7 @@ class DatabaseManager:
                     filing_aggregated[key]['shares'] += h['shares']
                     filing_aggregated[key]['value'] += h['value']
             
-            # Step 2: Apply "latest filing wins" logic per period
+            # Step 2: Apply "latest filing wins" logic per period (for partial amendments)
             # Key: (period, cusip, put_call) -> holding data from most recent filing
             merged = {}
             for h in filing_aggregated.values():
@@ -357,6 +398,7 @@ class DatabaseManager:
                 h['percent_portfolio'] = (h['value'] * 100.0 / total) if total > 0 else 0
             
             return result
+
 
     def get_filing_range(self, cik: str) -> Dict:
         cik = self.normalize_cik(cik)
