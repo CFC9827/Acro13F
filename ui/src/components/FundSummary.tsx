@@ -247,21 +247,27 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                 <div
                     className="kpi-tile has-tooltip"
                     onMouseEnter={(e) => handleMouseEnter(e, 'Position Changes', (
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                        <div>
                             {newPositions.length > 0 && (
                                 <div style={{ marginBottom: '8px' }}>
-                                    <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>ADDED ({newPositions.length})</div>
-                                    {newPositions.map(p => (
+                                    <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>NEW ({newPositions.length})</div>
+                                    {newPositions.slice(0, 5).map(p => (
                                         <div key={p.ticker} style={{ fontSize: '11px', color: '#e2e8f0' }}>+ {p.ticker}</div>
                                     ))}
+                                    {newPositions.length > 5 && (
+                                        <span className="tooltip-more">+{newPositions.length - 5} more</span>
+                                    )}
                                 </div>
                             )}
                             {exitedPositions.length > 0 && (
                                 <div>
-                                    <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 700, marginBottom: '4px' }}>REMOVED ({exitedPositions.length})</div>
-                                    {exitedPositions.map(p => (
+                                    <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 700, marginBottom: '4px' }}>EXITED ({exitedPositions.length})</div>
+                                    {exitedPositions.slice(0, 5).map(p => (
                                         <div key={p.ticker} style={{ fontSize: '11px', color: '#94a3b8' }}>- {p.ticker}</div>
                                     ))}
+                                    {exitedPositions.length > 5 && (
+                                        <span className="tooltip-more">+{exitedPositions.length - 5} more</span>
+                                    )}
                                 </div>
                             )}
                             {newPositions.length === 0 && exitedPositions.length === 0 && (
@@ -315,8 +321,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                 <div
                     className="kpi-tile has-tooltip"
                     onMouseEnter={(e) => handleMouseEnter(e, 'New Positions', (
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                            {newPositions.map(p => (
+                        <div>
+                            {newPositions.slice(0, 8).map(p => (
                                 <div key={p.ticker || p.issuer_name} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
                                     <span className="pos-ticker">{p.ticker || 'N/A'}</span>
                                     <span className="pos-fund">{p.issuer_name}</span>
@@ -326,6 +332,9 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                     </div>
                                 </div>
                             ))}
+                            {newPositions.length > 8 && (
+                                <span className="tooltip-more">+{newPositions.length - 8} more</span>
+                            )}
                             {newPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
                         </div>
                     ))}
@@ -349,8 +358,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                 <div
                     className="kpi-tile has-tooltip"
                     onMouseEnter={(e) => handleMouseEnter(e, 'Exited Positions', (
-                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                            {exitedPositions.map(p => (
+                        <div>
+                            {exitedPositions.slice(0, 8).map(p => (
                                 <div key={p.ticker || p.issuer_name} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
                                     <span className="pos-ticker">{p.ticker || 'N/A'}</span>
                                     <span className="pos-fund">{p.issuer_name}</span>
@@ -360,6 +369,9 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                     </div>
                                 </div>
                             ))}
+                            {exitedPositions.length > 8 && (
+                                <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
+                            )}
                             {exitedPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
                         </div>
                     ))}
@@ -381,21 +393,23 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
             </div>
 
             {/* Tooltip Portal */}
-            {tooltip && createPortal(
-                <div
-                    className="kpi-tooltip"
-                    style={{
-                        left: tooltip.x > window.innerWidth - 320 ? 'auto' : tooltip.x + 15,
-                        right: tooltip.x > window.innerWidth - 320 ? window.innerWidth - tooltip.x + 15 : 'auto',
-                        top: tooltip.y > window.innerHeight - 300 ? 'auto' : tooltip.y + 15,
-                        bottom: tooltip.y > window.innerHeight - 300 ? window.innerHeight - tooltip.y + 15 : 'auto'
-                    }}
-                >
-                    <div className="tooltip-title">{tooltip.title}</div>
-                    {tooltip.content}
-                </div>,
-                document.body
-            )}
+            {
+                tooltip && createPortal(
+                    <div
+                        className="kpi-tooltip"
+                        style={{
+                            left: tooltip.x > window.innerWidth - 320 ? 'auto' : tooltip.x + 15,
+                            right: tooltip.x > window.innerWidth - 320 ? window.innerWidth - tooltip.x + 15 : 'auto',
+                            top: tooltip.y > window.innerHeight - 300 ? 'auto' : tooltip.y + 15,
+                            bottom: tooltip.y > window.innerHeight - 300 ? window.innerHeight - tooltip.y + 15 : 'auto'
+                        }}
+                    >
+                        <div className="tooltip-title">{tooltip.title}</div>
+                        {tooltip.content}
+                    </div>,
+                    document.body
+                )
+            }
 
             <div className="dashboard-grid">
                 {/* Left Column: Top Holdings */}
