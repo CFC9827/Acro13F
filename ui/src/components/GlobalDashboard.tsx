@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -565,6 +565,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [fundHistories, setFundHistories] = useState<{ [cik: string]: any[] }>({});
     const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
     const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
+    const [isFundSummariesMinimized, setIsFundSummariesMinimized] = useState(false);
 
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
@@ -1204,103 +1205,117 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         {/* Left Column: Fund Highlights */}
                         <div className="dashboard-main">
                             <section className="dashboard-section">
-                                <div className="section-header">
-                                    <div className="section-icon-box">
-                                        <LayoutGrid className="section-icon" />
+                                <div className="section-header" style={{ justifyContent: 'space-between', width: '100%' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div className="section-icon-box">
+                                            <LayoutGrid className="section-icon" />
+                                        </div>
+                                        <div>
+                                            <h3 className="section-title">Fund Summaries</h3>
+                                            <p className="section-desc">
+                                                Top positions by reported market value
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="section-title">Fund Summaries</h3>
-                                        <p className="section-desc">
-                                            Top positions by reported market value
-                                        </p>
-                                    </div>
+                                    <button
+                                        className="section-collapse-btn"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsFundSummariesMinimized(!isFundSummariesMinimized);
+                                        }}
+                                        title={isFundSummariesMinimized ? "Expand" : "Minimize"}
+                                    >
+                                        {isFundSummariesMinimized ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                                    </button>
                                 </div>
 
-                                <div className="fund-highlights-grid">
-                                    {summary.fund_highlights.map((fund) => (
-                                        <div
-                                            key={fund.cik}
-                                            className="fund-summary-card"
-                                            onClick={() => onSelectFund(fund.cik)}
-                                        >
-                                            <div className="card-header">
-                                                <div className="fund-info">
-                                                    <h4 className="fund-name">{fund.name}</h4>
-                                                    <div className="fund-meta">
-                                                        <span className="fund-period">{formatQ(fund.period)}</span>
-                                                        {(fund.new_count !== undefined || fund.exit_count !== undefined) && (
-                                                            <div className="activity-badges">
-                                                                {(fund.new_count || 0) > 0 && <span className="badge new">{fund.new_count} New</span>}
-                                                                {(fund.exit_count || 0) > 0 && <span className="badge exited">{fund.exit_count} Exit</span>}
+                                {!isFundSummariesMinimized && (
+                                    <div className="fund-highlights-grid">
+                                        {summary.fund_highlights.map((fund) => (
+                                            <div
+                                                key={fund.cik}
+                                                className="fund-summary-card"
+                                                onClick={() => onSelectFund(fund.cik)}
+                                            >
+                                                <div className="card-header">
+                                                    <div className="fund-info">
+                                                        <h4 className="fund-name">{fund.name}</h4>
+                                                        <div className="fund-meta">
+                                                            <span className="fund-period">{formatQ(fund.period)}</span>
+                                                            {(fund.new_count !== undefined || fund.exit_count !== undefined) && (
+                                                                <div className="activity-badges">
+                                                                    {(fund.new_count || 0) > 0 && <span className="badge new">{fund.new_count} New</span>}
+                                                                    {(fund.exit_count || 0) > 0 && <span className="badge exited">{fund.exit_count} Exit</span>}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="fund-aum-block">
+                                                        <div className="fund-value">{formatCurrency(fund.total_value)}</div>
+                                                        {fund.value_change !== undefined && fund.value_change !== 0 && (
+                                                            <div className={`fund-change ${fund.value_change >= 0 ? 'positive' : 'negative'}`}>
+                                                                {fund.value_change >= 0 ? '↑' : '↓'} {fund.value_change_pct?.toFixed(1)}%
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="fund-aum-block">
-                                                    <div className="fund-value">{formatCurrency(fund.total_value)}</div>
-                                                    {fund.value_change !== undefined && fund.value_change !== 0 && (
-                                                        <div className={`fund-change ${fund.value_change >= 0 ? 'positive' : 'negative'}`}>
-                                                            {fund.value_change >= 0 ? '↑' : '↓'} {fund.value_change_pct?.toFixed(1)}%
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
 
-                                            <div className="fund-stats-row">
-                                                <div className="fund-stat">
-                                                    <span className="stat-value">{fund.position_count || '—'}</span>
-                                                    <span className="stat-label">positions</span>
-                                                </div>
-                                                <div className="fund-stat">
-                                                    <span className="stat-value">
-                                                        {fund.concentration?.toFixed(0) || '—'}%
-                                                        {fund.concentration_change !== undefined && fund.concentration_change !== 0 && (
-                                                            <span className={`stat-trend ${fund.concentration_change >= 0 ? 'positive' : 'negative'}`}>
-                                                                {fund.concentration_change >= 0 ? '↑' : '↓'}{Math.abs(fund.concentration_change).toFixed(0)}%
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    <span className="stat-label">top 3</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="top-holdings-list">
-                                                {fund.top_holdings.map((h, i) => (
-                                                    <div key={i} className="mini-holding">
-                                                        <div className="holding-ticker">{h.ticker || h.issuer_name.slice(0, 4)}</div>
-                                                        <div className="holding-bar-container">
-                                                            <div
-                                                                className="holding-bar"
-                                                                style={{ width: `${(h.value / fund.total_value) * 100}%` }}
-                                                            ></div>
-                                                        </div>
-                                                        <div className="holding-val">{formatCurrency(h.value)}</div>
-                                                        <div className="holding-weight-col">
-                                                            <span className="holding-weight">{h.weight?.toFixed(1)}%</span>
-                                                            <span className={`holding-change ${(h.weight_change ?? 0) >= 0 ? 'positive' : 'negative'}`}>
-                                                                ({(h.weight_change ?? 0) >= 0 ? '+' : ''}{(h.weight_change ?? 0).toFixed(1)}%)
-                                                            </span>
-                                                        </div>
+                                                <div className="fund-stats-row">
+                                                    <div className="fund-stat">
+                                                        <span className="stat-value">{fund.position_count || '—'}</span>
+                                                        <span className="stat-label">positions</span>
                                                     </div>
-                                                ))}
-                                            </div>
-
-                                            {fund.top_add && (
-                                                <div className="top-add-banner">
-                                                    <Sparkles size={12} className="sparkle-icon" />
-                                                    <span className="add-label">TOP ADD:</span>
-                                                    <span className="add-ticker">{fund.top_add.ticker || fund.top_add.issuer_name.slice(0, 4)}</span>
-                                                    <span className="add-delta positive">+{fund.top_add.weight_change.toFixed(1)}%</span>
+                                                    <div className="fund-stat">
+                                                        <span className="stat-value">
+                                                            {fund.concentration?.toFixed(0) || '—'}%
+                                                            {fund.concentration_change !== undefined && fund.concentration_change !== 0 && (
+                                                                <span className={`stat-trend ${fund.concentration_change >= 0 ? 'positive' : 'negative'}`}>
+                                                                    {fund.concentration_change >= 0 ? '↑' : '↓'}{Math.abs(fund.concentration_change).toFixed(0)}%
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                        <span className="stat-label">top 3</span>
+                                                    </div>
                                                 </div>
-                                            )}
 
-                                            <div className="card-footer">
-                                                <span>View Full Portfolio</span>
-                                                <ChevronRight size={14} />
+                                                <div className="top-holdings-list">
+                                                    {fund.top_holdings.map((h, i) => (
+                                                        <div key={i} className="mini-holding">
+                                                            <div className="holding-ticker">{h.ticker || h.issuer_name.slice(0, 4)}</div>
+                                                            <div className="holding-bar-container">
+                                                                <div
+                                                                    className="holding-bar"
+                                                                    style={{ width: `${(h.value / fund.total_value) * 100}%` }}
+                                                                ></div>
+                                                            </div>
+                                                            <div className="holding-val">{formatCurrency(h.value)}</div>
+                                                            <div className="holding-weight-col">
+                                                                <span className="holding-weight">{h.weight?.toFixed(1)}%</span>
+                                                                <span className={`holding-change ${(h.weight_change ?? 0) >= 0 ? 'positive' : 'negative'}`}>
+                                                                    ({(h.weight_change ?? 0) >= 0 ? '+' : ''}{(h.weight_change ?? 0).toFixed(1)}%)
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {fund.top_add && (
+                                                    <div className="top-add-banner">
+                                                        <Sparkles size={12} className="sparkle-icon" />
+                                                        <span className="add-label">TOP ADD:</span>
+                                                        <span className="add-ticker">{fund.top_add.ticker || fund.top_add.issuer_name.slice(0, 4)}</span>
+                                                        <span className="add-delta positive">+{fund.top_add.weight_change.toFixed(1)}%</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="card-footer">
+                                                    <span>View Full Portfolio</span>
+                                                    <ChevronRight size={14} />
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
+                                        ))}
+                                    </div>
+                                )}
                             </section>
 
                             <PerformanceComparisonChart groupId={selectedGroupId} />

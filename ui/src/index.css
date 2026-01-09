@@ -1888,6 +1888,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
+  margin-top: 24px;
 }
 
 .fund-summary-card {
@@ -2746,6 +2747,31 @@ body {
 
 .group-pill-container:active {
   cursor: grabbing;
+}
+
+.section-collapse-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.section-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.section-collapse-btn:active {
+  transform: scale(0.95);
 }
 
 @media (max-width: 1024px) {
