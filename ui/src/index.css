@@ -71,6 +71,7 @@ body {
   zoom: 0.9;
   width: 111.11vw;
   height: 111.11vh;
+  overflow-x: hidden;
 }
 
 .app-container {
@@ -159,14 +160,16 @@ body {
 
 .sidebar {
   width: 280px;
-  min-height: 100%;
-  align-self: stretch;
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 64px);
   border-right: 1px solid var(--border);
   background-color: var(--bg-card);
   transition: width 0.2s ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .sidebar.collapsed {
@@ -3285,4 +3288,95 @@ body {
   padding: 64px;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* Activity Controls */
+.activity-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Export Button */
+.activity-export-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  color: #a5b4fc;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.activity-export-btn:hover {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #c7d2fe;
+}
+
+/* Sortable Headers */
+.activity-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.activity-table th.sortable:hover {
+  color: var(--text-primary);
+}
+
+.activity-table th.sortable svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+/* Value Column */
+.activity-value {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Conviction Badges */
+.activity-conviction {
+  text-align: center;
+}
+
+.conviction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.conviction-badge.building {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.conviction-badge.building svg {
+  color: #f59e0b;
+}
+
+.conviction-badge.exiting {
+  background: rgba(244, 114, 182, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+}
+
+.conviction-badge.exiting svg {
+  color: #ec4899;
 }

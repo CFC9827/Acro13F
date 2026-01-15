@@ -659,7 +659,7 @@ function App() {
                                 )}
                             </div>
                             {!sidebarCollapsed && (
-                                <ul>
+                                <ul className="fund-list">
                                     {funds.map((f: Fund) => (
                                         <li
                                             key={f.cik}
@@ -824,7 +824,7 @@ function App() {
                                             className={`tab ${view === 'activity' ? 'active' : ''}`}
                                             onClick={() => navigate('activity', selectedCik)}
                                         >
-                                            <Activity size={18} /> Activity
+                                            <List size={18} /> Activity
                                         </button>
                                         <button
                                             className={`tab ${view === 'chart' ? 'active' : ''}`}
@@ -969,7 +969,7 @@ function App() {
                                         onOffsetChange={setOffset}
                                     />
                                 ) : view === 'activity' ? (
-                                    <ActivityView history={history} />
+                                    <ActivityView history={history} fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'} />
                                 ) : (
                                     <HoldingsTable
                                         history={history}
