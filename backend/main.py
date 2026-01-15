@@ -172,9 +172,30 @@ async def update_sectors():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/sectors/allocation")
-async def get_sector_allocation(group_id: int = None):
-    """Get aggregated sector allocation across all funds (or a group)."""
+async def get_sector_allocation(group_id: int = None, cik: str = None):
+    """Get aggregated sector allocation across all funds (or a group or single fund)."""
     try:
+        # If cik is provided, only get sectors for that fund
+        if cik:
+            holdings = db.get_latest_holdings(cik)
+            sector_totals = {}
+            total_value = 0
+            for h in holdings:
+                sector = h.get("sector") or sector_mapper.get_sector(h.get("ticker", ""))
+                value = h.get("value", 0)
+                sector_totals[sector] = sector_totals.get(sector, 0) + value
+                total_value += value
+            
+            allocation = []
+            for sector, value in sorted(sector_totals.items(), key=lambda x: -x[1]):
+                allocation.append({
+                    "sector": sector,
+                    "value": value,
+                    "weight": (value * 100 / total_value) if total_value > 0 else 0
+                })
+            return {"allocation": allocation, "total_value": total_value}
+        
+        # Otherwise aggregate across all funds (or group)
         summary = db.get_dashboard_summary(group_id=group_id)
         
         # Aggregate sector weights from all fund holdings

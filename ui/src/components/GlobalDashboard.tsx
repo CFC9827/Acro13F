@@ -463,21 +463,70 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                         />
                         <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" />
                         <Tooltip
-                            contentStyle={{
-                                backgroundColor: '#0f172a',
-                                border: '1px solid #1e293b',
-                                borderRadius: '12px',
-                                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)'
+                            content={({ active, payload, label }: any) => {
+                                if (!active || !payload || payload.length === 0) return null;
+
+                                // Sort payload by value descending (best performance first)
+                                const sortedPayload = [...payload].sort((a: any, b: any) => {
+                                    const aVal = typeof a.value === 'number' ? a.value : -Infinity;
+                                    const bVal = typeof b.value === 'number' ? b.value : -Infinity;
+                                    return bVal - aVal;
+                                });
+
+                                return (
+                                    <div style={{
+                                        backgroundColor: '#0f172a',
+                                        border: '1px solid #1e293b',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+                                        padding: '12px 16px',
+                                        minWidth: '200px'
+                                    }}>
+                                        <div style={{
+                                            color: '#f8fafc',
+                                            fontWeight: 600,
+                                            fontSize: '12px',
+                                            marginBottom: '8px',
+                                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                            paddingBottom: '4px'
+                                        }}>
+                                            {formatQ(label)}
+                                        </div>
+                                        {sortedPayload.map((entry: any, idx: number) => (
+                                            <div key={idx} style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '3px 0',
+                                                fontSize: '11px',
+                                                gap: '12px'
+                                            }}>
+                                                <span style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    color: entry.color
+                                                }}>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        borderRadius: '50%',
+                                                        background: entry.color,
+                                                        flexShrink: 0
+                                                    }} />
+                                                    {entry.name}
+                                                </span>
+                                                <span style={{
+                                                    color: entry.value >= 0 ? '#10b981' : '#ef4444',
+                                                    fontWeight: 700
+                                                }}>
+                                                    {entry.value >= 0 ? '+' : ''}{entry.value?.toFixed(2)}%
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
                             }}
-                            itemStyle={{ fontSize: '11px', padding: '2px 0' }}
-                            labelStyle={{ color: '#f8fafc', fontWeight: 600, fontSize: '12px', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}
-                            formatter={(value: number, name: string) => [
-                                <span style={{ color: value >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 }}>
-                                    {value >= 0 ? '+' : ''}{value.toFixed(2)}%
-                                </span>,
-                                name
-                            ]}
-                            labelFormatter={(label) => formatQ(label)}
                         />
                         <Legend
                             content={({ payload }) => (
@@ -768,7 +817,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     }, [fundHighlights, fundHistories]);
 
     const getMoverDisplay = (mover: Mover) => {
-        const ticker = mover.ticker || 'N/A';
+        const ticker = mover.ticker || mover.issuer_name;
         const activity = tickerActivity[ticker];
         switch (moversMode) {
             case 'percent':
@@ -1189,7 +1238,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         <div className="tooltip-title">Exited Positions</div>
                                         {weightSortedExited.slice(0, 8).map((pos, i) => (
                                             <div key={i} className="tooltip-position-row">
-                                                <span className="pos-ticker">{pos.ticker || 'N/A'}</span>
+                                                <span className="pos-ticker">{pos.ticker || pos.issuer_name}</span>
                                                 <span className="pos-fund">{pos.fund_name}</span>
                                                 <span className="pos-weight negative">-{pos.weight.toFixed(1)}%</span>
                                             </div>
@@ -1386,7 +1435,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             return (
                                                 <div key={i} className="mover-item">
                                                     <div className="mover-info">
-                                                        <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
+                                                        <span className="mover-ticker">{mover.ticker || mover.issuer_name}</span>
                                                         {!showTooltip && (
                                                             <span className="mover-fund">{mover.fund_name}</span>
                                                         )}
@@ -1453,7 +1502,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-label">Most Widely Held</div>
                                             <div className="crowding-list">
                                                 {crowding.most_held.slice(0, 3).map((item, i) => {
-                                                    const itemTicker = item.ticker || 'N/A';
+                                                    const itemTicker = item.ticker || item.issuer_name;
                                                     return (
                                                         <div key={i} className="crowding-item">
                                                             <span className="crowding-ticker">{itemTicker}</span>
@@ -1489,7 +1538,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {crowding.gaining_funds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                        <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span className="crowding-change positive">+{item.change}</span>
                                                     </div>
                                                 ))}
@@ -1503,7 +1552,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {crowding.losing_funds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker">{item.ticker || 'N/A'}</span>
+                                                        <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span className="crowding-change negative">{item.change}</span>
                                                     </div>
                                                 ))}
@@ -1540,7 +1589,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayNewPositions.map((pos, i) => (
                                             <div key={i} className="new-position-item">
                                                 <div className="new-position-info">
-                                                    <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
+                                                    <span className="new-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                                     <span className="new-position-fund">{pos.fund_name}</span>
                                                 </div>
                                                 <div className="new-position-stats">
@@ -1580,7 +1629,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayExitedPositions.map((pos, i) => (
                                             <div key={i} className="exited-position-item">
                                                 <div className="exited-position-info">
-                                                    <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>
+                                                    <span className="exited-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                                     <span className="exited-position-fund">{pos.fund_name}</span>
                                                 </div>
                                                 <div className="exited-position-stats">
@@ -1629,7 +1678,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         swoopOpportunities.map((op, i) => (
                                             <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
                                                 <div className="mover-info">
-                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || 'N/A'}</div>
+                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || op.issuer_name}</div>
                                                     <div className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
                                                         {op.fund_name}
                                                     </div>

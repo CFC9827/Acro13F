@@ -10,10 +10,11 @@ import { FundSummary } from './components/FundSummary'
 import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
+import { ActivityView } from './components/ActivityView'
 import { calculateIRR } from './utils/performanceUtils'
 
 // Type for view states
-type ViewType = 'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary';
+type ViewType = 'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary' | 'activity';
 
 // Parse URL path to extract view and CIK
 function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } {
@@ -30,7 +31,7 @@ function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } 
     if (segments[0] === 'fund' && segments[1]) {
         const cik = segments[1];
         const subView = segments[2] as ViewType | undefined;
-        if (subView && ['table', 'chart', 'performance'].includes(subView)) {
+        if (subView && ['table', 'chart', 'performance', 'activity'].includes(subView)) {
             return { view: subView, cik };
         }
         return { view: 'summary', cik };
@@ -142,6 +143,7 @@ function App() {
     const [showSplash, setShowSplash] = useState(true)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [showCikSearch, setShowCikSearch] = useState(false)
+    const [isAddingFund, setIsAddingFund] = useState(false)
 
     // Auto-clear notification after 5s
     useEffect(() => {
@@ -271,6 +273,7 @@ function App() {
         const cik = cikToAdd || refreshCik;
         if (!cik) return
         setLoading(true)
+        setIsAddingFund(true)
         setLoadingMessage("Syncing fund data from SEC EDGAR...")
         setError(null)
         setNotification(null)
@@ -303,6 +306,7 @@ function App() {
         } finally {
             setLoading(false)
             setLoadingMessage("")
+            setIsAddingFund(false)
         }
     }
 
@@ -433,6 +437,7 @@ function App() {
     const handleBatchAddFunds = async (ciks: string[]) => {
         if (!ciks || ciks.length === 0) return;
         setLoading(true);
+        setIsAddingFund(true);
         setError(null);
         setNotification(null);
 
@@ -505,6 +510,7 @@ function App() {
         } finally {
             setLoading(false);
             setLoadingMessage("");
+            setIsAddingFund(false);
         }
     }
 
@@ -722,7 +728,45 @@ function App() {
                             </div>
                         )}
 
-                        {view === 'dashboard' ? (
+                        {isAddingFund ? (
+                            <div className="adding-fund-screen" style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flex: 1,
+                                minHeight: '100%',
+                                gap: '24px',
+                                color: 'var(--text-muted)'
+                            }}>
+                                <div style={{
+                                    width: '80px',
+                                    height: '80px',
+                                    borderRadius: '50%',
+                                    background: 'rgba(56, 189, 248, 0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <RefreshCw className="spin" size={36} style={{ color: '#38bdf8' }} />
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                    <h2 style={{
+                                        color: 'var(--text-main)',
+                                        marginBottom: '8px',
+                                        fontSize: '1.5rem'
+                                    }}>
+                                        Adding New Fund
+                                    </h2>
+                                    <p style={{
+                                        fontSize: '0.95rem',
+                                        maxWidth: '400px'
+                                    }}>
+                                        {loadingMessage || 'Fetching data from SEC EDGAR...'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : view === 'dashboard' ? (
                             <GlobalDashboard
                                 summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [] }}
                                 onSelectFund={(cik) => {
@@ -774,7 +818,13 @@ function App() {
                                             className={view === 'table' ? 'tab active' : 'tab'}
                                             onClick={() => navigate('table', selectedCik)}
                                         >
-                                            <LayoutGrid size={16} /> Table
+                                            <LayoutGrid size={16} /> Holdings
+                                        </button>
+                                        <button
+                                            className={`tab ${view === 'activity' ? 'active' : ''}`}
+                                            onClick={() => navigate('activity', selectedCik)}
+                                        >
+                                            <Activity size={18} /> Activity
                                         </button>
                                         <button
                                             className={`tab ${view === 'chart' ? 'active' : ''}`}
@@ -908,6 +958,7 @@ function App() {
                                     <FundSummary
                                         history={history}
                                         fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
+                                        cik={selectedCik || undefined}
                                     />
                                 ) : view === 'performance' ? (
                                     <PerformanceChart
@@ -917,6 +968,8 @@ function App() {
                                         offset={offset}
                                         onOffsetChange={setOffset}
                                     />
+                                ) : view === 'activity' ? (
+                                    <ActivityView history={history} />
                                 ) : (
                                     <HoldingsTable
                                         history={history}
@@ -1114,9 +1167,11 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
             cutoffDate = new Date(latestDate);
             cutoffDate.setMonth(cutoffDate.getMonth() - ((quarters - 1) * 3));
         } else {
+            // Year-based range: 1Y = 4 quarters, 3Y = 12 quarters, etc.
             const years = parseInt(timeRange);
+            const quarters = years * 4;
             cutoffDate = new Date(latestDate);
-            cutoffDate.setFullYear(cutoffDate.getFullYear() - years);
+            cutoffDate.setMonth(cutoffDate.getMonth() - ((quarters - 1) * 3));
         }
 
         // Filter periods: Must be within the time window

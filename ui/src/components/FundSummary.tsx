@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 import { TrendingUp, ArrowUp, ArrowDown, DollarSign, PlusCircle, MinusCircle, LayoutGrid, Briefcase, ChevronRight, Info, PieChart, Activity, AlertCircle } from 'lucide-react';
 import { HistoricalHolding } from './PortfolioChart';
@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 interface FundSummaryProps {
     history: HistoricalHolding[];
     fundName: string;
+    cik?: string;
 }
 
 interface TooltipState {
@@ -31,8 +32,9 @@ const formatQ = (dateStr: string) => {
     return `${q}Q '${d.getFullYear().toString().slice(2)}`;
 };
 
-export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) => {
+export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik }) => {
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+    const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
 
     const handleMouseEnter = (e: React.MouseEvent, title: string, content: React.ReactNode) => {
         setTooltip({
@@ -56,13 +58,12 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
         exitedPositions,
         movers,
         topHoldings,
-        swoopOpportunities,
-        sectorAllocation
+        swoopOpportunities
     } = useMemo(() => {
         if (!history || history.length === 0) {
             return {
                 latestPeriod: '', priorPeriod: '', currentHoldings: [],
-                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: [], sectorAllocation: []
+                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: []
             };
         }
 
@@ -186,16 +187,6 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
         // Final Sorts
         const swoopOpportunities = swoopCandidates.sort((a, b) => a.dropPct - b.dropPct); // Biggest drop first (most negative)
 
-        // Calculate Sector Allocation
-        const sectorTotals: { [key: string]: number } = {};
-        currentHoldings.forEach(h => {
-            const sector = (h as any).sector || 'Unknown';
-            sectorTotals[sector] = (sectorTotals[sector] || 0) + h.value;
-        });
-        const sectorAllocation = Object.entries(sectorTotals)
-            .map(([sector, value]) => ({ sector, value, weight: (value / aum) * 100 }))
-            .sort((a, b) => b.weight - a.weight);
-
         return {
             latestPeriod,
             priorPeriod,
@@ -206,10 +197,27 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
             exitedPositions: exitedPositions.sort((a, b) => b.value - a.value),
             movers: movers.sort((a, b) => Math.abs(b.val_change) - Math.abs(a.val_change)),
             topHoldings,
-            swoopOpportunities,
-            sectorAllocation
+            swoopOpportunities
         };
     }, [history]);
+
+    // Fetch sector allocation from API
+    useEffect(() => {
+        if (!cik) return;
+
+        const fetchSectors = async () => {
+            try {
+                const res = await fetch(`/api/sectors/allocation?cik=${cik}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setSectorAllocation(data.allocation || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch sector allocation", err);
+            }
+        };
+        fetchSectors();
+    }, [cik, history]);
 
     const aumChange = aum - priorAum;
     const aumChangePercent = priorAum > 0 ? (aumChange / priorAum) * 100 : 0;
@@ -324,7 +332,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                         <div>
                             {newPositions.slice(0, 8).map(p => (
                                 <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                    <span className="pos-ticker">{p.ticker || 'N/A'}</span>
+                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
                                     <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
                                     <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
@@ -361,7 +369,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                         <div>
                             {exitedPositions.slice(0, 8).map(p => (
                                 <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                    <span className="pos-ticker">{p.ticker || 'N/A'}</span>
+                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
                                     <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
                                     <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
@@ -455,7 +463,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <div className="holding-rank" style={{ color: '#64748b', fontSize: '14px', fontWeight: 600, width: '20px' }}>{i + 1}</div>
                                             <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9' }}>{h.ticker || 'N/A'}</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9' }}>{h.ticker || h.issuer_name}</div>
                                                 <div style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                     {h.issuer_name.slice(0, 25)}
                                                 </div>
@@ -493,7 +501,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 return (
                                     <div key={i} className="mover-item">
                                         <div className="mover-info">
-                                            <span className="mover-ticker">{mover.ticker || 'N/A'}</span>
+                                            <span className="mover-ticker">{mover.ticker || mover.issuer_name}</span>
                                             <span className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b' }}>{mover.issuer_name.slice(0, 15)}...</span>
                                         </div>
                                         <div className={`mover-delta ${isPositive ? 'positive' : 'negative'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -523,7 +531,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 newPositions.slice(0, 8).map((pos, i) => (
                                     <div key={i} className="new-position-item">
                                         <div className="new-position-info">
-                                            <span className="new-position-ticker">{pos.ticker || 'N/A'}</span>
+                                            <span className="new-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                             <span className="new-position-fund">{pos.issuer_name.slice(0, 15)}...</span>
                                         </div>
                                         <div className="new-position-stats">
@@ -554,7 +562,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 exitedPositions.slice(0, 8).map((pos, i) => (
                                     <div key={i} className="exited-position-item">
                                         <div className="exited-position-info">
-                                            <span className="exited-position-ticker">{pos.ticker || 'N/A'}</span>
+                                            <span className="exited-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                             <span className="exited-position-fund">{pos.issuer_name.slice(0, 15)}...</span>
                                         </div>
                                         <div className="exited-position-stats">
@@ -596,7 +604,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                 swoopOpportunities.slice(0, 5).map((op, i) => (
                                     <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
                                         <div className="mover-info">
-                                            <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || 'N/A'}</div>
+                                            <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || op.issuer_name}</div>
                                             <div className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
                                                 {formatCurrency(op.prevPrice)} {'->'} {formatCurrency(op.currentPrice)}
                                             </div>
@@ -674,7 +682,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName }) =
                                         <div>
                                             {topHoldings.map(h => (
                                                 <div key={h.ticker} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                                    <span style={{ color: '#f1f5f9' }}>{h.ticker || 'N/A'}</span>
+                                                    <span style={{ color: '#f1f5f9' }}>{h.ticker || h.issuer_name}</span>
                                                     <span style={{ color: '#10b981' }}>{h.weight.toFixed(1)}%</span>
                                                 </div>
                                             ))}
