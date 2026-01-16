@@ -686,7 +686,8 @@ class DatabaseManager:
 
                     # Track new positions for spotlight
                     for h in latest_holdings:
-                        key = h['ticker'] or h['cusip']
+                        # Consistent key including put_call for spotlight logic
+                        key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                         if key in new_keys:
                             weight = (h['value'] * 100.0 / total_value) if total_value else 0
                             all_new_positions.append({
@@ -698,9 +699,9 @@ class DatabaseManager:
                             })
 
                     # Track exited positions for spotlight
-                    exited_keys = prev_keys - latest_keys
                     for h in prev_holdings_list:
-                        key = h['ticker'] or h['cusip']
+                        # Consistent key including put_call for spotlight logic
+                        key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                         if key in exited_keys:
                             weight = (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0
                             all_exited_positions.append({
@@ -816,13 +817,13 @@ class DatabaseManager:
             summary["crowding_signals"]["gaining_funds"] = gaining
             summary["crowding_signals"]["losing_funds"] = losing
 
-            # New positions spotlight (top 10 by value)
+            # New positions spotlight (top 100 by value)
             all_new_positions.sort(key=lambda x: x["value"], reverse=True)
-            summary["new_positions"] = all_new_positions[:10]
+            summary["new_positions"] = all_new_positions[:100]
 
-            # Exited positions spotlight (top 10 by value)
+            # Exited positions spotlight (top 100 by value)
             all_exited_positions.sort(key=lambda x: x["value"], reverse=True)
-            summary["exited_positions"] = all_exited_positions[:10]
+            summary["exited_positions"] = all_exited_positions[:100]
 
             # Calculate period alignment status
             summary["fund_periods"] = sorted(list(all_latest_periods), reverse=True)
