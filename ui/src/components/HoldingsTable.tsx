@@ -154,7 +154,7 @@ const StockHistoryChart: React.FC<{
                     date: h.period_of_report,
                     action,
                     actionColor,
-                    prevDate: prevH ? prevH.period_of_report : (action === 'NEW' ? prevDate : undefined)
+                    prevDate: action === 'NEW' ? prevDate : (prevH ? prevH.period_of_report : undefined)
                 });
 
                 // If exited, add explicit EXIT marker half-way through the next quarter
@@ -1097,8 +1097,18 @@ const StockHistoryChart: React.FC<{
                             dataKey={(d: any) => {
                                 if (!hoveredData.prevDate) return null;
                                 const curTime = new Date(d.date).getTime();
-                                const startTime = new Date(hoveredData.prevDate).getTime();
                                 const endTime = new Date(hoveredData.date).getTime();
+                                let startTime = new Date(hoveredData.prevDate).getTime();
+
+                                // Limit highlight of new/modified positions to a single quarter (~92 days)
+                                // This prevents long lines across gaps where the stock wasn't held.
+                                if (hoveredData.action !== 'EXIT') {
+                                    const maxLookback = 92 * 24 * 60 * 60 * 1000;
+                                    if (endTime - startTime > maxLookback) {
+                                        startTime = endTime - maxLookback;
+                                    }
+                                }
+
                                 // Add a tiny buffer to include the boundary points
                                 return (curTime >= startTime - 1000 && curTime <= endTime + 1000) ? d.value : null;
                             }}
