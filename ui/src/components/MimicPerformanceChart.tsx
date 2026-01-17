@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
-import { TrendingUp, Activity, Info, RefreshCw, BarChart3, AlertCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { TrendingUp, Activity, Info, RefreshCw, BarChart3, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, Layers, Calendar } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface MimicDataPoint {
@@ -9,16 +9,31 @@ interface MimicDataPoint {
     return: number;
     label: string;
     benchmark_return: number;
+    portfolio_value?: number;
+    holdings?: Record<string, number>;
+    holdings_detailed?: Array<{
+        ticker: string;
+        shares: number;
+        price: number;
+        value: number;
+    }>;
+    simulated_value?: number;
+    total_invested?: number;
 }
 
 interface MimicTrade {
     date: string;
     period: string;
     ticker: string;
-    action: 'Buy' | 'Sell' | 'Add' | 'Reduce';
+    action: 'Buy' | 'Sell' | 'Add' | 'Reduce' | 'Initial Buy' | 'Initial Setup';
     shares_change: number;
     price: number;
     value: number;
+    originalPeriod?: string;
+    isContext?: boolean;
+    isCapitalDeployment?: boolean;
+    user_shares?: number;
+    user_value?: number;
 }
 
 interface MimicPerformanceResponse {
@@ -60,6 +75,11 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
     const [customEndQuarter, setCustomEndQuarter] = useState<string>('');
     const [showStartDropdown, setShowStartDropdown] = useState(false);
     const [showEndDropdown, setShowEndDropdown] = useState(false);
+
+    // Simulator Mode State
+    const [isSimulatorMode, setIsSimulatorMode] = useState(false);
+    const [initialInvestment, setInitialInvestment] = useState(10000);
+    const [recurringContribution, setRecurringContribution] = useState(0);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -167,53 +187,267 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
         const baseVal = 1 + (startVal / 100);
         const baseBench = 1 + (startBench / 100);
 
-        return filtered.map(d => ({
-            ...d,
-            return: (((1 + d.return / 100) / baseVal) - 1) * 100,
-            benchmark_return: (((1 + d.benchmark_return / 100) / baseBench) - 1) * 100
-        }));
+        // Compute simulated values with contributions
+        let simBalance = initialInvestment;
+        let totalInvested = initialInvestment;
 
-    }, [data, timeRange, offset, customStartQuarter, customEndQuarter]);
+        return filtered.map((d, idx) => {
+            const rebasedReturn = (((1 + d.return / 100) / baseVal) - 1) * 100;
+            const rebasedBench = (((1 + d.benchmark_return / 100) / baseBench) - 1) * 100;
+
+            if (idx === 0) {
+                simBalance = initialInvestment;
+                totalInvested = initialInvestment;
+            } else {
+                // Add recurring contribution at start of each period
+                simBalance += recurringContribution;
+                totalInvested += recurringContribution;
+
+                // Apply period return
+                const prevPoint = filtered[idx - 1];
+                const prevBaseVal = 1 + (prevPoint.return / 100);
+                const currBaseVal = 1 + (d.return / 100);
+                const periodReturn = prevBaseVal > 0 ? (currBaseVal / prevBaseVal) - 1 : 0;
+                simBalance = simBalance * (1 + periodReturn);
+            }
+
+            return {
+                ...d,
+                return: rebasedReturn,
+                benchmark_return: rebasedBench,
+                simulated_value: simBalance,
+                total_invested: totalInvested
+            };
+        });
+
+    }, [data, timeRange, offset, customStartQuarter, customEndQuarter, initialInvestment, recurringContribution]);
 
 
     const stats = useMemo(() => {
-        if (filteredData.length === 0) return { totalReturn: 0, benchmarkTotal: 0, outperformance: 0 };
+        if (filteredData.length === 0) return { totalReturn: 0, benchmarkTotal: 0, outperformance: 0, simValue: 0, simInvested: 0, simProfit: 0, simRoi: 0 };
         const last = filteredData[filteredData.length - 1];
+        const simValue = last.simulated_value || 0;
+        const simInvested = last.total_invested || initialInvestment;
+        const simProfit = simValue - simInvested;
+        const simRoi = simInvested > 0 ? (simProfit / simInvested) * 100 : 0;
         return {
             totalReturn: last.return,
             benchmarkTotal: last.benchmark_return,
-            outperformance: last.return - last.benchmark_return
+            outperformance: last.return - last.benchmark_return,
+            simValue,
+            simInvested,
+            simProfit,
+            simRoi
         };
-    }, [filteredData]);
+    }, [filteredData, initialInvestment]);
 
-    // Group trades by period
+    // Group trades by period with smart filtering
     const tradesByPeriod = useMemo(() => {
         const groups = new Map<string, MimicTrade[]>();
-        // Filter trades to match the visible chart data range (approx)
-        // Or keep all trades? Let's keep all trades for now, but maybe only show relevant ones?
-        // Actually user usually wants to see history. Let's keep all trades but sort better.
 
-        // Sort trades by date descending (already done by backend, but good to ensure)
-        // Then within each period, sort by Absolute Value (Impact)
-
-        // We can't easily re-sort the flat list without losing period grouping if we don't group first.
-
-        // 1. Group first
-        const tempGroups = new Map<string, MimicTrade[]>();
-        for (const trade of trades) {
-            if (!tempGroups.has(trade.period)) {
-                tempGroups.set(trade.period, []);
+        if (!isSimulatorMode) {
+            // Non-simulator mode: show all trades, just grouped by period
+            const tempGroups = new Map<string, MimicTrade[]>();
+            for (const trade of trades) {
+                if (!tempGroups.has(trade.period)) {
+                    tempGroups.set(trade.period, []);
+                }
+                tempGroups.get(trade.period)!.push(trade);
             }
-            tempGroups.get(trade.period)!.push(trade);
+            // Sort within groups by value
+            for (const [, items] of tempGroups) {
+                items.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+            }
+            return tempGroups;
         }
 
-        // 2. Sort within groups
-        for (const [period, items] of tempGroups) {
-            items.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+        // Simulator mode: filter by date range and track user holdings
+        const startDate = filteredData.length > 0 ? filteredData[0].date : null;
+        const endDate = filteredData.length > 0 ? filteredData[filteredData.length - 1].date : null;
+
+        if (!startDate || !endDate) return groups;
+
+        const currentVisibleTrades = trades.filter(trade =>
+            trade.date >= startDate && trade.date <= endDate
+        );
+
+        const allInjectedTrades: MimicTrade[] = [];
+        const userHoldings = new Map<string, number>();
+
+        // We generate trades by comparing the "Target State" of each period
+        // This ensures tracking error is minimized and new capital is fully deployed.
+
+        let prevPeriodShares = new Map<string, number>();
+
+        filteredData.forEach((d, idx) => {
+            const isInitial = idx === 0;
+            const periodKey = isInitial ? 'INITIAL_SETUP' : d.period;
+
+            // 1. Calculate the Ratio for this period's target state
+            const fundVal = d.portfolio_value || 0;
+            const userVal = d.simulated_value || 0;
+            const ratio = (fundVal > 0 && userVal > 0) ? (userVal / fundVal) : 0;
+
+            if (ratio === 0) return;
+
+            // 2. Determine target shares for every ticker the fund holds
+            const targetSharesMap = new Map<string, number>();
+            if (d.holdings_detailed) {
+                d.holdings_detailed.forEach(h => {
+                    targetSharesMap.set(h.ticker, h.shares * ratio);
+                });
+            }
+
+            // 3. Generate trades to reach target from previous state
+            const allTickers = new Set([...Array.from(prevPeriodShares.keys()), ...Array.from(targetSharesMap.keys())]);
+
+            for (const ticker of allTickers) {
+                const oldShares = prevPeriodShares.get(ticker) || 0;
+                const targetShares = targetSharesMap.get(ticker) || 0;
+
+                if (Math.abs(targetShares - oldShares) < 0.0001) continue;
+
+                const fundHolding = d.holdings_detailed?.find(h => h.ticker === ticker);
+                const fundPrice = fundHolding?.price || 0;
+
+                let action: any = "Buy";
+                if (isInitial) action = "Initial Buy";
+                else if (targetShares === 0) action = "Sell";
+                else if (oldShares === 0) action = "Buy";
+                else if (targetShares > oldShares) action = "Add";
+                else action = "Reduce";
+
+                // Heuristic: Is this a fund move or just a capital deployment?
+                // We check the raw fund trades in this period to see if the fund also moved.
+                const fundTrade = trades.find(t => t.date === d.date && t.ticker === ticker);
+                const isCapitalOnly = !fundTrade && !isInitial;
+
+                allInjectedTrades.push({
+                    date: d.date,
+                    period: periodKey,
+                    ticker: ticker,
+                    action: action,
+                    shares_change: fundTrade?.shares_change || 0,
+                    price: fundPrice || (fundTrade?.price) || 0,
+                    value: fundTrade?.value || 0,
+                    user_shares: targetShares - oldShares,
+                    user_value: (targetShares - oldShares) * (fundPrice || fundTrade?.price || 0),
+                    isContext: false,
+                    isCapitalDeployment: isCapitalOnly
+                });
+            }
+
+            // 4. Update state for next period
+            prevPeriodShares = targetSharesMap;
+        });
+
+        // Add historical context trades (dimmed) that were NOT part of our executable state
+        // (Those where the fund traded but we didn't hold or care about)
+        const activeTradeKeys = new Set(allInjectedTrades.map(t => `${t.date}-${t.ticker}`));
+
+        for (const trade of currentVisibleTrades) {
+            if (!activeTradeKeys.has(`${trade.date}-${trade.ticker}`)) {
+                allInjectedTrades.push({
+                    ...trade,
+                    isContext: true
+                });
+            }
         }
 
-        return tempGroups;
-    }, [trades]);
+        // Group by period
+        for (const trade of allInjectedTrades) {
+            let periodKey = trade.period;
+            if (startDate && trade.date.substring(0, 10) === startDate.substring(0, 10)) {
+                periodKey = 'INITIAL_SETUP';
+            }
+
+            if (!groups.has(periodKey)) {
+                groups.set(periodKey, []);
+            }
+            groups.get(periodKey)!.push(trade);
+        }
+
+        // Sort within groups
+        for (const [period, items] of groups) {
+            items.sort((a, b) => {
+                if (period === 'INITIAL_SETUP') {
+                    // Setup buys first
+                    const aIsSetup = a.action === 'Initial Buy';
+                    const bIsSetup = b.action === 'Initial Buy';
+                    if (aIsSetup && !bIsSetup) return -1;
+                    if (!aIsSetup && bIsSetup) return 1;
+                }
+                // Sort by context (highlighted first) then value
+                if (a.isContext !== b.isContext) return a.isContext ? 1 : -1;
+                return Math.abs(b.value) - Math.abs(a.value);
+            });
+        }
+
+        return groups;
+    }, [trades, isSimulatorMode, filteredData]);
+
+    // Track user's available cash over time to enforce execution boundaries
+    const userCashSeries = useMemo(() => {
+        if (!isSimulatorMode || filteredData.length === 0) return new Map<string, number>();
+
+        const cashMap = new Map<string, number>();
+        let currentCash = initialInvestment;
+
+        // Group trades chronologically
+        const sortedPeriodKeys = Array.from(tradesByPeriod.keys()).sort((a, b) => {
+            if (a === 'INITIAL_SETUP') return -1;
+            if (b === 'INITIAL_SETUP') return 1;
+            const aTrade = tradesByPeriod.get(a)?.[0];
+            const bTrade = tradesByPeriod.get(b)?.[0];
+            return (aTrade?.date || '').localeCompare(bTrade?.date || '');
+        });
+
+        for (const periodKey of sortedPeriodKeys) {
+            const items = tradesByPeriod.get(periodKey) || [];
+            if (items.length === 0) continue;
+
+            const date = items[0].date;
+
+            // 1. Add quarterly contribution (if not initial setup)
+            if (periodKey !== 'INITIAL_SETUP') {
+                currentCash += recurringContribution;
+            }
+
+            // 2. Calculate fund-to-user ratio for this period
+            const fundDataPoint = data.find(d => d.date === date);
+            const userDataPoint = filteredData.find(d => d.date === date);
+            let ratio = 0;
+
+            if (periodKey === 'INITIAL_SETUP') {
+                const totalSetupValueInFund = items
+                    .filter(it => it.action === 'Initial Buy')
+                    .reduce((sum, it) => sum + Math.abs(it.value), 0);
+                ratio = totalSetupValueInFund > 0 ? initialInvestment / totalSetupValueInFund : 0;
+            } else if (fundDataPoint?.portfolio_value && userDataPoint?.simulated_value) {
+                ratio = userDataPoint.simulated_value / fundDataPoint.portfolio_value;
+            } else {
+                ratio = initialInvestment / 10000000000; // Global fallback
+            }
+
+            // 3. Process Sells first (increases cash)
+            const activeSells = items.filter(it => !it.isContext && (it.action === 'Sell' || it.action === 'Reduce'));
+            for (const sell of activeSells) {
+                currentCash += Math.abs(sell.value) * ratio;
+            }
+
+            // 4. Process Buys (decreases cash, but capped)
+            const activeBuys = items.filter(it => !it.isContext && (it.action === 'Buy' || it.action === 'Add' || it.action === 'Initial Buy'));
+            for (const buy of activeBuys) {
+                const requestedVal = Math.abs(buy.value) * ratio;
+                const actualSpend = Math.min(requestedVal, currentCash);
+                currentCash -= actualSpend;
+            }
+
+            cashMap.set(date, currentCash);
+        }
+
+        return cashMap;
+    }, [tradesByPeriod, initialInvestment, recurringContribution, filteredData, data, isSimulatorMode]);
 
     // Map filing dates to period labels for chart axis
     const dateToLabelMap = useMemo(() => {
@@ -265,30 +499,164 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
 
     return (
         <div className="portfolio-dashboard-v2">
+            {/* Simulator Mode Toggle - Prominent */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                marginBottom: '20px',
+                background: isSimulatorMode ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.1))' : '#1e293b',
+                borderRadius: '12px',
+                border: isSimulatorMode ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #334155'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                        onClick={() => setIsSimulatorMode(!isSimulatorMode)}
+                        style={{
+                            width: '52px',
+                            height: '28px',
+                            borderRadius: '14px',
+                            border: 'none',
+                            background: isSimulatorMode ? '#3b82f6' : '#475569',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'background 0.2s ease'
+                        }}
+                    >
+                        <div style={{
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            background: 'white',
+                            position: 'absolute',
+                            top: '3px',
+                            left: isSimulatorMode ? '27px' : '3px',
+                            transition: 'left 0.2s ease',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                    </button>
+                    <div>
+                        <div style={{ fontWeight: 600, fontSize: '15px', color: isSimulatorMode ? '#3b82f6' : '#f8fafc' }}>
+                            Investment Simulator
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                            {isSimulatorMode ? 'Showing your personalized dollar amounts' : 'Toggle to see what YOUR investment would be worth'}
+                        </div>
+                    </div>
+                </div>
+
+                {isSimulatorMode && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Starting Capital:</span>
+                            <div style={{ position: 'relative' }}>
+                                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>$</span>
+                                <input
+                                    type="number"
+                                    value={initialInvestment}
+                                    onChange={(e) => setInitialInvestment(Number(e.target.value) || 0)}
+                                    style={{
+                                        width: '100px',
+                                        padding: '8px 10px 8px 22px',
+                                        fontSize: '14px',
+                                        fontWeight: 700,
+                                        background: '#0f172a',
+                                        border: '2px solid #3b82f6',
+                                        borderRadius: '8px',
+                                        color: '#f8fafc',
+                                        textAlign: 'right'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Quarterly Addition:</span>
+                            <div style={{ position: 'relative' }}>
+                                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '13px', fontWeight: 600 }}>$</span>
+                                <input
+                                    type="number"
+                                    value={recurringContribution}
+                                    onChange={(e) => setRecurringContribution(Number(e.target.value) || 0)}
+                                    style={{
+                                        width: '80px',
+                                        padding: '8px 10px 8px 22px',
+                                        fontSize: '14px',
+                                        fontWeight: 700,
+                                        background: '#0f172a',
+                                        border: '1px solid #334155',
+                                        borderRadius: '8px',
+                                        color: '#f8fafc',
+                                        textAlign: 'right'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Summary Cards - Conditional based on simulator mode */}
             <div className="performance-summary-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '30px' }}>
-                <div className="summary-card">
-                    <div className="summary-label">Mimic Portfolio Return ({timeRange})</div>
-                    <div className={`summary-value ${stats.totalReturn >= 0 ? 'positive' : 'negative'}`}>
-                        {stats.totalReturn >= 0 ? '+' : ''}{stats.totalReturn.toFixed(2)}%
-                    </div>
-                    <div className="summary-subtext">Return for selected period</div>
-                </div>
+                {isSimulatorMode ? (
+                    <>
+                        <div className="summary-card">
+                            <div className="summary-label">Total Invested</div>
+                            <div className="summary-value" style={{ color: '#94a3b8' }}>
+                                {formatCurrency(stats.simInvested)}
+                            </div>
+                            <div className="summary-subtext">
+                                {recurringContribution > 0
+                                    ? `$${initialInvestment.toLocaleString()} + quarterly`
+                                    : 'Your starting capital'}
+                            </div>
+                        </div>
 
-                <div className="summary-card">
-                    <div className="summary-label">S&P 500 (SPY) Return</div>
-                    <div className={`summary-value ${stats.benchmarkTotal >= 0 ? 'positive' : 'negative'}`} style={{ color: '#6366f1' }}>
-                        {stats.benchmarkTotal >= 0 ? '+' : ''}{stats.benchmarkTotal.toFixed(2)}%
-                    </div>
-                    <div className="summary-subtext">Benchmark performance</div>
-                </div>
+                        <div className="summary-card">
+                            <div className="summary-label">Current Value</div>
+                            <div className={`summary-value ${stats.simProfit >= 0 ? 'positive' : 'negative'}`}>
+                                {formatCurrency(stats.simValue)}
+                            </div>
+                            <div className="summary-subtext" style={{ color: stats.simRoi >= 0 ? '#10b981' : '#ef4444' }}>
+                                {stats.simRoi >= 0 ? '+' : ''}{stats.simRoi.toFixed(1)}% ROI
+                            </div>
+                        </div>
 
-                <div className="summary-card">
-                    <div className="summary-label">Alpha (vs Benchmark)</div>
-                    <div className={`summary-value ${stats.outperformance >= 0 ? 'positive' : 'negative'}`}>
-                        {stats.outperformance >= 0 ? '+' : ''}{stats.outperformance.toFixed(2)}%
-                    </div>
-                    <div className="summary-subtext">Excess return</div>
-                </div>
+                        <div className="summary-card">
+                            <div className="summary-label">Net Profit</div>
+                            <div className={`summary-value ${stats.simProfit >= 0 ? 'positive' : 'negative'}`}>
+                                {stats.simProfit >= 0 ? '+' : ''}{formatCurrency(stats.simProfit)}
+                            </div>
+                            <div className="summary-subtext">After following this fund</div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="summary-card">
+                            <div className="summary-label">Mimic Portfolio Return ({timeRange})</div>
+                            <div className={`summary-value ${stats.totalReturn >= 0 ? 'positive' : 'negative'}`}>
+                                {stats.totalReturn >= 0 ? '+' : ''}{stats.totalReturn.toFixed(2)}%
+                            </div>
+                            <div className="summary-subtext">Return for selected period</div>
+                        </div>
+
+                        <div className="summary-card">
+                            <div className="summary-label">S&P 500 (SPY) Return</div>
+                            <div className={`summary-value ${stats.benchmarkTotal >= 0 ? 'positive' : 'negative'}`} style={{ color: '#6366f1' }}>
+                                {stats.benchmarkTotal >= 0 ? '+' : ''}{stats.benchmarkTotal.toFixed(2)}%
+                            </div>
+                            <div className="summary-subtext">Benchmark performance</div>
+                        </div>
+
+                        <div className="summary-card">
+                            <div className="summary-label">Alpha (vs Benchmark)</div>
+                            <div className={`summary-value ${stats.outperformance >= 0 ? 'positive' : 'negative'}`}>
+                                {stats.outperformance >= 0 ? '+' : ''}{stats.outperformance.toFixed(2)}%
+                            </div>
+                            <div className="summary-subtext">Excess return</div>
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="chart-panel-v2" style={{ height: '550px', position: 'relative', marginBottom: '32px' }}>
@@ -531,10 +899,13 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                 minTickGap={30}
                             />
                             <YAxis
-                                tickFormatter={(val) => `${val > 0 ? '+' : ''}${val.toFixed(0)}%`}
+                                tickFormatter={(val) => isSimulatorMode
+                                    ? `$${(val / 1000).toFixed(0)}K`
+                                    : `${val > 0 ? '+' : ''}${val.toFixed(0)}%`}
                                 tick={{ fontSize: 12, fill: '#94a3b8' }}
                                 axisLine={false}
                                 tickLine={false}
+                                domain={isSimulatorMode ? ['auto', 'auto'] : undefined}
                             />
                             <ReferenceLine y={0} stroke="#475569" strokeDasharray="3 3" />
                             <Tooltip
@@ -556,9 +927,13 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                                     {qLabel} (Filing: {item.date})
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                                    <span style={{ color: '#3b82f6', fontSize: '12px' }}>Mimic Return:</span>
-                                                    <span style={{ fontWeight: 600, color: item.return >= 0 ? '#10b981' : '#ef4444' }}>
-                                                        {item.return >= 0 ? '+' : ''}{item.return.toFixed(2)}%
+                                                    <span style={{ color: '#3b82f6', fontSize: '12px' }}>
+                                                        {isSimulatorMode ? 'Portfolio Value:' : 'Mimic Return:'}
+                                                    </span>
+                                                    <span style={{ fontWeight: 600, color: isSimulatorMode ? '#f8fafc' : (item.return >= 0 ? '#10b981' : '#ef4444') }}>
+                                                        {isSimulatorMode
+                                                            ? formatCurrency(item.simulated_value || 0)
+                                                            : `${item.return >= 0 ? '+' : ''}${item.return.toFixed(2)}%`}
                                                     </span>
                                                 </div>
                                                 {showBenchmark && (
@@ -577,9 +952,9 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                             />
                             <Legend wrapperStyle={{ paddingTop: '20px' }} />
                             <Area
-                                name="Mimic Portfolio"
+                                name={isSimulatorMode ? "Portfolio Value" : "Mimic Portfolio"}
                                 type="monotone"
-                                dataKey="return"
+                                dataKey={isSimulatorMode ? "simulated_value" : "return"}
                                 stroke="#3b82f6"
                                 strokeWidth={3}
                                 fillOpacity={1}
@@ -609,11 +984,15 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 padding: '20px',
                 marginTop: '12px'
             }}>
-                <div className="activity-header" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="activity-header" style={{ marginBottom: '16px' }}>
                     <div>
-                        <h3 style={{ fontSize: '1.1rem', color: '#f8fafc', marginBottom: '4px' }}>Simulated Trade Log</h3>
+                        <h3 style={{ fontSize: '1.1rem', color: '#f8fafc', marginBottom: '4px' }}>
+                            {isSimulatorMode ? "Simulation Instructions" : "Trade Log"}
+                        </h3>
                         <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                            Major portfolio changes executing on filing dates
+                            {isSimulatorMode
+                                ? "Execute these trades to replicate the fund's moves"
+                                : "Major portfolio changes executing on filing dates"}
                         </div>
                     </div>
                 </div>
@@ -627,97 +1006,301 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                         <table className="activity-table">
                             <thead>
                                 <tr>
-                                    {/* Date column removed as requested */}
                                     <th style={{ background: '#0f172a', paddingLeft: '16px' }}>Ticker</th>
                                     <th style={{ background: '#0f172a' }}>Action</th>
-                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Shares</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Fund Shares</th>
                                     <th style={{ textAlign: 'right', background: '#0f172a' }}>Price</th>
-                                    <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px' }}>Transaction Value</th>
+                                    {isSimulatorMode ? (
+                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px', color: '#10b981' }}>Your Action</th>
+                                    ) : (
+                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px' }}>Value</th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
-                                {Array.from(tradesByPeriod.entries()).map(([period, items]) => (
-                                    <React.Fragment key={period}>
-                                        <tr className="activity-period-header">
-                                            <td colSpan={5} style={{
-                                                color: '#e2e8f0',
-                                                background: '#1e293b',
-                                                borderBottom: '1px solid #334155',
-                                                padding: '8px 16px',
-                                                fontSize: '13px',
-                                                fontWeight: 600
-                                            }}>
-                                                {formatQ(items[0].period)} Filing ({items[0].date})
-                                            </td>
-                                        </tr>
-                                        {items.map((trade, idx) => (
-                                            <tr key={`${trade.date}-${trade.ticker}-${idx}`} className="activity-row" style={{ height: '44px' }}>
-                                                <td className="activity-stock" style={{ paddingLeft: '16px' }}>
-                                                    <span className="activity-ticker" style={{ fontWeight: 700, color: '#f8fafc' }}>{trade.ticker}</span>
-                                                </td>
-                                                <td>
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '11px',
-                                                        fontWeight: 600,
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.05em',
-                                                        background: (trade.action === 'Buy' || trade.action === 'Add') ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                                        color: (trade.action === 'Buy' || trade.action === 'Add') ? '#34d399' : '#f87171',
-                                                        border: '1px solid',
-                                                        borderColor: (trade.action === 'Buy' || trade.action === 'Add') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+                                {Array.from(tradesByPeriod.entries())
+                                    .sort((a, b) => {
+                                        if (a[0] === 'INITIAL_SETUP') return 1;
+                                        if (b[0] === 'INITIAL_SETUP') return -1;
+                                        return b[1][0]?.date.localeCompare(a[1][0]?.date) || 0;
+                                    })
+                                    .map(([period, items]) => {
+                                        const isInitialSetup = period === 'INITIAL_SETUP';
+
+                                        // Calculate proportional ratio for this period
+                                        const fundDataPoint0 = data.find(d => d.date === items[0].date);
+                                        const userDataPoint0 = filteredData.find(d => d.date === items[0].date);
+                                        let ratio0 = 0;
+
+                                        if (isInitialSetup) {
+                                            // FORCE Step 1 to sum to exactly initialInvestment
+                                            const totalSetupValueInFund = items
+                                                .filter(it => it.action === 'Initial Buy')
+                                                .reduce((sum, it) => sum + Math.abs(it.value), 0);
+                                            ratio0 = totalSetupValueInFund > 0 ? initialInvestment / totalSetupValueInFund : 0;
+                                        } else if (fundDataPoint0?.portfolio_value && userDataPoint0?.simulated_value) {
+                                            ratio0 = userDataPoint0.simulated_value / fundDataPoint0.portfolio_value;
+                                        } else if (isSimulatorMode) {
+                                            ratio0 = initialInvestment / 10000000000;
+                                        }
+
+                                        // PRE-CALCULATE CAPPED VALUES FOR THIS PERIOD
+                                        const sortedDates = Array.from(userCashSeries.keys()).sort();
+                                        const currentIdx = sortedDates.indexOf(items[0].date);
+                                        let runningCash = initialInvestment;
+                                        if (currentIdx > 0) {
+                                            runningCash = userCashSeries.get(sortedDates[currentIdx - 1]) || initialInvestment;
+                                        } else if (currentIdx === 0 && !isInitialSetup) {
+                                            runningCash = initialInvestment;
+                                        }
+
+                                        if (!isInitialSetup) runningCash += recurringContribution;
+
+                                        const cappedTrades = new Map<string, { val: number, capped: boolean }>();
+
+                                        // 1. Sells first
+                                        items.filter(it => !it.isContext && (it.action === 'Sell' || it.action === 'Reduce'))
+                                            .forEach(it => {
+                                                const val = Math.abs(it.value) * ratio0;
+                                                runningCash += val;
+                                                cappedTrades.set(`${it.ticker}-${it.action}-${it.shares_change}`, { val, capped: false });
+                                            });
+
+                                        // 2. Buys capped
+                                        items.filter(it => !it.isContext && (it.action === 'Buy' || it.action === 'Add' || it.action === 'Initial Buy'))
+                                            .forEach(it => {
+                                                const requestedVal = Math.abs(it.value) * ratio0;
+                                                const actualVal = Math.min(requestedVal, runningCash);
+                                                const isCapped = actualVal < requestedVal && requestedVal > 0.01;
+                                                runningCash -= actualVal;
+                                                cappedTrades.set(`${it.ticker}-${it.action}-${it.shares_change}`, { val: actualVal, capped: isCapped });
+                                            });
+
+                                        const highlightedItems = items.filter(trade =>
+                                            !isSimulatorMode || !trade.isContext
+                                        );
+
+                                        const buyItems = highlightedItems.filter(it => it.action === 'Buy' || it.action === 'Add' || it.action === 'Initial Buy' || it.action === 'Initial Setup');
+                                        const sellItems = highlightedItems.filter(it => it.action === 'Sell' || it.action === 'Reduce');
+
+                                        const buyCount = buyItems.length;
+                                        const sellCount = sellItems.length;
+
+                                        let totalBuyVal = 0;
+                                        let totalSellVal = 0;
+
+                                        highlightedItems.forEach(trade => {
+                                            const capped = cappedTrades.get(`${trade.ticker}-${trade.action}-${trade.shares_change}`);
+                                            const val = Math.abs(trade.user_value ?? (trade.value * ratio0));
+                                            const finalVal = capped ? capped.val : val;
+
+                                            if (trade.action === 'Buy' || trade.action === 'Add' || trade.action === 'Initial Buy' || trade.action === 'Initial Setup') totalBuyVal += finalVal;
+                                            else totalSellVal += finalVal;
+                                        });
+
+                                        return (
+                                            <React.Fragment key={period}>
+                                                <tr className="activity-period-header">
+                                                    <td colSpan={5} style={{
+                                                        color: '#e2e8f0',
+                                                        background: '#1e293b',
+                                                        borderBottom: '1px solid #334155',
+                                                        padding: '12px 16px',
+                                                        position: 'sticky',
+                                                        top: 0,
+                                                        zIndex: 20
                                                     }}>
-                                                        {trade.action}
-                                                    </span>
-                                                </td>
-                                                <td className={`activity-shares`} style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>
-                                                    {trade.shares_change > 0 ? '+' : ''}
-                                                    {Math.abs(trade.shares_change) >= 1000000
-                                                        ? (trade.shares_change / 1000000).toFixed(2) + 'M'
-                                                        : trade.shares_change.toLocaleString()}
-                                                </td>
-                                                <td className="activity-value" style={{ color: '#94a3b8', fontFamily: 'monospace' }}>
-                                                    ${trade.price.toFixed(2)}
-                                                </td>
-                                                <td className="activity-impact" style={{ color: '#f8fafc', fontWeight: 600, paddingRight: '16px', fontFamily: 'monospace' }}>
-                                                    {formatCurrency(trade.value)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </React.Fragment>
-                                ))}
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#f8fafc', letterSpacing: '0.025em' }}>
+                                                                {isInitialSetup ? (
+                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        <Layers size={14} style={{ color: '#3b82f6' }} />
+                                                                        Step 1: Initial Portfolio Setup ({items[0].originalPeriod || items[0].period})
+                                                                    </span>
+                                                                ) : (
+                                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        <Calendar size={14} style={{ color: '#94a3b8' }} />
+                                                                        Activity: {dateToLabelMap.get(items[0].date) || items[0].period}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>
+                                                                {!isInitialSetup && isSimulatorMode && (
+                                                                    <span style={{ marginRight: '8px', color: '#64748b' }}>
+                                                                        Funded by: <span style={{ color: '#cbd5e1' }}>${recurringContribution.toLocaleString()} Cash</span> + <span style={{ color: '#f87171' }}>{formatCurrency(totalSellVal)} Sales</span>
+                                                                    </span>
+                                                                )}
+                                                                <span><span style={{ color: '#10b981' }}>{buyCount}</span> Buys ({formatCurrency(totalBuyVal)})</span>
+                                                                <span><span style={{ color: '#ef4444' }}>{sellCount}</span> Sells ({formatCurrency(totalSellVal)})</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {period === 'INITIAL_SETUP' && (
+                                                    <tr style={{ background: '#0f172a' }}>
+                                                        <td colSpan={5} style={{ padding: '8px 16px', fontSize: '11px', color: '#64748b', borderBottom: '1px solid #1e293b' }}>
+                                                            <Info size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', marginBottom: '2px' }} />
+                                                            Initial buys establish your starting portfolio. Dimmed rows show the fund's internal trades during that quarter for context.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {items.map((trade, idx) => {
+                                                    const isStartDate = trade.date.substring(0, 10) === filteredData[0]?.date.substring(0, 10);
+
+                                                    // Dimmed logic
+                                                    let isDimmed = false;
+                                                    if (isSimulatorMode) {
+                                                        // 1. Context rows are ALWAYS dimmed
+                                                        isDimmed = !!trade.isContext;
+
+                                                        // 2. Active rows are dimmed ONLY if they are insignificant (< $1)
+                                                        if (!isDimmed && !isInitialSetup) {
+                                                            const val = Math.abs(trade.user_value ?? (trade.value * ratio0));
+                                                            if (val < 1.00) isDimmed = true;
+                                                        }
+                                                    }
+
+                                                    const isHighlighted = isSimulatorMode && !isDimmed;
+                                                    const isBuyAction = trade.action === 'Buy' || trade.action === 'Add' || trade.action === 'Initial Buy' || trade.action === 'Initial Setup';
+
+                                                    // Hide redundant historical context rows for the same ticker
+                                                    // if we already have an "Initial Buy" task for it in this period.
+                                                    if (isDimmed) {
+                                                        const hasActiveTask = items.some(it =>
+                                                            it.ticker === trade.ticker &&
+                                                            (it.action === 'Initial Buy' || it.action === 'Initial Setup')
+                                                        );
+                                                        if (hasActiveTask) return null;
+                                                    }
+
+                                                    // Show separator before first dimmed item
+                                                    const showSeparator = idx > 0 && isDimmed && !(isSimulatorMode &&
+                                                        items[idx - 1].date.substring(0, 10) === filteredData[0]?.date.substring(0, 10) &&
+                                                        items[idx - 1].period !== 'INITIAL_SETUP');
+
+                                                    // Proportional values
+                                                    const cappedInfo = cappedTrades.get(`${trade.ticker}-${trade.action}-${trade.shares_change}`);
+                                                    const userDollarAmount = isSimulatorMode
+                                                        ? (cappedInfo ? cappedInfo.val : Math.abs(trade.user_value ?? (trade.value * ratio0)))
+                                                        : 0;
+                                                    const userShareCount = isSimulatorMode
+                                                        ? (trade.user_shares ?? (trade.price > 0 ? userDollarAmount / trade.price : 0))
+                                                        : 0;
+
+                                                    // Hide negligible trades completely
+                                                    if (isSimulatorMode && !isInitialSetup && userDollarAmount < 1.00) {
+                                                        return null;
+                                                    }
+
+                                                    return (
+                                                        <React.Fragment key={`${trade.ticker}-${idx}`}>
+                                                            {showSeparator && (
+                                                                <tr>
+                                                                    <td colSpan={5} style={{ padding: '10px 0' }}>
+                                                                        <div style={{ height: '1px', background: '#334155', width: '100%' }}></div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                            <tr
+                                                                className="activity-row"
+                                                                style={{
+                                                                    height: '44px',
+                                                                    opacity: isDimmed ? 0.35 : 1,
+                                                                    background: 'transparent',
+                                                                    borderLeft: isHighlighted
+                                                                        ? `4px solid ${isBuyAction ? '#34d399' : '#f87171'}`
+                                                                        : '4px solid transparent'
+                                                                }}
+                                                            >
+                                                                <td className="activity-stock" style={{ paddingLeft: '16px' }}>
+                                                                    <span className="activity-ticker" style={{ fontWeight: 700, color: '#f8fafc' }}>{trade.ticker}</span>
+                                                                </td>
+                                                                <td>
+                                                                    <span style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        textTransform: 'uppercase',
+                                                                        letterSpacing: '0.05em',
+                                                                        background: isBuyAction ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                                                        color: isBuyAction ? '#34d399' : '#f87171',
+                                                                        border: '1px solid',
+                                                                        borderColor: isBuyAction ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+                                                                    }}>
+                                                                        {trade.action}
+                                                                        {trade.isCapitalDeployment && (
+                                                                            <span style={{ fontSize: '9px', marginLeft: '6px', color: '#60a5fa' }}>
+                                                                                {trade.action === 'Sell' || trade.action === 'Reduce' ? '(Rebalance)' : '(Capital Addition)'}
+                                                                            </span>
+                                                                        )}
+                                                                        {cappedInfo?.capped && <span style={{ fontSize: '10px', marginLeft: '4px', opacity: 0.8 }}>(Capped)</span>}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="activity-shares" style={{ color: '#cbd5e1', fontFamily: 'monospace', textAlign: 'right' }}>
+                                                                    {trade.shares_change > 0 ? '+' : ''}
+                                                                    {Math.abs(trade.shares_change).toLocaleString()}
+                                                                </td>
+                                                                <td className="activity-value" style={{ color: '#94a3b8', fontFamily: 'monospace', textAlign: 'right' }}>
+                                                                    {trade.price > 0 ? `$${trade.price.toFixed(2)}` : '—'}
+                                                                </td>
+                                                                <td style={{ textAlign: 'right', paddingRight: '16px', fontWeight: 600, fontFamily: 'monospace' }}>
+                                                                    {isSimulatorMode ? (
+                                                                        isDimmed ? (
+                                                                            <span style={{ color: '#64748b', fontSize: '11px' }}>N/A ⓘ</span>
+                                                                        ) : (
+                                                                            <span style={{ color: isBuyAction ? '#10b981' : '#ef4444' }}>
+                                                                                {isBuyAction ? 'Buy ' : 'Sell '}
+                                                                                {Math.abs(userShareCount) > 0
+                                                                                    ? (Math.abs(userShareCount) < 0.01 ? Math.abs(userShareCount).toFixed(4) : (Math.abs(userShareCount) < 1 ? Math.abs(userShareCount).toFixed(2) : Math.round(Math.abs(userShareCount)).toLocaleString())) + ' sh'
+                                                                                    : '$' + (userDollarAmount < 1 ? userDollarAmount.toFixed(2) : Math.round(userDollarAmount).toLocaleString())}
+                                                                            </span>
+                                                                        )
+                                                                    ) : (
+                                                                        <span style={{ color: '#f8fafc' }}>{formatCurrency(trade.value)}</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        );
+                                    })}
                             </tbody>
                         </table>
                     </div>
-                )}
-            </div>
+                )
+                }
+            </div >
 
-            {showMethodologyTooltip && createPortal(
-                <div
-                    className="kpi-tooltip"
-                    style={{
-                        left: showMethodologyTooltip.x > window.innerWidth - 400 ? 'auto' : showMethodologyTooltip.x + 15,
-                        right: showMethodologyTooltip.x > window.innerWidth - 400 ? window.innerWidth - showMethodologyTooltip.x + 15 : 'auto',
-                        top: showMethodologyTooltip.y + 20,
-                        maxWidth: '380px'
-                    }}
-                >
-                    <div className="tooltip-title">Mimic Portfolio Methodology</div>
-                    <div style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
-                        This simulation aims to replicate the performance of a user following a fund's 13F filings.
-                        <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                            <li><strong>Entry/Exit:</strong> Simulated trades occur on the exact <span style={{ color: '#e2e8f0', fontWeight: 600 }}>Filing Release Date</span>.</li>
-                            <li><strong>Weights:</strong> Position sizes are determined by the shares reported in the most recent filing.</li>
-                            <li><strong>Execution Price:</strong> Uses the market closing price on the filing day.</li>
-                        </ul>
-                    </div>
-                    <div style={{ color: '#94a3b8', fontSize: '11px', lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: '10px' }}>
-                        This differs from TWR by reflecting the <span style={{ fontStyle: 'italic' }}>delay</span> between a quarter ending and the filing becoming public (up to 45 days).
-                    </div>
-                </div>,
-                document.body
-            )}
-        </div>
+            {
+                showMethodologyTooltip && createPortal(
+                    <div
+                        className="kpi-tooltip"
+                        style={{
+                            left: showMethodologyTooltip.x > window.innerWidth - 400 ? 'auto' : showMethodologyTooltip.x + 15,
+                            right: showMethodologyTooltip.x > window.innerWidth - 400 ? window.innerWidth - showMethodologyTooltip.x + 15 : 'auto',
+                            top: showMethodologyTooltip.y + 20,
+                            maxWidth: '380px'
+                        }}
+                    >
+                        <div className="tooltip-title">Mimic Portfolio Methodology</div>
+                        <div style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
+                            This simulation aims to replicate the performance of a user following a fund's 13F filings.
+                            <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
+                                <li><strong>Entry/Exit:</strong> Simulated trades occur on the exact <span style={{ color: '#e2e8f0', fontWeight: 600 }}>Filing Release Date</span>.</li>
+                                <li><strong>Weights:</strong> Position sizes are determined by the shares reported in the most recent filing.</li>
+                                <li><strong>Execution Price:</strong> Uses the market closing price on the filing day.</li>
+                            </ul>
+                        </div>
+                        <div style={{ color: '#94a3b8', fontSize: '11px', lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: '10px' }}>
+                            This differs from TWR by reflecting the <span style={{ fontStyle: 'italic' }}>delay</span> between a quarter ending and the filing becoming public (up to 45 days).
+                        </div>
+                    </div>,
+                    document.body
+                )
+            }
+        </div >
     );
 };

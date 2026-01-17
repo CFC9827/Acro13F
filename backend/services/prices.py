@@ -14,9 +14,21 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     """
     if not ticker:
         return []
+    
+    # Normalize ticker for Yahoo Finance (e.g., BRK/A -> BRK-A, BF.B -> BF-B)
+    original_ticker = ticker
+    ticker = ticker.replace('/', '-').replace('.', '-')
 
     # 1. Try to get from DB first
-    prices = db.get_prices(ticker, start_date)
+    # Use the original ticker for DB lookup as that's how it's stored in holdings
+    prices = db.get_prices(original_ticker, start_date)
+    
+    # If not in DB, also check if we have it under the normalized ticker
+    if not prices and ticker != original_ticker:
+        prices = db.get_prices(ticker, start_date)
+        if prices:
+            # If found under normalized, return it
+            return prices
     
     # Check if we have a "failed" marker or old data
     with db._get_connection() as conn:

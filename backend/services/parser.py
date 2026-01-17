@@ -69,35 +69,34 @@ class InfTableParser:
         test_samples = [h for h in raw_holdings if h['shares'] > 100 and h['raw_value'] > 0]
         
         if len(test_samples) >= 3:
-            # With enough samples, use the expensive-price heuristic
-            too_expensive_count = 0
+            # With enough samples, use a consensus heuristic
+            needs_scaling_count = 0
             for h in test_samples[:50]:
-                price_if_scaled = (h['raw_value'] * 1000) / h['shares']
-                if price_if_scaled > 5000:
-                    too_expensive_count += 1
-            
-            if too_expensive_count / len(test_samples[:50]) > 0.3:
-                scale_by_1000 = False
-                logging.info(f"Scaling heuristic detected FULL DOLLARS (scale_by_1000=False). Samples: {len(test_samples)}")
-            else:
-                logging.info(f"Scaling heuristic detected THOUSANDS (scale_by_1000=True). Samples: {len(test_samples)}")
-        else:
-            # Few samples (amendments) - check if raw values give reasonable prices
-            # Most stocks trade between $0.10 and $10,000/share
-            reasonable_without_scaling = True
-            for h in test_samples:
                 price_unscaled = h['raw_value'] / h['shares']
-                if price_unscaled < 0.10 or price_unscaled > 50000:
-                    reasonable_without_scaling = False
-                    break
+                # If unscaled price is tiny (< $0.10) but scaled is reasonable, it probably needs scaling
+                if price_unscaled < 0.10:
+                    needs_scaling_count += 1
+                # If unscaled price is already high, it definitely doesn't need scaling
+                elif price_unscaled > 500:
+                    needs_scaling_count -= 1
             
-            if test_samples and reasonable_without_scaling:
-                # Prices look reasonable without scaling - values are already in dollars
-                scale_by_1000 = False
-                logging.info(f"Few samples ({len(test_samples)}), prices look reasonable unscaled - using FULL DOLLARS")
+            # Consensus: If > 50% look like they need scaling, and none look like they'd be astronomical
+            if needs_scaling_count > (len(test_samples[:50]) * 0.4):
+                scale_by_1000 = True
+                logging.info(f"Scaling heuristic detected THOUSANDS (consensus). Samples: {len(test_samples)}")
             else:
-                # Prices too low without scaling - need to multiply by 1000
-                logging.info(f"Few samples ({len(test_samples)}), defaulting to THOUSANDS")
+                scale_by_1000 = False
+                logging.info(f"Scaling heuristic detected FULL DOLLARS (consensus). Samples: {len(test_samples)}")
+        else:
+            # Very few samples (small amendments)
+            # Default to match the majority of the positions
+            price_unscaled = test_samples[0]['raw_value'] / test_samples[0]['shares'] if test_samples else 0
+            if 0.10 < price_unscaled < 30000:
+                scale_by_1000 = False
+                logging.info("Single sample looks like full dollars.")
+            else:
+                scale_by_1000 = True
+                logging.info("Defaulting to THOUSANDS for low-sample filing.")
             
         holdings = []
         for h in raw_holdings:

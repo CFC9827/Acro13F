@@ -33,7 +33,12 @@ class CUSIPMapper:
             "67066G104": "NVDA",
             "302130109": "XOM",
             "88160R101": "TSLA",
-            "060505104": "BAC"
+            "060505104": "BAC",
+            "112585104": "TRUP",
+            "112585104": "TRUP", # 9-digit
+            "89778L108": "TRUP", # Alternative CUSIP
+            "11258M106": "BN",   # Brookfield
+            "83200N103": "SMAR"  # Smartsheet
         }
         self.mappings.update(self.manual_mappings)
 
