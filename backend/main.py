@@ -7,6 +7,7 @@ from services.database import DatabaseManager
 from services.orchestrator import Orchestrator
 from services.benchmark import get_benchmark_data
 from services.prices import get_historical_prices
+from services.mimic_performance import MimicPerformanceCalculator
 from services.sector_mapper import SectorMapper
 from services.sec_client import SECClient
 import os
@@ -26,6 +27,7 @@ app.add_middleware(
 
 # Initialize database and orchestrator
 db = DatabaseManager()
+mimic_calc = MimicPerformanceCalculator(db)
 orch = Orchestrator(db)
 sector_mapper = SectorMapper()
 
@@ -101,6 +103,14 @@ async def get_dashboard_performance(group_id: int = None):
     try:
         return db.get_all_funds_performance(group_id=group_id)
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api.get("/funds/{cik}/mimic-performance")
+async def get_mimic_performance(cik: str):
+    try:
+        return mimic_calc.get_mimic_performance(cik)
+    except Exception as e:
+        logger.error(f"Error calculating mimic performance for {cik}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/groups")

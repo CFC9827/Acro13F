@@ -13,9 +13,10 @@ import { CikSearchModal } from './components/CikSearchModal'
 import { ActivityView } from './components/ActivityView'
 import { Onboarding } from './components/Onboarding'
 import { calculateIRR } from './utils/performanceUtils'
+import { MimicPerformanceChart } from './components/MimicPerformanceChart'
 
 // Type for view states
-type ViewType = 'table' | 'chart' | 'performance' | 'about' | 'dashboard' | 'summary' | 'activity';
+type ViewType = 'table' | 'chart' | 'performance' | 'mimic' | 'about' | 'dashboard' | 'summary' | 'activity';
 
 // Parse URL path to extract view and CIK
 function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } {
@@ -32,7 +33,7 @@ function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } 
     if (segments[0] === 'fund' && segments[1]) {
         const cik = segments[1];
         const subView = segments[2] as ViewType | undefined;
-        if (subView && ['table', 'chart', 'performance', 'activity'].includes(subView)) {
+        if (subView && ['table', 'chart', 'performance', 'mimic', 'activity'].includes(subView)) {
             return { view: subView, cik };
         }
         return { view: 'summary', cik };
@@ -906,10 +907,11 @@ function App() {
                                             <PieChart size={18} /> Composition
                                         </button>
                                         <button
-                                            className={`tab ${view === 'performance' ? 'active' : ''}`}
+                                            className={`tab ${(view === 'performance' || view === 'mimic') ? 'active' : ''}`}
                                             onClick={() => navigate('performance', selectedCik)}
                                         >
-                                            <TrendingUp size={18} /> Performance
+                                            <TrendingUp size={14} />
+                                            Performance
                                         </button>
                                     </div>
                                 </div>
@@ -917,7 +919,7 @@ function App() {
                                 {/* Data Range Info Bar: High Contrast and Fixed to Top of View Area */}
                                 {filingRange && filingRange.earliest && (
                                     <div style={{
-                                        display: 'inline-flex',
+                                        display: 'flex',
                                         alignItems: 'center',
                                         gap: '12px',
                                         padding: '6px 0', // Reduced padding since no border
@@ -928,7 +930,7 @@ function App() {
                                         fontWeight: '500',
                                         marginTop: '8px',
                                         marginBottom: '8px',
-                                        width: 'fit-content'
+                                        width: '100%'
                                     }}>
 
                                         <div
@@ -1011,6 +1013,60 @@ function App() {
                                             )}
                                         </button>
 
+                                        {(view === 'performance' || view === 'mimic') && (
+                                            <div style={{ marginLeft: 'auto' }}>
+                                                <div style={{
+                                                    display: 'flex',
+                                                    background: '#e2e8f0',
+                                                    padding: '3px',
+                                                    borderRadius: '10px',
+                                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.06)'
+                                                }}>
+                                                    <button
+                                                        onClick={() => navigate('performance', selectedCik)}
+                                                        style={{
+                                                            padding: '6px 16px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 600,
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            background: view === 'performance' ? '#ffffff' : 'transparent',
+                                                            color: view === 'performance' ? '#0f172a' : '#64748b',
+                                                            boxShadow: view === 'performance' ? '0 2px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        <TrendingUp size={14} style={{ opacity: view === 'performance' ? 1 : 0.6 }} />
+                                                        Reported
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate('mimic', selectedCik)}
+                                                        style={{
+                                                            padding: '6px 16px',
+                                                            borderRadius: '8px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 600,
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            background: view === 'mimic' ? '#ffffff' : 'transparent',
+                                                            color: view === 'mimic' ? '#0f172a' : '#64748b',
+                                                            boxShadow: view === 'mimic' ? '0 2px 4px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px'
+                                                        }}
+                                                    >
+                                                        <BarChart3 size={14} style={{ opacity: view === 'mimic' ? 1 : 0.6 }} />
+                                                        Mimic 13F
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -1033,14 +1089,25 @@ function App() {
                                         fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
                                         cik={selectedCik || undefined}
                                     />
-                                ) : view === 'performance' ? (
-                                    <PerformanceChart
-                                        data={history}
-                                        timeRange={timeRange}
-                                        onTimeRangeChange={(r) => { setTimeRange(r); setOffset(0); }}
-                                        offset={offset}
-                                        onOffsetChange={setOffset}
-                                    />
+                                ) : (view === 'performance' || view === 'mimic') ? (
+                                    <div className="performance-view-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                                            {view === 'performance' ? (
+                                                <PerformanceChart
+                                                    data={history}
+                                                    timeRange={timeRange}
+                                                    onTimeRangeChange={(r) => { setTimeRange(r); setOffset(0); }}
+                                                    offset={offset}
+                                                    onOffsetChange={setOffset}
+                                                />
+                                            ) : (
+                                                <MimicPerformanceChart
+                                                    cik={selectedCik || ''}
+                                                    fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
                                 ) : view === 'activity' ? (
                                     <ActivityView history={history} fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'} />
                                 ) : (
@@ -1074,6 +1141,12 @@ function App() {
                                             >
                                                 <TrendingUp size={18} /> Performance
                                             </button>
+                                            <button
+                                                className="tab"
+                                                onClick={() => navigate('mimic', selectedCik)}
+                                            >
+                                                <BarChart3 size={18} /> Mimic
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -1087,7 +1160,7 @@ function App() {
                         )}
                     </section>
                 </main>
-            </div>
+            </div >
             {showOnboarding && (
                 <Onboarding onComplete={() => {
                     setShowOnboarding(false);
@@ -1095,7 +1168,8 @@ function App() {
                     fetchFunds();
                     fetchDashboardSummary();
                 }} />
-            )}
+            )
+            }
         </>
     )
 }

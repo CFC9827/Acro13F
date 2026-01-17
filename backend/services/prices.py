@@ -18,10 +18,20 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     # 1. Try to get from DB first
     prices = db.get_prices(ticker, start_date)
     
+    # Check if we have a "failed" marker or old data
+    with db._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS ticker_metadata (ticker TEXT PRIMARY KEY, status TEXT, last_updated TEXT)")
+        cursor.execute("SELECT last_updated FROM ticker_metadata WHERE ticker = ? AND status = 'failed'", (ticker,))
+        fail_res = cursor.fetchone()
+        if fail_res:
+            last_fail = datetime.strptime(fail_res[0], "%Y-%m-%d %H:%M:%S")
+            # If we failed within the last 30 days, don't try again
+            if (datetime.now() - last_fail).days < 30:
+                logger.debug(f"Skipping recently failed ticker: {ticker}")
+                return prices
+
     # Check if cached data is usable:
-    # - Must have data
-    # - Must be fresh (latest date within 7 days)
-    # - Must cover the requested start date
     if prices:
         latest_date_str = prices[-1]['date']
         earliest_date_str = prices[0]['date']
@@ -51,7 +61,7 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         session = requests.Session()
         session.headers.update({'User-Agent': user_agent})
         
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(ticker, session=session)
         
         # If no start date, fetch a reasonable history (e.g. 10 years)
         fetch_start = start_date if start_date else "2015-01-01"
@@ -60,7 +70,18 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         
         if hist.empty:
             logger.warning(f"No price data found for {ticker}")
+            # Mark as failed in metadata
+            with db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("CREATE TABLE IF NOT EXISTS ticker_metadata (ticker TEXT PRIMARY KEY, status TEXT, last_updated TEXT)")
+                cursor.execute("INSERT OR REPLACE INTO ticker_metadata (ticker, status, last_updated) VALUES (?, ?, ?)", 
+                               (ticker, 'failed', datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             return prices # Return whatever we had in DB (even if empty)
+        
+        # Clear failure marker if it exists
+        with db._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM ticker_metadata WHERE ticker = ?", (ticker,))
 
         new_prices = []
         for date, row in hist.iterrows():
@@ -72,8 +93,6 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         # 3. Save to DB for next time
         db.save_prices(ticker, new_prices)
         
-        # Merge or just return newest? 
-        # Since we use INSERT OR REPLACE, the DB is the source of truth now.
         return db.get_prices(ticker, start_date)
 
     except Exception as e:
