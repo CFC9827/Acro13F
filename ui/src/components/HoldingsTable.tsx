@@ -69,11 +69,18 @@ const StockHistoryChart: React.FC<{
         if (ticker) {
             setFetchingPrices(true);
             // Fetch starting from 60 days before the earliest 13F quarter (to show pre-buy context)
-            const sorted13F = [...history].sort((a, b) => new Date(a.period_of_report).getTime() - new Date(b.period_of_report).getTime());
+            const sorted13F = [...(allQuarters || selectableQuarters || (history as any[]))]
+                .sort((a: any, b: any) => {
+                    const dateA = typeof a === 'string' ? a : a.period_of_report;
+                    const dateB = typeof b === 'string' ? b : b.period_of_report;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                });
+
             let startStr: string | undefined;
             if (sorted13F.length > 0) {
-                const earliestDate = new Date(sorted13F[0].period_of_report);
-                earliestDate.setDate(earliestDate.getDate() - 100); // 100 days before first filing (full quarter context)
+                const earliest = sorted13F[0] as any;
+                const earliestDate = new Date(typeof earliest === 'string' ? earliest : earliest.period_of_report);
+                earliestDate.setDate(earliestDate.getDate() - 120); // 4 months before first filing
                 startStr = earliestDate.toISOString().split('T')[0];
             }
 
@@ -147,15 +154,13 @@ const StockHistoryChart: React.FC<{
                     date: h.period_of_report,
                     action,
                     actionColor,
-                    prevDate
+                    prevDate: prevH ? prevH.period_of_report : (action === 'NEW' ? prevDate : undefined)
                 });
 
-                // If there's a gap after this record, add an EXIT action
-                // The exit happened sometime after this quarter's report
+                // If exited, add explicit EXIT marker half-way through the next quarter
                 if (hasGapAfter && h.shares > 0) {
-                    // Add EXIT marker slightly after this date (we'll map it to the closest price)
                     const exitDate = new Date(h.period_of_report);
-                    exitDate.setDate(exitDate.getDate() + 45); // ~1.5 months after quarter end
+                    exitDate.setDate(exitDate.getDate() + 45);
                     filingActions.push({
                         date: exitDate.toISOString().split('T')[0],
                         action: 'EXIT',
@@ -203,6 +208,7 @@ const StockHistoryChart: React.FC<{
 
                 return {
                     date: p.date,
+                    time: d.getTime(),
                     value: p.price,
                     ...actionData,
                     displayDate: `Q${q} '${year}`
@@ -251,6 +257,7 @@ const StockHistoryChart: React.FC<{
 
             return {
                 date: h.period_of_report,
+                time: new Date(h.period_of_report).getTime(),
                 value: normalizedPrices[i],
                 action,
                 actionColor,
@@ -270,19 +277,18 @@ const StockHistoryChart: React.FC<{
         if (!currentQuarter || chartData.length === 0) return null;
 
         const targetTime = new Date(currentQuarter).getTime();
-        let closest = chartData[0].date;
+        let closest = chartData[0].time;
         let minDiff = Infinity;
 
         for (const d of chartData) {
-            const diff = Math.abs(new Date(d.date).getTime() - targetTime);
+            const diff = Math.abs(d.time - targetTime);
             if (diff < minDiff) {
                 minDiff = diff;
-                closest = d.date;
+                closest = d.time;
             }
         }
 
-        // Only use if within 5 days of target
-        return minDiff <= 5 * 24 * 60 * 60 * 1000 ? closest : null;
+        return closest;
     }, [currentQuarter, chartData]);
 
     // Time range toggle
@@ -464,7 +470,7 @@ const StockHistoryChart: React.FC<{
     // Compute unique quarter ticks for X-axis (one tick per quarter, with smart spacing for long histories)
     const uniqueQuarterTicks = useMemo(() => {
         const seenQuarters = new Set<string>();
-        const allQuarterDates: string[] = [];
+        const allQuarterDates: number[] = [];
 
         for (const d of filteredChartData) {
             const date = new Date(d.date);
@@ -474,7 +480,7 @@ const StockHistoryChart: React.FC<{
 
             if (!seenQuarters.has(quarterKey)) {
                 seenQuarters.add(quarterKey);
-                allQuarterDates.push(d.date);
+                allQuarterDates.push(date.getTime());
             }
         }
 
@@ -488,7 +494,7 @@ const StockHistoryChart: React.FC<{
 
         // Calculate step to show roughly maxTicks labels
         const step = Math.ceil(allQuarterDates.length / maxTicks);
-        const sparseTicks: string[] = [];
+        const sparseTicks: number[] = [];
         for (let i = 0; i < allQuarterDates.length; i += step) {
             sparseTicks.push(allQuarterDates[i]);
         }
@@ -1026,12 +1032,15 @@ const StockHistoryChart: React.FC<{
                     </defs>
                     <CartesianGrid vertical={false} stroke="#334155" strokeDasharray="3 3" opacity={0.3} />
                     <XAxis
-                        dataKey="date"
+                        dataKey="time"
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#64748b', fontSize: 10 }}
                         ticks={uniqueQuarterTicks}
                         interval={0}
+                        scale="time"
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
                         tickFormatter={(val) => {
                             const d = new Date(val);
                             const q = Math.floor(d.getMonth() / 3) + 1;
@@ -1053,14 +1062,14 @@ const StockHistoryChart: React.FC<{
                     />
                     <RechartsTooltip content={() => null} />
                     <Area
-                        type="monotone"
+                        type="linear"
                         dataKey="value"
                         stroke="#3b82f6"
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#colorValue)"
-                        isAnimationActive={true}
-                        animationDuration={1000}
+                        isAnimationActive={false}
+                        animationDuration={0}
                         dot={(props: any) => {
                             const { cx, cy, payload, index } = props;
                             if (payload.action === 'HOLD') return <g />;
@@ -1084,8 +1093,15 @@ const StockHistoryChart: React.FC<{
                     />
                     {hoveredData && hoveredData.action !== 'HOLD' && hoveredData.prevDate && (
                         <Area
-                            type="monotone"
-                            dataKey={(d) => isPointInTradeInterval(d.date) ? d.value : null}
+                            type="linear"
+                            dataKey={(d: any) => {
+                                if (!hoveredData.prevDate) return null;
+                                const curTime = new Date(d.date).getTime();
+                                const startTime = new Date(hoveredData.prevDate).getTime();
+                                const endTime = new Date(hoveredData.date).getTime();
+                                // Add a tiny buffer to include the boundary points
+                                return (curTime >= startTime - 1000 && curTime <= endTime + 1000) ? d.value : null;
+                            }}
                             stroke={hoveredData.actionColor}
                             strokeWidth={3}
                             fill={hoveredData.actionColor}
@@ -1097,7 +1113,7 @@ const StockHistoryChart: React.FC<{
                     )}
                     {activeActionIndex !== null && filteredChartData[activeActionIndex] && (
                         <ReferenceLine
-                            x={filteredChartData[activeActionIndex].date}
+                            x={filteredChartData[activeActionIndex].time}
                             stroke={filteredChartData[activeActionIndex].actionColor}
                             strokeWidth={1.5}
                             strokeDasharray="4 4"

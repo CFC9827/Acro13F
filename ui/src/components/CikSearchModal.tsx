@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, X, Building2, Hash, Check, PlusCircle, Trash2 } from 'lucide-react';
+import { Search, X, Building2, Hash, Check, PlusCircle, Trash2, ExternalLink } from 'lucide-react';
 import './CikSearchModal.css';
 
 interface SearchResult {
@@ -205,11 +205,22 @@ export function CikSearchModal({ isOpen, onClose, onSelectCik, onSelectCiks }: C
                                         <span className="cik-result-ticker">{result.ticker}</span>
                                     )}
                                 </div>
-                                <div className="cik-result-cik" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div className="cik-result-cik" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                         <Hash size={12} />
                                         {formatCik(result.cik)}
                                     </div>
+                                    <a
+                                        href={`https://www.sec.gov/edgar/browse/?CIK=${result.cik}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="cik-external-link"
+                                        style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}
+                                        title="View on SEC EDGAR"
+                                    >
+                                        <ExternalLink size={14} />
+                                    </a>
                                     {isSelected && <Check size={16} color="#38bdf8" />}
                                 </div>
                             </div>
@@ -217,46 +228,58 @@ export function CikSearchModal({ isOpen, onClose, onSelectCik, onSelectCiks }: C
                     })}
                 </div>
 
-                <div className="cik-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {onSelectCiks ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: 'space-between' }}>
-                            <div style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                {selectedFunds.length === 0 ? "Select funds to add..." : `${selectedFunds.length} fund(s) selected`}
-                            </div>
+                <div className="cik-modal-footer" style={{ borderTop: '1px solid #1e293b', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {onSelectCiks && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
                             <button
                                 disabled={selectedFunds.length === 0}
                                 onClick={handleBatchSubmit}
                                 style={{
-                                    background: selectedFunds.length > 0 ? '#38bdf8' : '#334155',
-                                    color: selectedFunds.length > 0 ? '#0f172a' : '#94a3b8',
-                                    border: 'none',
-                                    padding: '8px 16px',
-                                    borderRadius: '6px',
-                                    fontWeight: 600,
-                                    fontSize: '13px',
+                                    background: selectedFunds.length > 0 ? '#3b82f6' : '#1e293b',
+                                    color: selectedFunds.length > 0 ? 'white' : '#64748b',
+                                    border: selectedFunds.length > 0 ? 'none' : '1px solid #334155',
+                                    padding: '10px 24px',
+                                    borderRadius: '8px',
+                                    fontWeight: 700,
+                                    fontSize: '14px',
                                     cursor: selectedFunds.length > 0 ? 'pointer' : 'not-allowed',
-                                    transition: 'all 0.2s',
+                                    transition: 'all 0.2s ease',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px'
+                                    gap: '8px',
+                                    boxShadow: selectedFunds.length > 0 ? '0 4px 12px rgba(59, 130, 246, 0.25)' : 'none'
                                 }}
                             >
-                                <PlusCircle size={16} />
-                                Add {selectedFunds.length > 0 ? `${selectedFunds.length} Funds` : 'Funds'}
+                                <PlusCircle size={18} />
+                                {selectedFunds.length > 0 ? `Add ${selectedFunds.length} Selected Funds` : 'Add Funds'}
                             </button>
                         </div>
-                    ) : (
-                        <>
-                            <span>Can't find it? </span>
-                            <a
-                                href="https://www.sec.gov/search-filings"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                Search SEC EDGAR directly →
-                            </a>
-                        </>
                     )}
+
+                    <div style={{
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        color: '#64748b',
+                        paddingTop: onSelectCiks ? '8px' : '0',
+                        borderTop: onSelectCiks ? '1px solid rgba(255,255,255,0.03)' : 'none'
+                    }}>
+                        <span>Can't find a fund? </span>
+                        <a
+                            href="https://www.sec.gov/edgar/searchedgar/companysearch"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                color: '#3b82f6',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                transition: 'color 0.2s'
+                            }}
+                            onMouseOver={(e) => (e.currentTarget.style.color = '#60a5fa')}
+                            onMouseOut={(e) => (e.currentTarget.style.color = '#3b82f6')}
+                        >
+                            Search SEC EDGAR directly.
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

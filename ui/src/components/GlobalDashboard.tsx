@@ -297,7 +297,10 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
         }
 
         return filtered.map(d => {
-            const row: any = { period: d.period };
+            const row: any = {
+                period: d.period,
+                time: new Date(d.period).getTime()
+            };
             data.funds.forEach(fund => {
                 const val = d[fund];
                 if (val !== null && val !== undefined) {
@@ -447,7 +450,10 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                     <LineChart data={filteredAndIndexedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                         <XAxis
-                            dataKey="period"
+                            dataKey="time"
+                            scale="time"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
                             stroke="#64748b"
                             tickFormatter={(val) => {
                                 const d = new Date(val);
