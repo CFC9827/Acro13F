@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, APIRouter
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict
 from services.database import DatabaseManager
@@ -6,9 +8,13 @@ from services.orchestrator import Orchestrator
 from services.benchmark import get_benchmark_data
 from services.prices import get_historical_prices
 from services.sector_mapper import SectorMapper
+from services.sec_client import SECClient
 import os
 
 app = FastAPI(title="Stock Screener API")
+
+# Create API router with /api prefix for production compatibility
+api = APIRouter(prefix="/api")
 
 # Enable CORS for frontend development
 app.add_middleware(
@@ -23,7 +29,7 @@ db = DatabaseManager()
 orch = Orchestrator(db)
 sector_mapper = SectorMapper()
 
-@app.get("/config")
+@api.get("/config")
 async def get_config():
     """Returns the current application configuration status."""
     user_agent = os.environ.get("SEC_USER_AGENT", "")
@@ -33,7 +39,7 @@ async def get_config():
         "is_configured": not is_placeholder
     }
 
-@app.post("/config")
+@api.post("/config")
 async def update_config(config: Dict[str, str]):
     """Updates the application configuration and persists it to .env."""
     user_agent = config.get("sec_user_agent")
@@ -68,15 +74,13 @@ async def update_config(config: Dict[str, str]):
         
     return {"status": "success"}
 
-@app.get("/")
-async def root():
-    return {"message": "Stock Screener API is running"}
 
-@app.get("/funds")
+
+@api.get("/funds")
 async def get_funds():
     return db.get_funds()
 
-@app.post("/funds/reorder")
+@api.post("/funds/reorder")
 async def reorder_funds(orders: Dict[str, int]):
     try:
         db.reorder_funds(orders)
@@ -84,7 +88,7 @@ async def reorder_funds(orders: Dict[str, int]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/dashboard/summary")
+@api.get("/dashboard/summary")
 async def get_dashboard_summary(group_id: int = None):
     try:
         summary = db.get_dashboard_summary(group_id=group_id)
@@ -92,21 +96,21 @@ async def get_dashboard_summary(group_id: int = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/dashboard/performance")
+@api.get("/dashboard/performance")
 async def get_dashboard_performance(group_id: int = None):
     try:
         return db.get_all_funds_performance(group_id=group_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/dashboard/groups")
+@api.get("/dashboard/groups")
 async def get_groups():
     try:
         return db.get_groups()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/dashboard/groups/reorder")
+@api.post("/dashboard/groups/reorder")
 async def reorder_groups(orders: Dict[int, int]):
     try:
         db.reorder_groups(orders)
@@ -114,7 +118,7 @@ async def reorder_groups(orders: Dict[int, int]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/dashboard/groups")
+@api.post("/dashboard/groups")
 async def create_group(name: str):
     try:
         group_id = db.create_group(name)
@@ -122,7 +126,7 @@ async def create_group(name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/dashboard/groups/{id}")
+@api.delete("/dashboard/groups/{id}")
 async def delete_group(id: int):
     try:
         db.delete_group(id)
@@ -130,7 +134,7 @@ async def delete_group(id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/dashboard/groups/{id}/members")
+@api.post("/dashboard/groups/{id}/members")
 async def add_group_member(id: int, cik: str):
     try:
         db.add_fund_to_group(id, cik)
@@ -138,7 +142,7 @@ async def add_group_member(id: int, cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/dashboard/groups/{id}/members/{cik}")
+@api.delete("/dashboard/groups/{id}/members/{cik}")
 async def remove_group_member(id: int, cik: str):
     try:
         db.remove_fund_from_group(id, cik)
@@ -146,7 +150,7 @@ async def remove_group_member(id: int, cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/funds/{cik}/holdings")
+@api.get("/funds/{cik}/holdings")
 async def get_holdings(cik: str):
     holdings = db.get_latest_holdings(cik)
     if not holdings:
@@ -157,7 +161,7 @@ async def get_holdings(cik: str):
         return []
     return holdings
 
-@app.get("/funds/{cik}/history")
+@api.get("/funds/{cik}/history")
 async def get_history(cik: str):
     try:
         history = db.get_historical_holdings(cik)
@@ -165,7 +169,7 @@ async def get_history(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/funds/{cik}/refresh")
+@api.post("/funds/{cik}/refresh")
 async def refresh_fund(cik: str, limit: int = None, force_all: bool = False):
     try:
         # Dynamic refresh: Automatically detects news vs existing.
@@ -177,7 +181,7 @@ async def refresh_fund(cik: str, limit: int = None, force_all: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/market/benchmark")
+@api.get("/market/benchmark")
 async def get_market_benchmark(start: str, end: str = None):
     try:
         data = get_benchmark_data(start, end)
@@ -185,7 +189,7 @@ async def get_market_benchmark(start: str, end: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/funds/{cik}")
+@api.delete("/funds/{cik}")
 async def delete_fund(cik: str):
     try:
         db.delete_fund(cik)
@@ -193,7 +197,7 @@ async def delete_fund(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/funds/{cik}/filing-range")
+@api.get("/funds/{cik}/filing-range")
 async def get_filing_range(cik: str):
     """Returns the date range and count of filings stored for a fund."""
     try:
@@ -202,7 +206,7 @@ async def get_filing_range(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/prices/{ticker}")
+@api.get("/prices/{ticker}")
 async def get_ticker_prices(ticker: str, start: str = None):
     """Returns high-resolution historical prices for a ticker."""
     try:
@@ -211,7 +215,7 @@ async def get_ticker_prices(ticker: str, start: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/sectors/update")
+@api.post("/sectors/update")
 async def update_sectors():
     """Backfill sector data for all holdings that are missing sectors."""
     try:
@@ -224,7 +228,7 @@ async def update_sectors():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/sectors/allocation")
+@api.get("/sectors/allocation")
 async def get_sector_allocation(group_id: int = None, cik: str = None):
     """Get aggregated sector allocation across all funds (or a group or single fund)."""
     try:
@@ -282,7 +286,7 @@ async def get_sector_allocation(group_id: int = None, cik: str = None):
 # Cache for SEC company data
 _sec_company_cache = {"data": None, "timestamp": 0}
 
-@app.get("/search-cik")
+@api.get("/search-cik")
 async def search_cik(q: str, limit: int = 20):
     """Search for companies/funds by name using SEC EDGAR search API."""
     import httpx
@@ -333,6 +337,21 @@ async def search_cik(q: str, limit: int = 20):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
+# --- UI Serving ---
+# This serves the built React frontend from the ui/dist directory
+# html=True mode enables automatic index.html serving for / and SPA routing
+
+ui_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ui", "dist")
+
+# Include the API router with /api prefix
+app.include_router(api)
+
+# Mount static files AFTER all API routes are defined
+# html=True ensures index.html is served for directories and unknown routes
+if os.path.exists(ui_path):
+    app.mount("/", StaticFiles(directory=ui_path, html=True), name="ui")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # When running as a standalone app, we use a fixed port
+    uvicorn.run(app, host="127.0.0.1", port=8000)

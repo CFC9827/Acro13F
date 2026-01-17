@@ -23,3 +23,8 @@ dist/
 backups/
 *.txt
 !requirements.txt
+
+# Desktop Distribution
+Abrams13F_v*.zip
+dist_staging/
+

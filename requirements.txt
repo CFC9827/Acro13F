@@ -4,4 +4,5 @@ requests
 lxml
 pandas
 python-dotenv
-sqlite3
+yfinance
+pywebview
