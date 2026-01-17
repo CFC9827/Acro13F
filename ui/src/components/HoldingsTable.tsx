@@ -103,7 +103,7 @@ const StockHistoryChart: React.FC<{
         // If we have high-res price history, use it as the base
         if (priceHistory.length > 0) {
             // Map 13F filings to actions
-            const filingActions: { date: string, action: string, actionColor: string, prevDate?: string }[] = [];
+            const filingActions: { date: string, action: string, actionColor: string, prevDate?: string, intendedDate?: string }[] = [];
 
             sortedHistory.forEach((h, i) => {
                 const prevH = sortedHistory[i - 1];
@@ -152,6 +152,7 @@ const StockHistoryChart: React.FC<{
 
                 filingActions.push({
                     date: h.period_of_report,
+                    intendedDate: h.period_of_report,
                     action,
                     actionColor,
                     prevDate: action === 'NEW' ? prevDate : (prevH ? prevH.period_of_report : undefined)
@@ -159,11 +160,14 @@ const StockHistoryChart: React.FC<{
 
                 // If exited, add explicit EXIT marker at the end of the next quarter
                 if (hasGapAfter && h.shares > 0) {
-                    const exitDate = new Date(h.period_of_report);
+                    // Use UTC to avoid timezone shifts (e.g. Mar 31 becoming Apr 1)
+                    const exitDate = new Date(h.period_of_report + 'T12:00:00Z');
                     // Move to the exact end of the next quarter (e.g., Mar 31 -> Jun 30)
-                    exitDate.setMonth(exitDate.getMonth() + 4, 0);
+                    exitDate.setUTCMonth(exitDate.getUTCMonth() + 4, 0);
+                    const isoDate = exitDate.toISOString().split('T')[0];
                     filingActions.push({
-                        date: exitDate.toISOString().split('T')[0],
+                        date: isoDate,
+                        intendedDate: isoDate,
                         action: 'EXIT',
                         actionColor: '#f87171',
                         prevDate: h.period_of_report
@@ -176,7 +180,7 @@ const StockHistoryChart: React.FC<{
 
             // Create a lookup for actions by date
             // Since 13F quarter-end dates may fall on weekends/holidays, find the closest price date
-            const actionMap = new Map<string, { action: string, actionColor: string, prevDate?: string }>();
+            const actionMap = new Map<string, { action: string, actionColor: string, prevDate?: string, intendedDate?: string }>();
 
             filingActions.forEach(a => {
                 const filingTime = new Date(a.date).getTime();
@@ -196,16 +200,17 @@ const StockHistoryChart: React.FC<{
                     actionMap.set(closestPriceDate, {
                         action: a.action,
                         actionColor: a.actionColor,
-                        prevDate: a.prevDate
+                        prevDate: a.prevDate,
+                        intendedDate: (a as any).intendedDate // Map to the price point
                     });
                 }
             });
 
             return priceHistory.map(p => {
-                const actionData = actionMap.get(p.date) || { action: 'HOLD', actionColor: 'transparent' };
-                const d = new Date(p.date);
-                const q = Math.floor(d.getMonth() / 3) + 1;
-                const year = d.getFullYear().toString().slice(2);
+                const actionData = actionMap.get(p.date) || { action: 'HOLD', actionColor: 'transparent', intendedDate: undefined };
+                const d = new Date(p.date + 'T12:00:00Z'); // Consistent UTC creation
+                const q = Math.floor(d.getUTCMonth() / 3) + 1;
+                const year = d.getUTCFullYear().toString().slice(2);
 
                 return {
                     date: p.date,
@@ -478,26 +483,26 @@ const StockHistoryChart: React.FC<{
         // 1. Generate perfect quarter-END boundaries (Mar 31, Jun 30, Sep 30, Dec 31)
         const allPossibleTicks: number[] = [];
         const curr = new Date(startTimestamp);
+        // Use UTC to avoid timezone ghosts
+        curr.setUTCHours(12, 0, 0, 0);
         // Standardize to end of its current quarter
-        // If it's Jan/Feb/Mar, go to Mar 31
-        curr.setMonth((Math.floor(curr.getMonth() / 3) + 1) * 3, 0);
-        curr.setHours(23, 59, 59, 999);
+        curr.setUTCMonth((Math.floor(curr.getUTCMonth() / 3) + 1) * 3, 0);
 
         // Walk backwards to earliest possible tick to ensure coverage
         const walk = new Date(curr);
         while (walk.getTime() >= startTimestamp) {
             allPossibleTicks.unshift(walk.getTime());
-            walk.setMonth(walk.getMonth() - 2, 0); // Jump back to end of previous quarter
-            walk.setHours(23, 59, 59, 999);
+            walk.setUTCMonth(walk.getUTCMonth() - 2, 0); // Jump back to end of previous quarter
+            walk.setUTCHours(12, 0, 0, 0);
         }
 
         // Walk forwards to endTimestamp
         walk.setTime(curr.getTime());
-        walk.setMonth(walk.getMonth() + 4, 0); // Next quarter end
+        walk.setUTCMonth(walk.getUTCMonth() + 4, 0); // Next quarter end
         while (walk.getTime() <= endTimestamp) {
             allPossibleTicks.push(walk.getTime());
-            walk.setMonth(walk.getMonth() + 4, 0);
-            walk.setHours(23, 59, 59, 999);
+            walk.setUTCMonth(walk.getUTCMonth() + 4, 0);
+            walk.setUTCHours(12, 0, 0, 0);
         }
 
         const sortedUniqueTicks = Array.from(new Set(allPossibleTicks)).sort((a, b) => a - b);
@@ -1041,8 +1046,12 @@ const StockHistoryChart: React.FC<{
 
                             if (nearestActionIdx !== -1) {
                                 setActiveActionIndex(nearestActionIdx);
-                                setHoveredData(filteredChartData[nearestActionIdx]);
-                                const actionDate = filteredChartData[nearestActionIdx].date;
+                                const rawData = filteredChartData[nearestActionIdx];
+                                setHoveredData({
+                                    ...rawData,
+                                    date: (rawData as any).intendedDate || rawData.date
+                                });
+                                const actionDate = rawData.date;
                                 const jIdx = actionPoints.findIndex(ap => ap.date === actionDate);
                                 if (jIdx !== -1) setJumpIndex(jIdx);
                             } else {
