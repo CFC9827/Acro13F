@@ -11,9 +11,12 @@ class SECClient:
     BASE_DATA_URL = "https://data.sec.gov/submissions"
     BASE_ARCHIVE_URL = "https://www.sec.gov/Archives/edgar/data"
 
-    def __init__(self, user_agent: str = "MyTrackerApp/1.0 (contact@example.com)"):
+    def __init__(self, user_agent: Optional[str] = None):
+        # SEC rules require a declared User-Agent: Name (email)
+        # We prioritize the passed argument, then environment variable, then a placeholder.
+        self.user_agent = user_agent or os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
         self.headers = {
-            "User-Agent": user_agent,
+            "User-Agent": self.user_agent,
             "Accept-Encoding": "gzip, deflate"
         }
 
