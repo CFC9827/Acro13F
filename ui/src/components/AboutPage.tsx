@@ -12,7 +12,8 @@ import {
     Database,
     MousePointer2,
     PieChart,
-    Search
+    Search,
+    PlusCircle
 } from 'lucide-react';
 
 export const AboutPage: React.FC = () => {
@@ -27,6 +28,25 @@ export const AboutPage: React.FC = () => {
                     A systematic framework for dissecting institutional positioning, isolating manager alpha,
                     and quantifying net capital flows using SEC persistent metadata.
                 </p>
+            </div>
+
+            {/* Quick Start for New Users */}
+            <div style={{ marginBottom: '64px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.1)', padding: '24px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <PlusCircle size={20} className="text-blue-400" /> Getting Started
+                </h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                    {[
+                        { step: "1. Add a Fund", desc: "Use the 'Add Fund' button in the sidebar. Search by name or enter a 10-digit SEC CIK." },
+                        { step: "2. Initial Sync", desc: "The engine will pull the last 10 years of 13F filings. This can take 30-60 seconds per fund." },
+                        { step: "3. Explore Data", desc: "View holdings, trade history, and performance metrics once the sync completes." }
+                    ].map((item, i) => (
+                        <div key={i}>
+                            <div style={{ fontWeight: 600, color: '#f8fafc', marginBottom: '4px', fontSize: '14px' }}>{item.step}</div>
+                            <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{item.desc}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             {/* 1. What is this generally? */}
@@ -189,6 +209,18 @@ export const AboutPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Disclaimer Section */}
+            <div style={{ marginTop: '80px', padding: '32px', borderTop: '1px solid rgba(51, 65, 85, 0.3)', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
+                    Standard Disclaimer
+                </h3>
+                <p style={{ fontSize: '12px', color: '#64748b', maxWidth: '700px', margin: '0 auto', lineHeight: 1.8, fontStyle: 'italic' }}>
+                    This application is an open-source educational tool. Data is sourced from SEC EDGAR and Yahoo Finance; while we strive for accuracy, no guarantee is provided.
+                    Institutional filings (13Fs) are subject to significant delays (up to 45 days) and do not include short positions or non-equity holdings.
+                    This software does not constitute financial advice. Use at your own risk.
+                </p>
             </div>
 
             {/* Anchored Copyright Notice */}
