@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List } from 'lucide-react';
 import {
     AreaChart,
@@ -48,6 +48,22 @@ const StockHistoryChart: React.FC<{
     const [fetchingPrices, setFetchingPrices] = useState(false);
     const [activeActionIndex, setActiveActionIndex] = useState<number | null>(null);
     const [hoveredData, setHoveredData] = useState<any>(null);
+
+    // Container ref for measuring width
+    const chartContainerRef = useRef<HTMLDivElement>(null);
+    const [containerWidth, setContainerWidth] = useState(800); // Default width
+
+    // Measure container width on mount and resize
+    useEffect(() => {
+        const updateWidth = () => {
+            if (chartContainerRef.current) {
+                setContainerWidth(chartContainerRef.current.offsetWidth);
+            }
+        };
+        updateWidth();
+        window.addEventListener('resize', updateWidth);
+        return () => window.removeEventListener('resize', updateWidth);
+    }, []);
 
     useEffect(() => {
         if (ticker) {
@@ -147,26 +163,9 @@ const StockHistoryChart: React.FC<{
                         prevDate: h.period_of_report
                     });
                 }
-
-                // If this is the LAST record and it's not in the current quarter, position was exited
-                const isLastRecord = i === sortedHistory.length - 1;
-                if (isLastRecord && h.shares > 0) {
-                    const lastDate = new Date(h.period_of_report);
-                    const now = new Date();
-                    const daysSinceLast = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
-
-                    // If the last record is more than 100 days old, they likely exited
-                    if (daysSinceLast > 100) {
-                        const exitDate = new Date(h.period_of_report);
-                        exitDate.setDate(exitDate.getDate() + 45);
-                        filingActions.push({
-                            date: exitDate.toISOString().split('T')[0],
-                            action: 'EXIT',
-                            actionColor: '#f87171',
-                            prevDate: h.period_of_report
-                        });
-                    }
-                }
+                // NOTE: Removed synthetic exit for last record > 100 days old.
+                // If the position is in the latest filing with shares > 0, it's still held.
+                // We should NOT create synthetic exits - the next 13F just hasn't been filed.
             });
 
             // Create a lookup for actions by date
@@ -462,6 +461,45 @@ const StockHistoryChart: React.FC<{
     const actionPoints = useMemo(() => filteredChartData.filter(d => d.action !== 'HOLD'), [filteredChartData]);
     const [jumpIndex, setJumpIndex] = useState<number>(-1);
 
+    // Compute unique quarter ticks for X-axis (one tick per quarter, with smart spacing for long histories)
+    const uniqueQuarterTicks = useMemo(() => {
+        const seenQuarters = new Set<string>();
+        const allQuarterDates: string[] = [];
+
+        for (const d of filteredChartData) {
+            const date = new Date(d.date);
+            const q = Math.floor(date.getMonth() / 3) + 1;
+            const year = date.getFullYear();
+            const quarterKey = `${year}-Q${q}`;
+
+            if (!seenQuarters.has(quarterKey)) {
+                seenQuarters.add(quarterKey);
+                allQuarterDates.push(d.date);
+            }
+        }
+
+        // Dynamic maxTicks based on container width (each label needs ~55px)
+        const tickWidth = 55;
+        const maxTicks = Math.max(5, Math.floor(containerWidth / tickWidth));
+
+        if (allQuarterDates.length <= maxTicks) {
+            return allQuarterDates;
+        }
+
+        // Calculate step to show roughly maxTicks labels
+        const step = Math.ceil(allQuarterDates.length / maxTicks);
+        const sparseTicks: string[] = [];
+        for (let i = 0; i < allQuarterDates.length; i += step) {
+            sparseTicks.push(allQuarterDates[i]);
+        }
+        // Always include the last tick
+        if (sparseTicks[sparseTicks.length - 1] !== allQuarterDates[allQuarterDates.length - 1]) {
+            sparseTicks.push(allQuarterDates[allQuarterDates.length - 1]);
+        }
+
+        return sparseTicks;
+    }, [filteredChartData, containerWidth]);
+
     // Helper to determine if a point on the chart is within a trade interval being hovered
     const isPointInTradeInterval = useCallback((pointDate: string) => {
         if (!hoveredData || hoveredData.action === 'HOLD' || !hoveredData.prevDate) return false;
@@ -505,24 +543,20 @@ const StockHistoryChart: React.FC<{
                 portfolioChange
             });
 
-            // Check for synthetic exits
+            // Check for synthetic exits - only for HISTORICAL gaps, not for current holdings
+            // A gap means there's a nextH record and the gap between them is >100 days
             let hasGapAfter = false;
-            let isLateExit = false;
 
             if (nextH) {
                 const curDate = new Date(h.period_of_report);
                 const nextDate = new Date(nextH.period_of_report);
                 const daysDiff = (nextDate.getTime() - curDate.getTime()) / (1000 * 60 * 60 * 24);
                 hasGapAfter = daysDiff > 100;
-            } else {
-                // Last record check
-                const lastDate = new Date(h.period_of_report);
-                const now = new Date();
-                const daysSinceLast = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
-                isLateExit = daysSinceLast > 100;
             }
+            // NOTE: Removed isLateExit check - if the position is in the latest filing,
+            // it's still held. We should NOT create synthetic exits for current holdings.
 
-            if ((hasGapAfter || isLateExit) && h.shares > 0) {
+            if (hasGapAfter && h.shares > 0) {
                 const exitDate = new Date(h.period_of_report);
                 exitDate.setDate(exitDate.getDate() + 45);
                 const exitDateStr = exitDate.toISOString().split('T')[0];
@@ -586,7 +620,7 @@ const StockHistoryChart: React.FC<{
     };
 
     return (
-        <div style={{ width: '100%', height: '260px', marginBottom: '32px', position: 'relative' }}>
+        <div ref={chartContainerRef} style={{ width: '100%', height: '260px', marginBottom: '32px', position: 'relative' }}>
             {/* Chart Header & Legend Row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{
@@ -996,7 +1030,8 @@ const StockHistoryChart: React.FC<{
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#64748b', fontSize: 10 }}
-                        minTickGap={60}
+                        ticks={uniqueQuarterTicks}
+                        interval={0}
                         tickFormatter={(val) => {
                             const d = new Date(val);
                             const q = Math.floor(d.getMonth() / 3) + 1;
