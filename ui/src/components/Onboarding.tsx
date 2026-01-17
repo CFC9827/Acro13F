@@ -95,10 +95,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     <div className="onboarding-content">
                         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                             <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', marginBottom: '16px' }}>
-                                SEC <span style={{ color: '#3b82f6' }}>Edgar Access</span>
+                                Data Provider <span style={{ color: '#3b82f6' }}>Access</span>
                             </h1>
                             <p style={{ color: '#94a3b8', lineHeight: 1.6, fontSize: '14px' }}>
-                                SEC rules require all requests to be identified with a User-Agent containing your name and email.
+                                To ensure stable data access (SEC Edgar & Yahoo Finance), requests must be identified with a User-Agent containing your name and email.
                             </p>
                         </div>
 
@@ -108,7 +108,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                                 <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase' }}>Why is this required?</span>
                             </div>
                             <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
-                                Identifying your requests prevents your IP from being blocked. Your info is stored locally and sent only to SEC.gov.
+                                Identifying your requests prevents your IP from being rate-limited or blocked. Your info is stored locally and used only to identify yourself to data providers.
                                 <a href="https://www.sec.gov/edgar/searchedgar/accessing-edgar-data.htm" target="_blank" rel="noopener noreferrer" className="onboarding-link" style={{ marginLeft: '4px' }}>
                                     Read SEC Rules <ExternalLink size={10} style={{ display: 'inline', marginLeft: '2px' }} />
                                 </a>

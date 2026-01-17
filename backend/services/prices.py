@@ -1,5 +1,7 @@
 import yfinance as yf
 import logging
+import requests
+import os
 from datetime import datetime
 from services.database import DatabaseManager
 
@@ -43,7 +45,13 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     # 2. Fetch from Yahoo Finance
     try:
         logger.info(f"Fetching historical prices for {ticker} from Yahoo Finance")
-        stock = yf.Ticker(ticker)
+        
+        # Identify the request
+        user_agent = os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
+        session = requests.Session()
+        session.headers.update({'User-Agent': user_agent})
+        
+        stock = yf.Ticker(ticker, session=session)
         
         # If no start date, fetch a reasonable history (e.g. 10 years)
         fetch_start = start_date if start_date else "2015-01-01"

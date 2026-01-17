@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime
+import requests
+import os
 import random
 import math
 
@@ -13,7 +15,13 @@ def get_benchmark_data(start_date: str, end_date: str = None):
     try:
         import yfinance as yf
         logger.info(f"Fetching SPY data from {start_date} to {end_date}")
-        spy = yf.Ticker("SPY")
+        
+        # Identify the request
+        user_agent = os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
+        session = requests.Session()
+        session.headers.update({'User-Agent': user_agent})
+        
+        spy = yf.Ticker("SPY", session=session)
         # Ensure we fetch enough data
         hist = spy.history(start=start_date, end=end_date)
         
