@@ -31,18 +31,60 @@ export const AboutPage: React.FC = () => {
             </div>
 
             {/* Quick Start for New Users */}
-            <div style={{ marginBottom: '64px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '16px', border: '1px solid rgba(59, 130, 246, 0.1)', padding: '24px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <PlusCircle size={20} className="text-blue-400" /> Getting Started
-                </h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+            <div style={{ marginBottom: '64px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                    <div style={{
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                    }}>
+                        <PlusCircle className="text-blue-400" size={24} />
+                    </div>
+                    <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Getting Started</h2>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                     {[
-                        { step: "1. Add a Fund", desc: "Use the 'Add Fund' button in the sidebar. Search by name or enter a 10-digit SEC CIK." },
-                        { step: "2. Initial Sync", desc: "The engine will pull the last 10 years of 13F filings. This can take 30-60 seconds per fund." },
-                        { step: "3. Explore Data", desc: "View holdings, trade history, and performance metrics once the sync completes." }
+                        {
+                            step: "01",
+                            title: "Add a Fund",
+                            desc: "Use the 'Add Fund' button in the sidebar. Search by manager name or enter a 10-digit SEC CIK."
+                        },
+                        {
+                            step: "02",
+                            title: "Initial Sync",
+                            desc: "The engine pulls 10 years of history. First sync takes 30-60s to resolve splits and CUSIPs."
+                        },
+                        {
+                            step: "03",
+                            title: "Explore Alpha",
+                            desc: "Analyze conviction signals, sector rotation, and manager performance once synced."
+                        }
                     ].map((item, i) => (
-                        <div key={i}>
-                            <div style={{ fontWeight: 600, color: '#f8fafc', marginBottom: '4px', fontSize: '14px' }}>{item.step}</div>
+                        <div key={i} style={{
+                            background: 'rgba(30, 41, 59, 0.3)',
+                            border: '1px solid rgba(51, 65, 85, 0.3)',
+                            borderRadius: '16px',
+                            padding: '24px',
+                            position: 'relative'
+                        }}>
+                            <div style={{
+                                position: 'absolute',
+                                top: '20px',
+                                right: '24px',
+                                fontSize: '24px',
+                                fontWeight: 900,
+                                opacity: 0.05,
+                                color: '#3b82f6'
+                            }}>
+                                {item.step}
+                            </div>
+                            <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#f8fafc', marginBottom: '8px' }}>{item.title}</h3>
                             <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>{item.desc}</p>
                         </div>
                     ))}
