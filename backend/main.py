@@ -23,6 +23,51 @@ db = DatabaseManager()
 orch = Orchestrator(db)
 sector_mapper = SectorMapper()
 
+@app.get("/config")
+async def get_config():
+    """Returns the current application configuration status."""
+    user_agent = os.environ.get("SEC_USER_AGENT", "")
+    is_placeholder = "contact@example.com" in user_agent or not user_agent
+    return {
+        "sec_user_agent": user_agent,
+        "is_configured": not is_placeholder
+    }
+
+@app.post("/config")
+async def update_config(config: Dict[str, str]):
+    """Updates the application configuration and persists it to .env."""
+    user_agent = config.get("sec_user_agent")
+    if not user_agent:
+        raise HTTPException(status_code=400, detail="sec_user_agent is required")
+    
+    # Update current environment
+    os.environ["SEC_USER_AGENT"] = user_agent
+    
+    # Re-initialize orchestrator's client with new user agent
+    orch.client = SECClient(user_agent=user_agent)
+    
+    # Persist to .env file
+    env_path = ".env"
+    lines = []
+    found = False
+    
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if line.startswith("SEC_USER_AGENT="):
+                    lines.append(f"SEC_USER_AGENT={user_agent}\n")
+                    found = True
+                else:
+                    lines.append(line)
+    
+    if not found:
+        lines.append(f"SEC_USER_AGENT={user_agent}\n")
+        
+    with open(env_path, "w") as f:
+        f.writelines(lines)
+        
+    return {"status": "success"}
+
 @app.get("/")
 async def root():
     return {"message": "Stock Screener API is running"}

@@ -11,6 +11,7 @@ import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
 import { ActivityView } from './components/ActivityView'
+import { Onboarding } from './components/Onboarding'
 import { calculateIRR } from './utils/performanceUtils'
 
 // Type for view states
@@ -145,6 +146,8 @@ function App() {
     const [showCikSearch, setShowCikSearch] = useState(false)
     const [isAddingFund, setIsAddingFund] = useState(false)
     const [draggedFundCik, setDraggedFundCik] = useState<string | null>(null)
+    const [showOnboarding, setShowOnboarding] = useState(false)
+    const [isConfigured, setIsConfigured] = useState(true) // Default to true until checked
 
     // Auto-clear notification after 5s
     useEffect(() => {
@@ -155,8 +158,22 @@ function App() {
     }, [notification])
 
     useEffect(() => {
+        checkConfig()
         fetchFunds()
     }, [])
+
+    const checkConfig = async () => {
+        try {
+            const res = await fetch('/api/config')
+            const data = await res.json()
+            setIsConfigured(data.is_configured)
+            if (!data.is_configured) {
+                setShowOnboarding(true)
+            }
+        } catch (err) {
+            console.error("Failed to check config", err)
+        }
+    }
 
     const fetchFunds = async () => {
         try {
@@ -1071,6 +1088,14 @@ function App() {
                     </section>
                 </main>
             </div>
+            {showOnboarding && (
+                <Onboarding onComplete={() => {
+                    setShowOnboarding(false);
+                    setIsConfigured(true);
+                    fetchFunds();
+                    fetchDashboardSummary();
+                }} />
+            )}
         </>
     )
 }
