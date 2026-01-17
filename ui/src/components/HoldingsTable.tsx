@@ -620,7 +620,7 @@ const StockHistoryChart: React.FC<{
     };
 
     return (
-        <div ref={chartContainerRef} style={{ width: '100%', height: '260px', marginBottom: '32px', position: 'relative' }}>
+        <div ref={chartContainerRef} style={{ width: '100%', height: '260px', marginBottom: '48px', position: 'relative' }}>
             {/* Chart Header & Legend Row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <div style={{
