@@ -174,14 +174,19 @@ class MimicPerformanceCalculator:
         # Get benchmark data for comparison
         benchmark = get_benchmark_data(mimic_series[0]['date'], mimic_series[-1]['date'])
         
-        # Flatten benchmark return to match our series dates
-        for item in mimic_series:
-            d = item['date']
-            # Find closest benchmark date
-            closest = min(benchmark, key=lambda x: abs((datetime.strptime(x['date'], "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days))
-            # Re-index benchmark to 0 at start date
-            start_bench_val = benchmark[0]['value']
-            item['benchmark_return'] = ((closest['value'] / start_bench_val) - 1.0) * 100.0
+        if benchmark:
+            # Flatten benchmark return to match our series dates
+            for item in mimic_series:
+                d = item['date']
+                # Find closest benchmark date
+                closest = min(benchmark, key=lambda x: abs((datetime.strptime(x['date'], "%Y-%m-%d") - datetime.strptime(d, "%Y-%m-%d")).days))
+                # Re-index benchmark to 0 at start date
+                start_bench_val = benchmark[0]['value']
+                item['benchmark_return'] = ((closest['value'] / start_bench_val) - 1.0) * 100.0
+        else:
+            # No benchmark available
+            for item in mimic_series:
+                item['benchmark_return'] = 0.0
 
         # Get fund name
         fund_name = ""

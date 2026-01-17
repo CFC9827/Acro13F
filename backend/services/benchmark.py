@@ -16,12 +16,8 @@ def get_benchmark_data(start_date: str, end_date: str = None):
         import yfinance as yf
         logger.info(f"Fetching SPY data from {start_date} to {end_date}")
         
-        # Identify the request
-        user_agent = os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
-        session = requests.Session()
-        session.headers.update({'User-Agent': user_agent})
-        
-        spy = yf.Ticker("SPY", session=session)
+        # Use default yfinance settings - session injection can cause issues
+        spy = yf.Ticker("SPY")
         # Ensure we fetch enough data
         hist = spy.history(start=start_date, end=end_date)
         
