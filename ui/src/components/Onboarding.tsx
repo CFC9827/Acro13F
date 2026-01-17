@@ -64,18 +64,18 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     <div className="onboarding-content">
                         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                             <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', marginBottom: '16px' }}>
-                                Welcome to <span style={{ color: '#3b82f6' }}>Institutional Analytics</span>
+                                Welcome to <span style={{ color: '#3b82f6' }}>Abrams13F</span>
                             </h1>
                             <p style={{ color: '#94a3b8', lineHeight: 1.6 }}>
-                                You're about to unlock professional-grade insights into hedge fund positioning and institutional alpha.
+                                A data-driven framework for analyzing institutional holdings and historical position management.
                             </p>
                         </div>
 
                         <div style={{ display: 'grid', gap: '16px', marginBottom: '32px' }}>
                             {[
-                                { icon: <Search size={18} />, title: "Track Any Fund", text: "Sync 10 years of history for any manager with a 13F filing." },
-                                { icon: <TrendingUp size={18} />, title: "Isolate Alpha", text: "See real transaction flows hidden within raw SEC metadata." },
-                                { icon: <Clock size={18} />, title: "Temporal Accuracy", text: "PnL models that account for reporting lags and splits." }
+                                { icon: <Search size={18} />, title: "Manager Tracking", text: "Aggregate years of historical data for any manager with active 13F filings." },
+                                { icon: <TrendingUp size={18} />, title: "Flow Analysis", text: "Isolate transaction volume and cost basis using SEC metadata." },
+                                { icon: <Clock size={18} />, title: "Temporal Modeling", text: "Maintain PnL accuracy across corporate actions and reporting cycles." }
                             ].map((item, i) => (
                                 <div key={i} style={{ display: 'flex', gap: '16px', background: 'rgba(30, 41, 59, 0.4)', padding: '16px', borderRadius: '12px' }}>
                                     <div style={{ color: '#3b82f6' }}>{item.icon}</div>
@@ -88,29 +88,29 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         </div>
 
                         <button className="onboarding-button" onClick={() => setStep(2)}>
-                            Next: Configure SEC Access
+                            Next: Identity Configuration
                         </button>
                     </div>
                 ) : (
                     <div className="onboarding-content">
                         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                             <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#f8fafc', marginBottom: '16px' }}>
-                                Data Provider <span style={{ color: '#3b82f6' }}>Access</span>
+                                Identity <span style={{ color: '#3b82f6' }}>Authorization</span>
                             </h1>
                             <p style={{ color: '#94a3b8', lineHeight: 1.6, fontSize: '14px' }}>
-                                To ensure stable data access (SEC Edgar & Yahoo Finance), requests must be identified with a User-Agent containing your name and email.
+                                Please provide your identification details to authorize data retrieval from SEC Edgar and Yahoo Finance.
                             </p>
                         </div>
 
                         <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.1)', padding: '16px', borderRadius: '12px', marginBottom: '24px' }}>
                             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', color: '#60a5fa', marginBottom: '8px' }}>
                                 <ShieldCheck size={16} />
-                                <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase' }}>Why is this required?</span>
+                                <span style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase' }}>Security & Compliance</span>
                             </div>
                             <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
-                                Identifying your requests prevents your IP from being rate-limited or blocked. Your info is stored locally and used only to identify yourself to data providers.
+                                Requests are encapsulated within a standard User-Agent header for audit logging and to prevent IP throttling. This information is persisted locally in an encrypted-at-rest environment and is only transmitted directly to data endpoints via HTTPS.
                                 <a href="https://www.sec.gov/edgar/searchedgar/accessing-edgar-data.htm" target="_blank" rel="noopener noreferrer" className="onboarding-link" style={{ marginLeft: '4px' }}>
-                                    Read SEC Rules <ExternalLink size={10} style={{ display: 'inline', marginLeft: '2px' }} />
+                                    SEC Compliance Details <ExternalLink size={10} style={{ display: 'inline', marginLeft: '2px' }} />
                                 </a>
                             </p>
                         </div>
