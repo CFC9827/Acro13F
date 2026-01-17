@@ -144,6 +144,7 @@ function App() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const [showCikSearch, setShowCikSearch] = useState(false)
     const [isAddingFund, setIsAddingFund] = useState(false)
+    const [draggedFundCik, setDraggedFundCik] = useState<string | null>(null)
 
     // Auto-clear notification after 5s
     useEffect(() => {
@@ -514,6 +515,56 @@ function App() {
         }
     }
 
+    // Fund drag-and-drop handlers
+    const handleFundDragStart = (e: React.DragEvent, cik: string) => {
+        setDraggedFundCik(cik);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', cik);
+        // Add slight opacity to dragged item
+        setTimeout(() => {
+            (e.target as HTMLElement).style.opacity = '0.4';
+        }, 0);
+    };
+
+    const handleFundDragEnd = (e: React.DragEvent) => {
+        setDraggedFundCik(null);
+        (e.target as HTMLElement).style.opacity = '1';
+    };
+
+    const handleFundDragOver = (e: React.DragEvent, targetCik: string) => {
+        e.preventDefault();
+        if (draggedFundCik === null || draggedFundCik === targetCik) return;
+
+        setFunds(prevFunds => {
+            const dragIndex = prevFunds.findIndex(f => f.cik === draggedFundCik);
+            const targetIndex = prevFunds.findIndex(f => f.cik === targetCik);
+
+            if (dragIndex === -1 || targetIndex === -1) return prevFunds;
+
+            const newFunds = [...prevFunds];
+            const [draggedItem] = newFunds.splice(dragIndex, 1);
+            newFunds.splice(targetIndex, 0, draggedItem);
+            return newFunds;
+        });
+    };
+
+    const handleFundDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        // Build orders object mapping cik to new sort_order
+        const orders: { [key: string]: number } = {};
+        funds.forEach((f, index) => { orders[f.cik] = index; });
+
+        try {
+            await fetch('/api/funds/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(orders)
+            });
+        } catch (err) {
+            console.error("Failed to save fund order", err);
+        }
+    };
+
     return (
         <>
             {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
@@ -663,8 +714,13 @@ function App() {
                                     {funds.map((f: Fund) => (
                                         <li
                                             key={f.cik}
-                                            className={selectedCik === f.cik ? 'active' : ''}
+                                            className={`${selectedCik === f.cik ? 'active' : ''} ${draggedFundCik === f.cik ? 'dragging' : ''}`}
                                             onClick={() => navigate('summary', f.cik)}
+                                            draggable
+                                            onDragStart={(e) => handleFundDragStart(e, f.cik)}
+                                            onDragEnd={handleFundDragEnd}
+                                            onDragOver={(e) => handleFundDragOver(e, f.cik)}
+                                            onDrop={handleFundDrop}
                                         >
                                             <div className="fund-info">
                                                 <span className="fund-name">{f.name}</span>

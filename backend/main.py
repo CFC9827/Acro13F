@@ -31,6 +31,14 @@ async def root():
 async def get_funds():
     return db.get_funds()
 
+@app.post("/funds/reorder")
+async def reorder_funds(orders: Dict[str, int]):
+    try:
+        db.reorder_funds(orders)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/dashboard/summary")
 async def get_dashboard_summary(group_id: int = None):
     try:

@@ -16,6 +16,7 @@ class DatabaseManager:
         self._normalize_put_call_casing()
         self._migrate_sector()
         self._migrate_group_sort_order()
+        self._migrate_fund_sort_order()
 
     def _get_connection(self):
         return sqlite3.connect(self.db_path)
@@ -79,6 +80,16 @@ class DatabaseManager:
             columns = [row[1] for row in cursor.fetchall()]
             if 'sort_order' not in columns:
                 cursor.execute("ALTER TABLE fund_groups ADD COLUMN sort_order INTEGER DEFAULT 0")
+                conn.commit()
+
+    def _migrate_fund_sort_order(self):
+        """Add sort_order column to funds table if it doesn't exist."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(funds)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'sort_order' not in columns:
+                cursor.execute("ALTER TABLE funds ADD COLUMN sort_order INTEGER DEFAULT 0")
                 conn.commit()
 
     def _init_db(self):
@@ -237,8 +248,16 @@ class DatabaseManager:
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM funds")
+            cursor.execute("SELECT * FROM funds ORDER BY sort_order, name")
             return [dict(row) for row in cursor.fetchall()]
+
+    def reorder_funds(self, orders: Dict[str, int]):
+        """Updates the sort_order for multiple funds. orders is {cik: sort_order}."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            for cik, order in orders.items():
+                cursor.execute("UPDATE funds SET sort_order = ? WHERE cik = ?", (order, cik))
+            conn.commit()
 
     def get_latest_holdings(self, cik: str) -> List[Dict]:
         cik = self.normalize_cik(cik)

@@ -136,7 +136,8 @@ body {
   display: flex;
   flex: 1;
   align-items: stretch;
-  overflow: hidden;
+  overflow: visible;
+  min-height: 0;
 }
 
 .content {
@@ -160,13 +161,12 @@ body {
 
 .sidebar {
   width: 280px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
+  position: relative;
+  min-height: 100vh;
   border-right: 1px solid var(--border);
   background-color: var(--bg-card);
   transition: width 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -411,6 +411,21 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Drag-and-drop styling for fund list */
+.sidebar li.dragging {
+  opacity: 0.4;
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+}
+
+.sidebar li[draggable="true"] {
+  cursor: grab;
+}
+
+.sidebar li[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .delete-btn {
