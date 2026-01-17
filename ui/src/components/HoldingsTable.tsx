@@ -157,10 +157,11 @@ const StockHistoryChart: React.FC<{
                     prevDate: action === 'NEW' ? prevDate : (prevH ? prevH.period_of_report : undefined)
                 });
 
-                // If exited, add explicit EXIT marker half-way through the next quarter
+                // If exited, add explicit EXIT marker at the end of the next quarter
                 if (hasGapAfter && h.shares > 0) {
                     const exitDate = new Date(h.period_of_report);
-                    exitDate.setDate(exitDate.getDate() + 45);
+                    // Move to the exact end of the next quarter (e.g., Mar 31 -> Jun 30)
+                    exitDate.setMonth(exitDate.getMonth() + 4, 0);
                     filingActions.push({
                         date: exitDate.toISOString().split('T')[0],
                         action: 'EXIT',
@@ -469,42 +470,74 @@ const StockHistoryChart: React.FC<{
 
     // Compute unique quarter ticks for X-axis (one tick per quarter, with smart spacing for long histories)
     const uniqueQuarterTicks = useMemo(() => {
-        const seenQuarters = new Set<string>();
-        const allQuarterDates: number[] = [];
+        if (filteredChartData.length === 0) return [];
 
-        for (const d of filteredChartData) {
-            const date = new Date(d.date);
-            const q = Math.floor(date.getMonth() / 3) + 1;
-            const year = date.getFullYear();
-            const quarterKey = `${year}-Q${q}`;
+        const startTimestamp = filteredChartData[0].time;
+        const endTimestamp = filteredChartData[filteredChartData.length - 1].time;
 
-            if (!seenQuarters.has(quarterKey)) {
-                seenQuarters.add(quarterKey);
-                allQuarterDates.push(date.getTime());
+        // 1. Generate perfect quarter-END boundaries (Mar 31, Jun 30, Sep 30, Dec 31)
+        const allPossibleTicks: number[] = [];
+        const curr = new Date(startTimestamp);
+        // Standardize to end of its current quarter
+        // If it's Jan/Feb/Mar, go to Mar 31
+        curr.setMonth((Math.floor(curr.getMonth() / 3) + 1) * 3, 0);
+        curr.setHours(23, 59, 59, 999);
+
+        // Walk backwards to earliest possible tick to ensure coverage
+        const walk = new Date(curr);
+        while (walk.getTime() >= startTimestamp) {
+            allPossibleTicks.unshift(walk.getTime());
+            walk.setMonth(walk.getMonth() - 2, 0); // Jump back to end of previous quarter
+            walk.setHours(23, 59, 59, 999);
+        }
+
+        // Walk forwards to endTimestamp
+        walk.setTime(curr.getTime());
+        walk.setMonth(walk.getMonth() + 4, 0); // Next quarter end
+        while (walk.getTime() <= endTimestamp) {
+            allPossibleTicks.push(walk.getTime());
+            walk.setMonth(walk.getMonth() + 4, 0);
+            walk.setHours(23, 59, 59, 999);
+        }
+
+        const sortedUniqueTicks = Array.from(new Set(allPossibleTicks)).sort((a, b) => a - b);
+
+        // 2. Dynamic step size to fit container width (each label needs ~60px)
+        const tickWidth = 60;
+        const maxTicks = Math.max(4, Math.floor(containerWidth / tickWidth));
+
+        if (sortedUniqueTicks.length <= maxTicks) {
+            return sortedUniqueTicks;
+        }
+
+        let step = 1;
+        const roundSteps = [1, 2, 4, 8, 12, 16, 20, 24, 40];
+        for (const s of roundSteps) {
+            if (Math.ceil(sortedUniqueTicks.length / s) <= maxTicks) {
+                step = s;
+                break;
             }
         }
 
-        // Dynamic maxTicks based on container width (each label needs ~55px)
-        const tickWidth = 55;
-        const maxTicks = Math.max(5, Math.floor(containerWidth / tickWidth));
-
-        if (allQuarterDates.length <= maxTicks) {
-            return allQuarterDates;
-        }
-
-        // Calculate step to show roughly maxTicks labels
-        const step = Math.ceil(allQuarterDates.length / maxTicks);
         const sparseTicks: number[] = [];
-        for (let i = 0; i < allQuarterDates.length; i += step) {
-            sparseTicks.push(allQuarterDates[i]);
-        }
-        // Always include the last tick
-        if (sparseTicks[sparseTicks.length - 1] !== allQuarterDates[allQuarterDates.length - 1]) {
-            sparseTicks.push(allQuarterDates[allQuarterDates.length - 1]);
+        // Ensure most recent quarter is always labeled
+        for (let i = sortedUniqueTicks.length - 1; i >= 0; i -= step) {
+            sparseTicks.unshift(sortedUniqueTicks[i]);
         }
 
         return sparseTicks;
     }, [filteredChartData, containerWidth]);
+
+    const xDomain = useMemo(() => {
+        if (uniqueQuarterTicks.length === 0) return ['dataMin', 'dataMax'];
+        // Ensure domain covers all ticks and data points
+        const minTick = uniqueQuarterTicks[0];
+        const maxTick = uniqueQuarterTicks[uniqueQuarterTicks.length - 1];
+        const minData = filteredChartData[0]?.time || 0;
+        const maxData = filteredChartData[filteredChartData.length - 1]?.time || 0;
+
+        return [Math.min(minTick, minData), Math.max(maxTick, maxData)];
+    }, [uniqueQuarterTicks, filteredChartData]);
 
     // Helper to determine if a point on the chart is within a trade interval being hovered
     const isPointInTradeInterval = useCallback((pointDate: string) => {
@@ -1040,7 +1073,7 @@ const StockHistoryChart: React.FC<{
                         interval={0}
                         scale="time"
                         type="number"
-                        domain={['dataMin', 'dataMax']}
+                        domain={xDomain}
                         tickFormatter={(val) => {
                             const d = new Date(val);
                             const q = Math.floor(d.getMonth() / 3) + 1;
@@ -1100,13 +1133,11 @@ const StockHistoryChart: React.FC<{
                                 const endTime = new Date(hoveredData.date).getTime();
                                 let startTime = new Date(hoveredData.prevDate).getTime();
 
-                                // Limit highlight of new/modified positions to a single quarter (~92 days)
-                                // This prevents long lines across gaps where the stock wasn't held.
-                                if (hoveredData.action !== 'EXIT') {
-                                    const maxLookback = 92 * 24 * 60 * 60 * 1000;
-                                    if (endTime - startTime > maxLookback) {
-                                        startTime = endTime - maxLookback;
-                                    }
+                                // Limit highlight to roughly one quarter (~92 days)
+                                // Standardizes "length" (width) across all action types
+                                const maxLookback = 92 * 24 * 60 * 60 * 1000;
+                                if (endTime - startTime > maxLookback) {
+                                    startTime = endTime - maxLookback;
                                 }
 
                                 // Add a tiny buffer to include the boundary points
@@ -1724,7 +1755,13 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                 <div className="table-actions-right">
                     {/* Quarter Navigation */}
                     {/* Quarter Navigation */}
-                    {quarterFilings.map((filing) => (
+                    {quarterFilings.map((filing: {
+                        accession: string;
+                        cik: string;
+                        url: string | undefined;
+                        label: string;
+                        isAmendment: boolean;
+                    }) => (
                         <a
                             key={filing.accession}
                             href={filing.url}
