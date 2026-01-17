@@ -11,10 +11,21 @@ interface MimicDataPoint {
     benchmark_return: number;
 }
 
+interface MimicTrade {
+    date: string;
+    period: string;
+    ticker: string;
+    action: 'Buy' | 'Sell' | 'Add' | 'Reduce';
+    shares_change: number;
+    price: number;
+    value: number;
+}
+
 interface MimicPerformanceResponse {
     cik: string;
     fund_name: string;
     series: MimicDataPoint[];
+    trades?: MimicTrade[];
     error?: string;
 }
 
@@ -34,6 +45,7 @@ const formatCurrency = (value: number): string => {
 
 export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ cik, fundName }) => {
     const [data, setData] = useState<MimicDataPoint[]>([]);
+    const [trades, setTrades] = useState<MimicTrade[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showBenchmark, setShowBenchmark] = useState(true);
@@ -50,6 +62,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                     setError(result.error);
                 } else {
                     setData(result.series || []);
+                    setTrades(result.trades || []);
                 }
             } catch (err) {
                 setError("Failed to fetch mimic performance data");
@@ -71,6 +84,50 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
             outperformance: last.return - last.benchmark_return
         };
     }, [data]);
+
+    // Group trades by period
+    const tradesByPeriod = useMemo(() => {
+        const groups = new Map<string, MimicTrade[]>();
+        for (const trade of trades) {
+            if (!groups.has(trade.period)) {
+                groups.set(trade.period, []);
+            }
+            groups.get(trade.period)!.push(trade);
+        }
+        return groups;
+    }, [trades]);
+
+    // Map filing dates to period labels for chart axis
+    const dateToLabelMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const item of data) {
+            // Use PERIOD (Report Date) for the label, not date (Filing Date)
+            // e.g. period="2025-09-30" -> Q3 '25
+            if (item.period) {
+                const d = new Date(item.period);
+                // Month is 0-indexed. 
+                // Q1: Jan-Mar (0-2) -> (2+3)/3 = 1.66 -> flr 1 -> Q1
+                // Q2: Apr-Jun (3-5) -> (5+3)/3 = 2.66 -> flr 2 -> Q2
+                // Q3: Jul-Sep (6-8) -> (8+3)/3 = 3.66 -> flr 3 -> Q3
+                // Q4: Oct-Dec (9-11) -> (11+3)/3 = 4.66 -> flr 4 -> Q4
+                // Correct logic: Math.floor(d.getMonth() / 3) + 1
+                const q = Math.floor(d.getMonth() / 3) + 1;
+                map.set(item.date, `Q${q} '${d.getFullYear().toString().slice(2)}`);
+            } else {
+                // Fallback to filing date if period missing
+                const d = new Date(item.date);
+                const q = Math.floor((d.getMonth() + 3) / 3);
+                map.set(item.date, `Q${q} '${d.getFullYear().toString().slice(2)}*`);
+            }
+        }
+        return map;
+    }, [data]);
+
+    const formatQ = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const q = Math.floor(d.getMonth() / 3) + 1;
+        return `Q${q} ${d.getFullYear()}`;
+    };
 
     if (loading) {
         return (
@@ -125,7 +182,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 </div>
             </div>
 
-            <div className="chart-panel-v2" style={{ height: '550px', position: 'relative' }}>
+            <div className="chart-panel-v2" style={{ height: '550px', position: 'relative', marginBottom: '32px' }}>
                 <div className="chart-header-v2">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div className="chart-title-v2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -167,9 +224,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                             <XAxis
                                 dataKey="date"
                                 tickFormatter={(str: string) => {
-                                    const d = new Date(str);
-                                    const q = Math.floor((d.getMonth() + 3) / 3);
-                                    return `Q${q} '${d.getFullYear().toString().slice(2)}`;
+                                    return dateToLabelMap.get(str) || str;
                                 }}
                                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                                 axisLine={false}
@@ -185,8 +240,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                             <Tooltip
                                 content={({ active, payload, label }) => {
                                     if (active && payload && payload.length) {
-                                        const d = new Date(label as string);
-                                        const qLabel = `Q${Math.floor(d.getMonth() / 3) + 1} '${d.getFullYear().toString().slice(2)}`;
+                                        const qLabel = dateToLabelMap.get(label as string) || label;
                                         const item = payload[0].payload;
 
                                         return (
@@ -199,7 +253,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                                 minWidth: '200px'
                                             }}>
                                                 <div style={{ fontWeight: 600, marginBottom: '8px', color: '#f1f5f9', borderBottom: '1px solid #334155', paddingBottom: '4px' }}>
-                                                    {qLabel} ({item.date})
+                                                    {qLabel} (Filing: {item.date})
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                                     <span style={{ color: '#3b82f6', fontSize: '12px' }}>Mimic Return:</span>
@@ -248,6 +302,78 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
+            </div>
+
+            {/* Simulated Trades Table */}
+            <div className="activity-view" style={{
+                background: '#0f172a',
+                borderRadius: '8px',
+                border: '1px solid #334155',
+                padding: '20px',
+                marginTop: '12px'
+            }}>
+                <div className="activity-header" style={{ marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '1.1rem', color: '#f8fafc' }}>Simulated Trade Log</h3>
+                    <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        Trades executed on 13F filing dates to match reported holdings
+                    </div>
+                </div>
+
+                {trades.length === 0 ? (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontStyle: 'italic' }}>
+                        No trades recorded during the simulation period.
+                    </div>
+                ) : (
+                    <div className="activity-table-container">
+                        <table className="activity-table">
+                            <thead>
+                                <tr>
+                                    <th style={{ background: '#0f172a' }}>Date</th>
+                                    <th style={{ background: '#0f172a' }}>Ticker</th>
+                                    <th style={{ background: '#0f172a' }}>Action</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Shares</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Price</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {Array.from(tradesByPeriod.entries()).map(([period, items]) => (
+                                    <React.Fragment key={period}>
+                                        <tr className="activity-period-header">
+                                            <td colSpan={6} style={{ color: '#e2e8f0', background: '#1e293b', borderBottom: '1px solid #334155' }}>
+                                                {formatQ(items[0].period)} Filing ({items[0].date})
+                                            </td>
+                                        </tr>
+                                        {items.map((trade, idx) => (
+                                            <tr key={`${trade.date}-${trade.ticker}-${idx}`} className="activity-row">
+                                                <td style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                    {trade.date}
+                                                </td>
+                                                <td className="activity-stock">
+                                                    <span className="activity-ticker">{trade.ticker}</span>
+                                                </td>
+                                                <td>
+                                                    <span className={`activity-badge ${trade.action === 'Buy' || trade.action === 'Add' ? 'activity-buy' : 'activity-sell'}`}>
+                                                        {trade.action}
+                                                    </span>
+                                                </td>
+                                                <td className={`activity-shares ${trade.shares_change >= 0 ? 'positive' : 'negative'}`}>
+                                                    {trade.shares_change > 0 ? '+' : ''}{trade.shares_change.toLocaleString()}
+                                                </td>
+                                                <td className="activity-value" style={{ color: '#e2e8f0' }}>
+                                                    ${trade.price.toFixed(2)}
+                                                </td>
+                                                <td className="activity-impact" style={{ color: '#e2e8f0' }}>
+                                                    {formatCurrency(trade.value)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
             {showMethodologyTooltip && createPortal(

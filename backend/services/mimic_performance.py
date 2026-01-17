@@ -54,6 +54,7 @@ class MimicPerformanceCalculator:
             price_cache[ticker] = get_historical_prices(ticker, self.db, abs_start)
 
         mimic_series = []
+        trades_log = []
         
         # Initial state
         first_filing = filings_map[sorted_accs[0]]
@@ -118,8 +119,57 @@ class MimicPerformanceCalculator:
                 "label": f"Filing {curr_filing['period']}"
             })
             
-            # Rebalance
-            current_holdings = { (h['ticker'] or h['cusip']): h['shares'] for h in curr_filing['holdings'] if h['shares'] > 0 }
+            # Rebalance Logic & Trade Logging
+            # Compare current_holdings (what we held coming into this date)
+            # vs curr_filing (what we want to hold going forward)
+            
+            target_holdings_map = { (h['ticker'] or h['cusip']): h['shares'] for h in curr_filing['holdings'] if h['shares'] > 0 }
+            
+            all_involved_tickers = set(current_holdings.keys()) | set(target_holdings_map.keys())
+            
+            for ticker in all_involved_tickers:
+                old_shares = current_holdings.get(ticker, 0)
+                new_shares = target_holdings_map.get(ticker, 0)
+                
+                if old_shares == new_shares:
+                    continue
+                    
+                diff = new_shares - old_shares
+                action = ""
+                
+                if old_shares == 0 and new_shares > 0:
+                    action = "Buy"
+                elif old_shares > 0 and new_shares == 0:
+                    action = "Sell"
+                elif diff > 0:
+                    action = "Add"
+                else:
+                    action = "Reduce"
+                
+                # Execution Price on c_date
+                exec_price = 0.0
+                prices = price_cache.get(ticker, [])
+                if prices:
+                    # Find price on or before c_date (the filing date)
+                    found_price = next((p['price'] for p in reversed(prices) if p['date'] <= c_date), None)
+                    if found_price:
+                        exec_price = found_price
+                
+                # If no price found, we can't estimate value perfectly, but we log the trade
+                value_traded = abs(diff) * exec_price
+                
+                trades_log.append({
+                    "date": c_date,
+                    "period": curr_filing['period'], # The filing that triggered this trade
+                    "ticker": ticker,
+                    "action": action,
+                    "shares_change": diff,
+                    "price": exec_price,
+                    "value": value_traded
+                })
+
+            # Update holdings for next period
+            current_holdings = target_holdings_map
 
         # Get benchmark data for comparison
         benchmark = get_benchmark_data(mimic_series[0]['date'], mimic_series[-1]['date'])
@@ -145,5 +195,6 @@ class MimicPerformanceCalculator:
         return {
             "cik": cik,
             "fund_name": fund_name,
-            "series": mimic_series
+            "series": mimic_series,
+            "trades": sorted(trades_log, key=lambda x: x['date'], reverse=True) # Returns newest trades first
         }
