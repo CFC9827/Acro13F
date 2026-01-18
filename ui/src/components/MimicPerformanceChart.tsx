@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
-import { TrendingUp, Activity, Info, RefreshCw, BarChart3, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, Layers, Calendar } from 'lucide-react';
+import { TrendingUp, Activity, Info, RefreshCw, BarChart3, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, Layers, Calendar, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 interface MimicDataPoint {
@@ -29,11 +29,10 @@ interface MimicTrade {
     shares_change: number;
     price: number;
     value: number;
-    originalPeriod?: string;
-    isContext?: boolean;
-    isCapitalDeployment?: boolean;
     user_shares?: number;
     user_value?: number;
+    isContext?: boolean;
+    isCapitalDeployment?: boolean;
 }
 
 interface MimicPerformanceResponse {
@@ -46,7 +45,6 @@ interface MimicPerformanceResponse {
 
 interface MimicPerformanceChartProps {
     cik: string;
-    fundName: string;
 }
 
 const formatCurrency = (value: number): string => {
@@ -60,7 +58,7 @@ const formatCurrency = (value: number): string => {
 
 const timeRanges = ['2Q', 'YTD', '1Y', '3Y', '5Y', '10Y', 'MAX', 'CUSTOM'];
 
-export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ cik, fundName }) => {
+export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ cik }) => {
     const [data, setData] = useState<MimicDataPoint[]>([]);
     const [trades, setTrades] = useState<MimicTrade[]>([]);
     const [loading, setLoading] = useState(true);
@@ -80,6 +78,8 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
     const [isSimulatorMode, setIsSimulatorMode] = useState(false);
     const [initialInvestment, setInitialInvestment] = useState(10000);
     const [recurringContribution, setRecurringContribution] = useState(0);
+    const [isMethodologyOpen, setIsMethodologyOpen] = useState(false);
+    const [isTrackerInfoOpen, setIsTrackerInfoOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -537,8 +537,27 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                         }} />
                     </button>
                     <div>
-                        <div style={{ fontWeight: 600, fontSize: '15px', color: isSimulatorMode ? '#3b82f6' : '#f8fafc' }}>
-                            Investment Simulator
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '15px', color: isSimulatorMode ? '#3b82f6' : '#f8fafc' }}>
+                                Investment Simulator
+                            </div>
+                            {isSimulatorMode && (
+                                <button
+                                    onClick={() => setIsMethodologyOpen(true)}
+                                    style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: '#64748b',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        padding: 0
+                                    }}
+                                    title="How does this work?"
+                                >
+                                    <Info size={16} />
+                                </button>
+                            )}
                         </div>
                         <div style={{ fontSize: '12px', color: '#94a3b8' }}>
                             {isSimulatorMode ? 'Showing your personalized dollar amounts' : 'Toggle to see what YOUR investment would be worth'}
@@ -663,12 +682,21 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 <div className="chart-header-v2" style={{ justifyContent: 'space-between' }}>
                     <div className="chart-title-v2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         Mimic Portfolio Tracker
-                        <Info
-                            size={16}
-                            style={{ color: '#94a3b8', cursor: 'help' }}
-                            onMouseEnter={(e) => setShowMethodologyTooltip({ x: e.clientX, y: e.clientY })}
-                            onMouseLeave={() => setShowMethodologyTooltip(null)}
-                        />
+                        <button
+                            onClick={() => setIsTrackerInfoOpen(true)}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#94a3b8',
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: 0
+                            }}
+                            title="How does this work?"
+                        >
+                            <Info size={16} />
+                        </button>
                         <button
                             className={`quarter-nav-btn ${showBenchmark ? 'active' : ''}`}
                             onClick={() => setShowBenchmark(!showBenchmark)}
@@ -1004,16 +1032,16 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 ) : (
                     <div className="activity-table-container">
                         <table className="activity-table">
-                            <thead>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 30 }}>
                                 <tr>
-                                    <th style={{ background: '#0f172a', paddingLeft: '16px' }}>Ticker</th>
-                                    <th style={{ background: '#0f172a' }}>Action</th>
-                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Fund Shares</th>
-                                    <th style={{ textAlign: 'right', background: '#0f172a' }}>Price</th>
+                                    <th style={{ background: '#0f172a', paddingLeft: '16px', borderBottom: '1px solid #334155' }}>Ticker</th>
+                                    <th style={{ background: '#0f172a', borderBottom: '1px solid #334155' }}>Action</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a', borderBottom: '1px solid #334155' }}>Fund Shares</th>
+                                    <th style={{ textAlign: 'right', background: '#0f172a', borderBottom: '1px solid #334155' }}>Price</th>
                                     {isSimulatorMode ? (
-                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px', color: '#10b981' }}>Your Action</th>
+                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px', color: '#10b981', borderBottom: '1px solid #334155' }}>Your Action</th>
                                     ) : (
-                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px' }}>Value</th>
+                                        <th style={{ textAlign: 'right', background: '#0f172a', paddingRight: '16px', borderBottom: '1px solid #334155' }}>Value</th>
                                     )}
                                 </tr>
                             </thead>
@@ -1047,14 +1075,28 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                         // PRE-CALCULATE CAPPED VALUES FOR THIS PERIOD
                                         const sortedDates = Array.from(userCashSeries.keys()).sort();
                                         const currentIdx = sortedDates.indexOf(items[0].date);
-                                        let runningCash = initialInvestment;
-                                        if (currentIdx > 0) {
-                                            runningCash = userCashSeries.get(sortedDates[currentIdx - 1]) || initialInvestment;
-                                        } else if (currentIdx === 0 && !isInitialSetup) {
+
+                                        let runningCash = 0;
+                                        if (isInitialSetup) {
+                                            // Initial Setup starts with the full initial investment
                                             runningCash = initialInvestment;
+                                        } else if (currentIdx > 0) {
+                                            // Subsequent periods start with previous period's ENDING cash balance
+                                            runningCash = userCashSeries.get(sortedDates[currentIdx - 1]) ?? 0;
+                                        } else if (currentIdx === 0) {
+                                            // First tracked period after Initial Setup - should have minimal carryover
+                                            // Look for Initial Setup ending balance, default to 0
+                                            runningCash = 0;
                                         }
+                                        // Else: period not found in series, start with 0
+
+                                        // Track carryover BEFORE adding quarterly (for display)
+                                        const carryoverCash = runningCash;
 
                                         if (!isInitialSetup) runningCash += recurringContribution;
+
+                                        // Capture cash before sells (quarterly + carryover)
+                                        const cashBeforeSells = runningCash;
 
                                         const cappedTrades = new Map<string, { val: number, capped: boolean }>();
 
@@ -1090,12 +1132,25 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                         let totalSellVal = 0;
 
                                         highlightedItems.forEach(trade => {
-                                            const capped = cappedTrades.get(`${trade.ticker}-${trade.action}-${trade.shares_change}`);
-                                            const val = Math.abs(trade.user_value ?? (trade.value * ratio0));
-                                            const finalVal = capped ? capped.val : val;
+                                            const cappedEntry = cappedTrades.get(`${trade.ticker}-${trade.action}-${trade.shares_change}`);
 
-                                            if (trade.action === 'Buy' || trade.action === 'Add' || trade.action === 'Initial Buy' || trade.action === 'Initial Setup') totalBuyVal += finalVal;
-                                            else totalSellVal += finalVal;
+                                            if (isSimulatorMode) {
+                                                // In simulator mode: buys use capped values, sells use calculated values
+                                                const isBuyType = trade.action === 'Buy' || trade.action === 'Add' || trade.action === 'Initial Buy' || trade.action === 'Initial Setup';
+                                                if (isBuyType) {
+                                                    // ALWAYS use capped value if available, otherwise the trade wasn't processed (context)
+                                                    totalBuyVal += cappedEntry ? cappedEntry.val : 0;
+                                                } else {
+                                                    // Sells just add their proportional value
+                                                    totalSellVal += cappedEntry ? cappedEntry.val : Math.abs(trade.value) * ratio0;
+                                                }
+                                            } else {
+                                                // In non-simulator mode, use actual fund values
+                                                const isBuyType = trade.action === 'Buy' || trade.action === 'Add' || trade.action === 'Initial Buy' || trade.action === 'Initial Setup';
+                                                const val = Math.abs(trade.value);
+                                                if (isBuyType) totalBuyVal += val;
+                                                else totalSellVal += val;
+                                            }
                                         });
 
                                         return (
@@ -1124,14 +1179,24 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                                                                     </span>
                                                                 )}
                                                             </span>
-                                                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: 500, color: '#94a3b8' }}>
-                                                                {!isInitialSetup && isSimulatorMode && (
-                                                                    <span style={{ marginRight: '8px', color: '#64748b' }}>
-                                                                        Funded by: <span style={{ color: '#cbd5e1' }}>${recurringContribution.toLocaleString()} Cash</span> + <span style={{ color: '#f87171' }}>{formatCurrency(totalSellVal)} Sales</span>
+                                                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: 500, color: '#94a3b8', flexWrap: 'wrap' }}>
+                                                                {isSimulatorMode && (
+                                                                    <span style={{ color: '#64748b' }}>
+                                                                        {isInitialSetup
+                                                                            ? <>Funded by: <span style={{ color: '#10b981' }}>{formatCurrency(initialInvestment)} Initial</span></>
+                                                                            : <>Funded by:
+                                                                                {recurringContribution > 0 && <><span style={{ color: '#60a5fa' }}>{formatCurrency(recurringContribution)} Quarterly</span> + </>}
+                                                                                {carryoverCash > 0.01 && <><span style={{ color: '#a78bfa' }}>{formatCurrency(carryoverCash)} Carryover</span> + </>}
+                                                                                <span style={{ color: '#f87171' }}>{formatCurrency(totalSellVal)} Sales</span>
+                                                                            </>
+                                                                        }
                                                                     </span>
                                                                 )}
                                                                 <span><span style={{ color: '#10b981' }}>{buyCount}</span> Buys ({formatCurrency(totalBuyVal)})</span>
                                                                 <span><span style={{ color: '#ef4444' }}>{sellCount}</span> Sells ({formatCurrency(totalSellVal)})</span>
+                                                                {isSimulatorMode && !isInitialSetup && runningCash > 0.01 && (
+                                                                    <span style={{ color: '#a78bfa' }}>→ {formatCurrency(runningCash)} Leftover</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1274,33 +1339,305 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 }
             </div >
 
-            {
-                showMethodologyTooltip && createPortal(
-                    <div
-                        className="kpi-tooltip"
-                        style={{
-                            left: showMethodologyTooltip.x > window.innerWidth - 400 ? 'auto' : showMethodologyTooltip.x + 15,
-                            right: showMethodologyTooltip.x > window.innerWidth - 400 ? window.innerWidth - showMethodologyTooltip.x + 15 : 'auto',
-                            top: showMethodologyTooltip.y + 20,
-                            maxWidth: '380px'
-                        }}
-                    >
-                        <div className="tooltip-title">Mimic Portfolio Methodology</div>
-                        <div style={{ color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6, marginBottom: '12px' }}>
-                            This simulation aims to replicate the performance of a user following a fund's 13F filings.
-                            <ul style={{ paddingLeft: '20px', marginTop: '8px' }}>
-                                <li><strong>Entry/Exit:</strong> Simulated trades occur on the exact <span style={{ color: '#e2e8f0', fontWeight: 600 }}>Filing Release Date</span>.</li>
-                                <li><strong>Weights:</strong> Position sizes are determined by the shares reported in the most recent filing.</li>
-                                <li><strong>Execution Price:</strong> Uses the market closing price on the filing day.</li>
-                            </ul>
+            {/* Methodology Popup */}
+            {isMethodologyOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '700px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '24px 32px',
+                            borderBottom: '1px solid #334155',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            position: 'sticky',
+                            top: 0,
+                            background: '#1e293b',
+                            zIndex: 10
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ background: 'rgba(59, 130, 246, 0.15)', padding: '8px', borderRadius: '10px' }}>
+                                    <TrendingUp size={24} color="#60a5fa" />
+                                </div>
+                                <div>
+                                    <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#f8fafc' }}>Simulator Methodology</h2>
+                                    <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>How we calculate your mirrored portfolio</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsMethodologyOpen(false)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    transition: 'background 0.2s',
+                                    display: 'flex'
+                                }}
+                            >
+                                <X size={24} />
+                            </button>
                         </div>
-                        <div style={{ color: '#94a3b8', fontSize: '11px', lineHeight: 1.5, borderTop: '1px solid #334155', paddingTop: '10px' }}>
-                            This differs from TWR by reflecting the <span style={{ fontStyle: 'italic' }}>delay</span> between a quarter ending and the filing becoming public (up to 45 days).
+
+                        {/* Content */}
+                        <div style={{ padding: '32px' }}>
+                            <div style={{ display: 'grid', gap: '28px' }}>
+
+                                {/* Key Insight Banner */}
+                                <div style={{ background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05))', border: '1px solid rgba(251, 191, 36, 0.3)', padding: '16px 20px', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                        <div style={{ background: '#fbbf24', borderRadius: '50%', padding: '6px', display: 'flex' }}>
+                                            <AlertCircle size={16} color="#0f172a" />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: '#fbbf24', marginBottom: '4px', fontSize: '14px' }}>
+                                                This is a "Follower" Simulation
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#fcd34d', lineHeight: '1.5' }}>
+                                                We simulate trades on the <strong>13F Filing Release Date</strong>, not the quarter end. This reflects reality: you can only act on positions <em>after</em> they become public (up to 45 days after quarter end).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Step 1 - Goal */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '26px', height: '26px', background: '#3b82f6', borderRadius: '50%', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>1</div>
+                                        Match the Fund's Allocation
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        We replicate the fund's <strong>percentage weights</strong> using your capital. If the fund has 15% in Apple, you get 15% of your money in Apple. The goal is to track their conviction, not their dollar amounts.
+                                    </div>
+                                </div>
+
+                                {/* Step 2 - Timing */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '26px', height: '26px', background: '#3b82f6', borderRadius: '50%', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>2</div>
+                                        Trade on Filing Date (Not Quarter End)
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        <strong>Why?</strong> The fund makes trades throughout the quarter, but you don't know about them until the 13F is filed (up to 45 days later). This simulator assumes you execute trades the day the filing becomes public, using the <strong>market price on that date</strong>.
+                                        <div style={{ marginTop: '12px', padding: '12px', background: '#1e293b', borderRadius: '6px', fontSize: '13px', color: '#94a3b8' }}>
+                                            <strong style={{ color: '#e2e8f0' }}>Example:</strong> Q4 ends Dec 31. Filing released Feb 14. You trade on Feb 14 at Feb 14 prices.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Step 3 - Execution */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '26px', height: '26px', background: '#3b82f6', borderRadius: '50%', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>3</div>
+                                        Capital-Constrained Execution
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        Your trades are limited by your <strong>available cash</strong> (starting capital + quarterly additions + sales proceeds). Unlike the fund, you can't raise billions from outside investors. If a trade requires more cash than you have, it gets <strong>(Capped)</strong>.
+                                    </div>
+                                </div>
+
+                                {/* FAQ Section */}
+                                <div style={{ borderTop: '1px solid #334155', paddingTop: '24px' }}>
+                                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', marginBottom: '16px' }}>
+                                        FAQ
+                                    </h3>
+
+                                    <div style={{ display: 'grid', gap: '16px' }}>
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '16px', borderRadius: '10px' }}>
+                                            <div style={{ fontWeight: 600, color: '#f87171', marginBottom: '6px', fontSize: '14px' }}>
+                                                Why are my returns different from the fund's reported returns?
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6' }}>
+                                                Their reported returns measure performance from quarter-end to quarter-end. Yours are measured from filing date to filing date because that's when you actually trade. The price gap during the delay period causes the difference.
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '16px', borderRadius: '10px' }}>
+                                            <div style={{ fontWeight: 600, color: '#f87171', marginBottom: '6px', fontSize: '14px' }}>
+                                                Why "(Capped)"?
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6' }}>
+                                                The fund increased a position by more than your available cash allows. We cap your order at what you can afford to prevent negative balances.
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '16px', borderRadius: '10px' }}>
+                                            <div style={{ fontWeight: 600, color: '#60a5fa', marginBottom: '6px', fontSize: '14px' }}>
+                                                What is "(Rebalance)"?
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6' }}>
+                                                A trade triggered because your portfolio drifted from the target weights (due to price movements), not because the fund explicitly traded. These keep your % allocation aligned.
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: 'rgba(167, 139, 250, 0.05)', border: '1px solid rgba(167, 139, 250, 0.2)', padding: '16px', borderRadius: '10px' }}>
+                                            <div style={{ fontWeight: 600, color: '#a78bfa', marginBottom: '6px', fontSize: '14px' }}>
+                                                Why do quarterly additions affect my returns?
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6' }}>
+                                                With <strong>$0 quarterly additions</strong>, your only buying power is sale proceeds. If the fund net-buys (buys &gt; sells), many of your buys get capped and your portfolio <strong>diverges</strong> from the fund's allocation over time.
+                                                <br /><br />
+                                                With <strong>ongoing contributions</strong>, you have capital to actually execute the fund's moves, so your portfolio tracks more closely. Different contribution levels = different portfolios, not just different scales.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>,
-                    document.body
-                )
-            }
+                    </div>
+                </div>
+            )}
+
+            {/* Tracker Info Popup (Non-Simulator Mode) */}
+            {isTrackerInfoOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '16px',
+                        width: '100%',
+                        maxWidth: '650px',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '24px 32px',
+                            borderBottom: '1px solid #334155',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            position: 'sticky',
+                            top: 0,
+                            background: '#1e293b',
+                            zIndex: 10
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ background: 'rgba(99, 102, 241, 0.15)', padding: '8px', borderRadius: '10px' }}>
+                                    <BarChart3 size={24} color="#818cf8" />
+                                </div>
+                                <div>
+                                    <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#f8fafc' }}>Mimic Portfolio Tracker</h2>
+                                    <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>What this chart shows</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsTrackerInfoOpen(false)}
+                                style={{
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    color: '#64748b',
+                                    padding: '8px',
+                                    borderRadius: '8px',
+                                    display: 'flex'
+                                }}
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ padding: '28px 32px' }}>
+                            <div style={{ display: 'grid', gap: '24px' }}>
+
+                                {/* What It Shows */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px' }}>
+                                        What This Chart Shows
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        The cumulative return of a portfolio that <strong>copies the fund's holdings</strong> at each 13F filing.
+                                        This is a <strong>time-weighted return (TWR)</strong> – it shows how a $1 investment would grow, ignoring cash flows.
+                                    </div>
+                                </div>
+
+                                {/* Key Timing */}
+                                <div style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(79, 70, 229, 0.05))', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '16px 20px', borderRadius: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                        <div style={{ background: '#6366f1', borderRadius: '50%', padding: '6px', display: 'flex' }}>
+                                            <Calendar size={16} color="#fff" />
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '4px', fontSize: '14px' }}>
+                                                Filing Date Returns (Not Quarter End)
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#c7d2fe', lineHeight: '1.5' }}>
+                                                Returns are calculated from <strong>filing date to filing date</strong>, because that's when you'd actually know about the positions. This differs from the fund's official returns (quarter-end to quarter-end).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* How It Works */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px' }}>
+                                        How Returns Are Calculated
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                                            <li style={{ marginBottom: '8px' }}>We take the fund's <strong>share counts</strong> from each 13F filing</li>
+                                            <li style={{ marginBottom: '8px' }}>We lookup the <strong>stock price on the date the filing was released</strong> (not the values in the filing, which are quarter-end)</li>
+                                            <li style={{ marginBottom: '8px' }}>Portfolio Value = Shares × Stock Price on Release Date</li>
+                                            <li style={{ marginBottom: '8px' }}><strong>Period Return</strong> = (Value on Release Date₂) / (Value on Release Date₁) - 1</li>
+                                            <li>Returns are <strong>compounded</strong> to show cumulative growth</li>
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                {/* vs S&P 500 */}
+                                <div>
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#f8fafc', marginBottom: '12px' }}>
+                                        S&P 500 Comparison
+                                    </h3>
+                                    <div style={{ background: '#0f172a', padding: '16px', borderRadius: '8px', border: '1px solid #334155', color: '#cbd5e1', fontSize: '14px', lineHeight: '1.7' }}>
+                                        The dashed purple line shows what <strong>SPY</strong> (S&P 500 ETF) returned over the same period, using the same filing-date-aligned timing. This gives you a fair "apples-to-apples" comparison of the fund's alpha.
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
