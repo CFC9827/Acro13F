@@ -656,6 +656,18 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
         return `Q${q} '${d.getFullYear().toString().slice(2)}`;
     }, [basePeriodDate]);
 
+    // Check if we need log scale (when there's extreme variation in AUM values)
+    const { needsLogScale, minAum, maxAum } = useMemo(() => {
+        if (chartData.length === 0) return { needsLogScale: false, minAum: 0, maxAum: 0 };
+        const totals = chartData.map((d: any) => d.total || 0).filter((v: number) => v > 0);
+        if (totals.length === 0) return { needsLogScale: false, minAum: 0, maxAum: 0 };
+        const minAum = Math.min(...totals);
+        const maxAum = Math.max(...totals);
+        // Use log scale if max is more than 100x min
+        const needsLogScale = maxAum > minAum * 100 && minAum > 0;
+        return { needsLogScale, minAum, maxAum };
+    }, [chartData]);
+
     return (
         <div className="portfolio-dashboard-v2">
             {!hideChart && (
@@ -876,7 +888,15 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                        tickFormatter={(val) => (val / 1e6).toFixed(0)}
+                                        tickFormatter={(val) => {
+                                            if (val >= 1e9) return `${(val / 1e9).toFixed(1)}B`;
+                                            if (val >= 1e6) return `${(val / 1e6).toFixed(0)}M`;
+                                            if (val >= 1e3) return `${(val / 1e3).toFixed(0)}K`;
+                                            return val.toFixed(0);
+                                        }}
+                                        scale={needsLogScale ? 'log' : 'auto'}
+                                        domain={needsLogScale ? [minAum * 0.5, 'auto'] : ['auto', 'auto']}
+                                        allowDataOverflow={needsLogScale}
                                     />
                                     <Tooltip
                                         content={<CustomTooltip allKeys={allKeys} />}
@@ -920,7 +940,15 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fill: '#94a3b8', fontSize: 11 }}
-                                        tickFormatter={(val) => (val / 1e6).toFixed(0)}
+                                        tickFormatter={(val) => {
+                                            if (val >= 1e9) return `${(val / 1e9).toFixed(1)}B`;
+                                            if (val >= 1e6) return `${(val / 1e6).toFixed(0)}M`;
+                                            if (val >= 1e3) return `${(val / 1e3).toFixed(0)}K`;
+                                            return val.toFixed(0);
+                                        }}
+                                        scale={needsLogScale ? 'log' : 'auto'}
+                                        domain={needsLogScale ? [minAum * 0.5, 'auto'] : ['auto', 'auto']}
+                                        allowDataOverflow={needsLogScale}
                                     />
                                     <Tooltip
                                         content={<CustomTooltip allKeys={allKeys} />}

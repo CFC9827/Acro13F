@@ -63,40 +63,45 @@ class InfTableParser:
             })
 
         # Heuristic: Determine if values are in thousands or dollars
-        # SEC standard varies - some filings report in thousands, others in full dollars
-        # The form header indicates "(to the nearest dollar)" for full dollars or "(in thousands)" for thousands
-        scale_by_1000 = True
-        test_samples = [h for h in raw_holdings if h['shares'] > 100 and h['raw_value'] > 0]
+        # SEC 13F filings can be in either format. We use a weighted scoring system
+        # based on what implied stock prices would look like with/without scaling.
         
-        if len(test_samples) >= 3:
-            # With enough samples, use a consensus heuristic
-            needs_scaling_count = 0
-            for h in test_samples[:50]:
-                price_unscaled = h['raw_value'] / h['shares']
-                # If unscaled price is tiny (< $0.10) but scaled is reasonable, it probably needs scaling
-                if price_unscaled < 0.10:
-                    needs_scaling_count += 1
-                # If unscaled price is already high, it definitely doesn't need scaling
-                elif price_unscaled > 500:
-                    needs_scaling_count -= 1
+        test_samples = [h for h in raw_holdings if h['shares'] > 0 and h['raw_value'] > 0]
+        
+        if test_samples:
+            # Weighted scoring: positive = needs scaling, negative = already full dollars
+            score = 0
             
-            # Consensus: If > 50% look like they need scaling, and none look like they'd be astronomical
-            if needs_scaling_count > (len(test_samples[:50]) * 0.4):
+            for h in test_samples[:50]:
+                unscaled_price = h['raw_value'] / h['shares']
+                scaled_price = unscaled_price * 1000
+                
+                # Signals that we NEED to scale (values are in thousands)
+                if unscaled_price < 1.0:
+                    score += 3  # Very low price, almost certainly needs scaling
+                elif unscaled_price < 10.0:
+                    score += 2  # Low price, likely needs scaling
+                elif unscaled_price < 100.0:
+                    score += 1  # Moderate price, might need scaling
+                
+                # Signals that we should NOT scale (values are already in full dollars)
+                if scaled_price > 50000:
+                    score -= 3  # Scaling would give >$50k/share, almost certainly wrong
+                elif scaled_price > 10000:
+                    score -= 2  # Scaling would give >$10k/share, likely wrong
+                elif unscaled_price > 500:
+                    score -= 1  # Already a high-priced stock
+            
+            # Make decision based on net score
+            if score > 0:
                 scale_by_1000 = True
-                logging.info(f"Scaling heuristic detected THOUSANDS (consensus). Samples: {len(test_samples)}")
+                logging.info(f"Detected THOUSANDS (score={score}). Samples: {len(test_samples[:50])}")
             else:
                 scale_by_1000 = False
-                logging.info(f"Scaling heuristic detected FULL DOLLARS (consensus). Samples: {len(test_samples)}")
+                logging.info(f"Detected FULL DOLLARS (score={score}). Samples: {len(test_samples[:50])}")
         else:
-            # Very few samples (small amendments)
-            # Default to match the majority of the positions
-            price_unscaled = test_samples[0]['raw_value'] / test_samples[0]['shares'] if test_samples else 0
-            if 0.10 < price_unscaled < 30000:
-                scale_by_1000 = False
-                logging.info("Single sample looks like full dollars.")
-            else:
-                scale_by_1000 = True
-                logging.info("Defaulting to THOUSANDS for low-sample filing.")
+            scale_by_1000 = True  # Default to thousands for institutional filings
+            logging.info("No samples to test scaling, defaulting to THOUSANDS.")
             
         holdings = []
         for h in raw_holdings:

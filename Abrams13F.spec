@@ -18,6 +18,8 @@ datas = [
     (os.path.join(project_root, 'backend', 'data', 'CUSIP.csv'), 'backend/data'),
     (os.path.join(project_root, 'backend', 'data', 'sp500_sectors.csv'), 'backend/data'),
     (os.path.join(project_root, 'backend', 'data', 'manual_cusip.csv'), 'backend/data'),
+    # Include the entire backend directory (with services module) as source
+    (os.path.join(project_root, 'backend'), 'backend'),
 ]
 
 # Filter out non-existent files
@@ -46,6 +48,7 @@ a = Analysis(
         'webview',
         'clr_loader',
         'pythonnet',
+        # Services as top-level (how main.py imports them)
         'services',
         'services.database',
         'services.orchestrator',
@@ -55,14 +58,29 @@ a = Analysis(
         'services.sector_mapper',
         'services.benchmark',
         'services.prices',
+        'services.mimic_performance',
+        # Also include backend.services paths
         'backend',
         'backend.main',
         'backend.services',
+        'backend.services.database',
+        'backend.services.orchestrator',
+        'backend.services.parser',
+        'backend.services.sec_client',
+        'backend.services.cusip_mapper',
+        'backend.services.sector_mapper',
+        'backend.services.benchmark',
+        'backend.services.prices',
+        'backend.services.mimic_performance',
         'dotenv',
+        'httpx',
+        'yfinance',
+        'pandas',
+        'aiosqlite',
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(project_root, 'runtime_hook.py')],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -88,7 +106,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Add icon path here if you have one
+    icon=os.path.join(project_root, 'app_icon.ico'),
 )
 
 coll = COLLECT(

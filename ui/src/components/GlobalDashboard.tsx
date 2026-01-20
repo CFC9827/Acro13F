@@ -818,8 +818,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 if (seen.has(key)) return false;
                 seen.add(key);
                 return true;
-            })
-            .slice(0, 5);
+            });
     }, [fundHighlights, fundHistories]);
 
     const getMoverDisplay = (mover: Mover) => {

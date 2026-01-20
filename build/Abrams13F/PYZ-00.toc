@@ -990,6 +990,42 @@
    'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
    'Screener\\backend\\services\\__init__.py',
    'PYMODULE'),
+  ('backend.services.benchmark',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\benchmark.py',
+   'PYMODULE'),
+  ('backend.services.cusip_mapper',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\cusip_mapper.py',
+   'PYMODULE'),
+  ('backend.services.database',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\database.py',
+   'PYMODULE'),
+  ('backend.services.mimic_performance',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\mimic_performance.py',
+   'PYMODULE'),
+  ('backend.services.orchestrator',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\orchestrator.py',
+   'PYMODULE'),
+  ('backend.services.parser',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\parser.py',
+   'PYMODULE'),
+  ('backend.services.prices',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\prices.py',
+   'PYMODULE'),
+  ('backend.services.sec_client',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\sec_client.py',
+   'PYMODULE'),
+  ('backend.services.sector_mapper',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\sector_mapper.py',
+   'PYMODULE'),
   ('backports',
    'C:\\Users\\abram\\AppData\\Local\\Programs\\Python\\Python313\\Lib\\site-packages\\setuptools\\_vendor\\backports\\__init__.py',
    'PYMODULE'),
@@ -6289,6 +6325,10 @@
   ('services.database',
    'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
    'Screener\\backend\\services\\database.py',
+   'PYMODULE'),
+  ('services.mimic_performance',
+   'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
+   'Screener\\backend\\services\\mimic_performance.py',
    'PYMODULE'),
   ('services.orchestrator',
    'C:\\Users\\abram\\.gemini\\antigravity\\scratch\\Stock '
