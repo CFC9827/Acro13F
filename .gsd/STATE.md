@@ -4,28 +4,28 @@
 
 ## Current Position
 
-**Milestone:** Pre-initialization
-**Phase:** Codebase Mapping
-**Status:** ✅ Complete
+**Milestone:** v2.0 — Production Ready
+**Phase:** 1 (Fix Data Accuracy)
+**Status:** ⬜ Not Started
 
 ## Last Session Summary
 
-Codebase mapping complete via `/map` workflow:
-- 7 backend services identified (orchestrator, database, SEC client, parser, prices, sector mapper, mimic performance)
-- 26 API endpoints in FastAPI
-- 15 React components analyzed
-- 7 dependencies (production) + 5 dev dependencies
-- 6 technical debt items documented
-- No TODO/FIXME markers found in codebase
+Project initialization complete via `/new-project`:
+- Codebase mapped with ARCHITECTURE.md and STACK.md
+- SPEC.md finalized with production readiness goals
+- ROADMAP.md created with 6 phases
+- Known bug: Portfolio composition chart incorrect for Giverny fund
 
-## Created Files
+## Project Files
 
-- `.gsd/ARCHITECTURE.md` — System architecture documentation
-- `.gsd/STACK.md` — Technology stack inventory
+- `.gsd/SPEC.md` — Project specification (FINALIZED)
+- `.gsd/ROADMAP.md` — 6-phase roadmap to production
+- `.gsd/ARCHITECTURE.md` — System architecture
+- `.gsd/STACK.md` — Technology inventory
+- `.gsd/DECISIONS.md` — ADR log
+- `.gsd/JOURNAL.md` — Development journal
+- `.gsd/TODO.md` — Quick capture list
 
 ## Next Steps
 
-Proceed with `/new-project` to complete project initialization:
-1. Deep questioning to define project vision
-2. Create SPEC.md with goals and requirements
-3. Create ROADMAP.md with execution phases
+Run `/plan 1` to create detailed execution plan for Phase 1 (Fix Data Accuracy)
