@@ -59,6 +59,9 @@
 - Researched competitor platforms (aum13f.com, dataroma.com, whalewisdom.com)
 - Discussed all 4 gray areas: Data Pipeline, Navigation/Explore, Fund Detail, Pre-computation
 - Created `07-CONTEXT.md` with all decisions
+- Resolved 1000x scaling mismatch in Portfolio Composition chart (514 rows migrated across BlueSpruce, Third Point, BAUPOST, etc.)
+- Updated `parser.py` to correctly multiply SEC value tag (thousands) by 1000 for standard dollar storage
+- Fixed Coverage Range text to auto-update immediately after fund refresh without page reload
 - Rewrote `ROADMAP.md` with v3.0 Phases 7-10
 
 **Key Decisions:**

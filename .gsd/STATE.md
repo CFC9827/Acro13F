@@ -16,6 +16,9 @@
 - Fixed SEC 403 Forbidden error (100ms rate-limiting in SECClient)
 - Confirmed Egerton Capital data accuracy (24 holdings, 100% correct)
 - Implemented granular activity filters and rows per page selector
+- Fixed Coverage Range auto-update after fund refresh
+- Resolved 1000x scaling mismatch in Portfolio Composition chart (514 rows migrated)
+- Fixed parser to always convert SEC thousands to dollars
 - Tagged working state as `v2.0-stable`
 
 ### v3.0 Online Platform Discussion
