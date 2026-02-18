@@ -1,79 +1,64 @@
 # ROADMAP.md
 
-> **Current Phase**: Not started
-> **Milestone**: v2.0 — Production Ready
+> **Current Phase**: Phase 7 (next up)
+> **Milestone**: v3.0 — Online 13F Platform
 
-## Must-Haves (from SPEC)
+## v2.0 — Production Ready (CLOSED)
+
+> Closed 2026-02-17. Data accuracy and tech debt items deferred to v3.0.
 
 - [x] Codebase mapped and documented
-- [ ] Portfolio composition bug fixed
-- [ ] Technical debt reduced
-- [ ] Performance optimized
-- [ ] Cloud-ready with multi-user support
+- [~] Portfolio composition bug investigated (Egerton/Giverny — carried forward)
+- [~] Technical debt — deferred, will be addressed during v3.0 refactor
+- [~] Performance — deferred, absorbed into v3.0 pre-computation engine
+- [~] Cloud readiness — replaced by v3.0 online deployment
+- [~] Multi-user auth — deferred to future phase
 
-## Phases
+## v3.0 Phases
 
-### Phase 1: Fix Data Accuracy
+### Phase 7: Bulk Data Pipeline
 **Status**: ⬜ Not Started
-**Objective**: Resolve portfolio composition calculation bugs
+**Objective**: Build automated ingestion of SEC's quarterly 13F data sets for all filers >$100M AUM
 **Deliverables**:
-- Investigate Giverny fund calculation discrepancy
-- Fix value computation logic in backend/frontend
-- Add validation tests for calculation accuracy
+- Bulk CSV/ZIP downloader for SEC quarterly 13F data sets (2013–present)
+- Parser for flattened SEC data format into database
+- PostgreSQL migration (from SQLite) to handle scale
+- Summary Engine: pre-compute trade activity, AUM, concentration for each fund/quarter
+- Seed database with top 100 funds, then expand to full universe
+- Amendment monitor for between-quarter updates
 
 ---
 
-### Phase 2: Technical Debt Reduction
+### Phase 8: Explore & Screener
 **Status**: ⬜ Not Started
-**Objective**: Refactor oversized components and clean up codebase
+**Objective**: Add fund discovery and stock screener pages
 **Deliverables**:
-- Refactor `App.tsx` (2,209→<500 lines) into smaller modules
-- Refactor `HoldingsTable.tsx` (180KB) — extract logic and subcomponents
-- Refactor `GlobalDashboard.tsx` (106KB) — componentize
-- Remove/organize 15+ debug scripts from root folder
-- Set up ESLint/Prettier with consistent rules
+- Explore page (`/explore`) with searchable, filterable fund table
+- Typeahead search (fund name, manager, ticker held)
+- Filter bar: Fund Type, AUM Range, Last Filing, Concentration
+- Stock Screener (`/explore/stocks`) — reverse lookup: "who holds this stock?"
+- Navigation restructure: My Portfolio vs. Explore
 
 ---
 
-### Phase 3: Test Infrastructure
+### Phase 9: Cloud Deployment
 **Status**: ⬜ Not Started
-**Objective**: Add automated test coverage
+**Objective**: Deploy the application online with production infrastructure
 **Deliverables**:
-- Backend: pytest suite for core services (database, parser, orchestrator)
-- Frontend: Vitest/React Testing Library for critical components
-- CI pipeline for automated testing
-
----
-
-### Phase 4: Performance Optimization
-**Status**: ⬜ Not Started
-**Objective**: Improve load times and responsiveness
-**Deliverables**:
-- Profile slow operations (dashboard, charts, SEC sync)
-- Optimize database queries (add indexes, reduce N+1)
-- Implement caching for expensive computations
-- Lazy load charts and large data sets
-- Target: Dashboard loads < 2 seconds
-
----
-
-### Phase 5: Cloud Infrastructure
-**Status**: ⬜ Not Started
-**Objective**: Prepare for cloud deployment with PostgreSQL
-**Deliverables**:
-- Abstract database layer for PostgreSQL compatibility
-- Add SQLAlchemy or async DB adapter
-- Environment-based configuration (dev/prod)
 - Containerization (Docker)
-- Deploy to cloud platform (Railway/Vercel/Render)
+- Cloud deployment (Railway/Render/Vercel)
+- Environment-based configuration (dev/prod)
+- Automated quarterly sync (cron/scheduled task)
+- CDN/static asset optimization for frontend
 
 ---
 
-### Phase 6: Multi-User Authentication
+### Phase 10: Polish & Performance
 **Status**: ⬜ Not Started
-**Objective**: Add user accounts and fund ownership
+**Objective**: Optimize for production traffic and user experience
 **Deliverables**:
-- Integrate authentication (e.g., Clerk, Auth.js, Supabase Auth)
-- User↔Fund ownership model
-- Protected API routes
-- User-scoped data isolation
+- API response caching layer
+- Frontend performance optimization (lazy loading, code splitting)
+- Error handling and monitoring (Sentry or similar)
+- SEO basics (meta tags, Open Graph, sitemap)
+- Target: all pages load in <100ms
