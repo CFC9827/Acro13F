@@ -1200,7 +1200,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const [showQuarterDropdown, setShowQuarterDropdown] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
-    const itemsPerPage = 15;
+    const [itemsPerPage, setItemsPerPage] = useState(25);
 
     // 1. Extract unique sorted quarters
     const sortedQuarters = useMemo(() => {
@@ -2724,7 +2724,27 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                 </table>
             </div >
 
-            {totalPages > 1 && (
+            <div className="pagination-controls-container">
+                <div className="rows-selector">
+                    <span>Show</span>
+                    <select
+                        value={itemsPerPage === processedData.length ? 'all' : itemsPerPage}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            const newSize = val === 'all' ? processedData.length : parseInt(val);
+                            setItemsPerPage(newSize);
+                            setCurrentPage(1); // Reset to first page when changing size
+                        }}
+                        className="rows-select"
+                    >
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value="all">All</option>
+                    </select>
+                    <span>entries</span>
+                </div>
+
                 <div className="pagination-controls">
                     <button
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -2744,7 +2764,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                         <ChevronRight size={16} />
                     </button>
                 </div>
-            )}
+            </div>
 
             <CsvExportModal
                 isOpen={isExportModalOpen}
