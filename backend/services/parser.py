@@ -62,56 +62,18 @@ class InfTableParser:
                 "put_call": put_call  # Guaranteed uppercase if present
             })
 
-        # Heuristic: Determine if values are in thousands or dollars
-        # SEC 13F filings can be in either format. We use a weighted scoring system
-        # based on what implied stock prices would look like with/without scaling.
+        # SEC 13F values are ALWAYS reported in thousands of dollars.
+        # We convert to actual dollars for consistent storage.
         
-        test_samples = [h for h in raw_holdings if h['shares'] > 0 and h['raw_value'] > 0]
-        
-        if test_samples:
-            # Weighted scoring: positive = needs scaling, negative = already full dollars
-            score = 0
-            
-            for h in test_samples[:50]:
-                unscaled_price = h['raw_value'] / h['shares']
-                scaled_price = unscaled_price * 1000
-                
-                # Signals that we NEED to scale (values are in thousands)
-                if unscaled_price < 1.0:
-                    score += 3  # Very low price, almost certainly needs scaling
-                elif unscaled_price < 10.0:
-                    score += 2  # Low price, likely needs scaling
-                elif unscaled_price < 100.0:
-                    score += 1  # Moderate price, might need scaling
-                
-                # Signals that we should NOT scale (values are already in full dollars)
-                if scaled_price > 50000:
-                    score -= 3  # Scaling would give >$50k/share, almost certainly wrong
-                elif scaled_price > 10000:
-                    score -= 2  # Scaling would give >$10k/share, likely wrong
-                elif unscaled_price > 500:
-                    score -= 1  # Already a high-priced stock
-            
-            # Make decision based on net score
-            if score > 0:
-                scale_by_1000 = True
-                logging.info(f"Detected THOUSANDS (score={score}). Samples: {len(test_samples[:50])}")
-            else:
-                scale_by_1000 = False
-                logging.info(f"Detected FULL DOLLARS (score={score}). Samples: {len(test_samples[:50])}")
-        else:
-            scale_by_1000 = True  # Default to thousands for institutional filings
-            logging.info("No samples to test scaling, defaulting to THOUSANDS.")
-            
         holdings = []
         for h in raw_holdings:
             final_h = h.copy()
-            # Final value in dollars
-            final_h['value'] = h['raw_value'] * 1000 if scale_by_1000 else h['raw_value']
+            final_h['value'] = h['raw_value'] * 1000  # Convert from thousands to dollars
             del final_h['raw_value']
             holdings.append(final_h)
         
-        # Post-parse validation: check for anomalous prices
+        # Post-parse validation: check for anomalous implied prices
+        # This catches cases where values may have been double-scaled or wrong
         for h in holdings:
             if h['shares'] > 0:
                 implied_price = h['value'] / h['shares']
