@@ -4,28 +4,39 @@
 
 ## Current Position
 
-**Milestone:** v2.0 — Production Ready
-**Phase:** 1 (Fix Data Accuracy & Stability)
-**Status:** ✅ Phase Complete (Activity, Holdings & SEC Stability)
+**Milestone:** v3.0 — Online 13F Platform
+**Phase:** 7 (Bulk Data Pipeline)
+**Status:** ⬜ Not Started — Context gathered, ready for planning
+
+**Safety Tag:** `v2.0-stable` — revert point if anything goes wrong
 
 ## Last Session Summary
 
-### SEC Stability Fix
-- Fixed `403 Forbidden` error on fund refreshes.
-- Enabled `.env` loading in the backend (it was previously ignored).
-- Implemented mandatory **100ms rate-limiting delay** in `SECClient` for all EDGAR requests.
-- Confirmed compliance with SEC 10 req/sec guidelines.
+### v2.0 Closed Out
+- Fixed SEC 403 Forbidden error (100ms rate-limiting in SECClient)
+- Confirmed Egerton Capital data accuracy (24 holdings, 100% correct)
+- Implemented granular activity filters and rows per page selector
+- Tagged working state as `v2.0-stable`
 
-### Egerton Investigation
-- Investigated reports of incorrect "New Buy" activity for Egerton Capital.
-- **Result:** Confirmed data is 100% accurate. Egerton genuinely had 24 holdings in Q3 2025.
-
-### Feature Enhancements
-- Implemented **Granular Activity Filters** (Buy, Add, Reduce, Sell).
-- Implemented **Rows Per Page Selector** (25, 50, 100, All).
+### v3.0 Online Platform Discussion
+- Researched competitor platforms (aum13f.com, dataroma.com, whalewisdom.com)
+- Decided on SEC EDGAR quarterly bulk data sets as primary data source
+- Designed Explore page + Stock Screener for fund discovery
+- Chose full pre-computation engine for instant page loads
+- Created `.planning/phases/07-online-platform/07-CONTEXT.md` with all decisions
+- Rewrote ROADMAP.md with v3.0 Phases 7-10
 
 ## Next Steps
 
-1. User requested transition to online platform (hosting/speed optimization).
-2. Explore/Screener requirement definition.
-3. Performance optimization for large datasets.
+1. **Create feature branch** `feature/online-platform` before any code changes
+2. **Plan Phase 7** (Bulk Data Pipeline) — run `/gsd-plan-phase 7`
+3. PostgreSQL migration from SQLite
+4. Build bulk SEC data downloader and parser
+5. Implement Summary Engine for pre-computation
+6. Seed database with initial fund universe (top 100)
+
+## Key Files for Context Restoration
+
+- `.planning/phases/07-online-platform/07-CONTEXT.md` — all decisions from discussion
+- `.gsd/ROADMAP.md` — v3.0 phases overview
+- `.gsd/JOURNAL.md` — session history
