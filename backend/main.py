@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException, Request, APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+load_dotenv()
 from typing import List, Dict
 from services.database import DatabaseManager
 from services.orchestrator import Orchestrator

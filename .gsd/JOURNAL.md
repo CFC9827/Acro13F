@@ -32,20 +32,21 @@
 - Finalized first state of GSD methodology files
 - Pushed all local commits to origin/main
 
-## 2026-02-17 — Activity & Holdings Enhancements
+## 2026-02-17 — Activity, Holdings & SEC Stability
 
-**Session Goal:** Verify Egerton data accuracy, implement granular activity filters, and expand holdings visibility.
+**Session Goal:** Verify Egerton data accuracy, implement UI enhancements, and resolve SEC 403 errors.
 
 **Accomplished:**
+- **Fixed SEC 403 Forbidden error:** Enabled `.env` loading in `main.py` and implemented a mandatory 100ms rate-limiting delay in `SECClient`.
 - Confirmed Egerton Capital's Q3 2025 data (24 holdings) is 100% accurate against SEC sources.
-- Implemented **Granular Activity Filters** (Buy, Add, Reduce, Sell) in a dropdown menu in the Activity tab.
-- Implemented **Rows Per Page Selector** in the Holdings table, allowing users to show 25, 50, 100, or All positions.
-- Increased default holdings view from 15 to **25**.
+- Implemented **Granular Activity Filters** (Buy, Add, Reduce, Sell) in a dropdown menu.
+- Implemented **Rows Per Page Selector** for the Holdings table (25, 50, 100, All).
 - Updated GSD state files (`STATE.md`, `JOURNAL.md`).
 
 **Key Decisions:**
-- Increased default names to 25 to provide more immediate context without overwhelming the user.
-- Added an "All" option to the row selector for power users who want a single-page view.
+- Hardcoded a 100ms delay in the low-level `SECClient` to guarantee compliance with SEC guidelines across all service layers.
+- Forced `.env` loading at the very entry point of the backend to prevent configuration gaps.
+
 
 ---
 

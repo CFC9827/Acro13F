@@ -1,6 +1,8 @@
 import requests
 import os
+import time
 from typing import List, Dict, Optional
+from dotenv import load_dotenv
 
 class SECClient:
     """
@@ -22,6 +24,7 @@ class SECClient:
 
     def get_submissions(self, cik: str) -> Dict:
         """Fetches the latest submissions for a given CIK (padded to 10 digits)."""
+        time.sleep(0.1) # SEC rate limiting (max 10 req/sec)
         cik_padded = cik.zfill(10)
         url = f"{self.BASE_DATA_URL}/CIK{cik_padded}.json"
         response = requests.get(url, headers=self.headers)
@@ -39,6 +42,7 @@ class SECClient:
         cik_clean = cik.lstrip('0')
         accession_clean = accession_number.replace('-', '')
         # SEC provides an index.json for each filing directory
+        time.sleep(0.1) # SEC rate limiting
         url = f"{self.BASE_ARCHIVE_URL}/{cik_clean}/{accession_clean}/index.json"
         
         response = requests.get(url, headers=self.headers)
@@ -65,11 +69,13 @@ class SECClient:
 
     def download_xml(self, url: str) -> str:
         """Downloads the XML content of a filing."""
+        time.sleep(0.1) # SEC rate limiting
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         return response.text
 
 if __name__ == "__main__":
+    load_dotenv()
     # Test with Berkshire Hathaway CIK: 0001067983
     client = SECClient()
     try:
