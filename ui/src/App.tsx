@@ -351,7 +351,11 @@ function App() {
                     .then(res => res.json())
                     .then(data => setHistory(data))
 
-                await Promise.all([p1, p2])
+                const p3 = fetch(`/api/funds/${selectedCik}/filing-range`)
+                    .then(res => res.json())
+                    .then(data => setFilingRange(data))
+
+                await Promise.all([p1, p2, p3])
 
                 const skippedLegacy = result.skipped_legacy || 0
 
@@ -437,7 +441,8 @@ function App() {
             if (selectedCik) {
                 const p1 = fetch(`/api/funds/${selectedCik}/holdings`).then(res => res.json()).then(data => setHoldings(data))
                 const p2 = fetch(`/api/funds/${selectedCik}/history`).then(res => res.json()).then(data => setHistory(data))
-                await Promise.all([p1, p2])
+                const p3 = fetch(`/api/funds/${selectedCik}/filing-range`).then(res => res.json()).then(data => setFilingRange(data))
+                await Promise.all([p1, p2, p3])
             }
 
             setNotification({
