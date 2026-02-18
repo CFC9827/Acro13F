@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Filter, Download, ChevronUp, ChevronDown, Flame, Target } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { TrendingUp, TrendingDown, Filter, Download, ChevronUp, ChevronDown, Flame, Target, Check } from 'lucide-react';
 import { ActivityExportModal } from './ActivityExportModal';
 
 interface HistoricalHolding {
@@ -25,7 +25,8 @@ interface ActivityItem {
     consecutiveQuarters?: number;
 }
 
-type ActivityFilter = 'all' | 'buys' | 'sells';
+type ActivityType = 'Buy' | 'Sell' | 'Add' | 'Reduce';
+const ALL_ACTIVITY_TYPES: ActivityType[] = ['Buy', 'Add', 'Reduce', 'Sell'];
 type SortField = 'ticker' | 'activity' | 'shares' | 'value' | 'portfolio';
 type SortDirection = 'asc' | 'desc';
 
@@ -52,9 +53,23 @@ const formatCurrency = (value: number) => {
 };
 
 export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) {
-    const [filter, setFilter] = useState<ActivityFilter>('all');
+    const [activeTypes, setActiveTypes] = useState<Set<ActivityType>>(new Set(ALL_ACTIVITY_TYPES));
     const [sortField, setSortField] = useState<SortField>('portfolio');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [filterOpen, setFilterOpen] = useState(false);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        if (!filterOpen) return;
+        const handleClick = (e: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+                setFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [filterOpen]);
     const [showExportModal, setShowExportModal] = useState(false);
 
     // Compute activity from historical holdings
@@ -203,14 +218,32 @@ export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) 
         return activities;
     }, [history]);
 
-    // Filter activities based on selected filter
+    // Toggle a single activity type on/off
+    const toggleType = useCallback((type: ActivityType) => {
+        setActiveTypes(prev => {
+            const next = new Set(prev);
+            if (next.has(type)) {
+                next.delete(type);
+                // If nothing left, re-enable all
+                if (next.size === 0) return new Set(ALL_ACTIVITY_TYPES);
+            } else {
+                next.add(type);
+            }
+            return next;
+        });
+    }, []);
+
+    const resetFilters = useCallback(() => {
+        setActiveTypes(new Set(ALL_ACTIVITY_TYPES));
+    }, []);
+
+    const allActive = activeTypes.size === ALL_ACTIVITY_TYPES.length;
+
+    // Filter activities based on active type toggles
     const filteredActivities = useMemo(() => {
-        if (filter === 'all') return activityData;
-        if (filter === 'buys') {
-            return activityData.filter(a => a.activityType === 'Buy' || a.activityType === 'Add');
-        }
-        return activityData.filter(a => a.activityType === 'Sell' || a.activityType === 'Reduce');
-    }, [activityData, filter]);
+        if (allActive) return activityData;
+        return activityData.filter(a => activeTypes.has(a.activityType));
+    }, [activityData, activeTypes, allActive]);
 
     // Sort activities
     const sortedActivities = useMemo(() => {
@@ -310,27 +343,37 @@ export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) 
                 <div className="activity-header">
                     <h3>Trading Activity</h3>
                     <div className="activity-controls">
-                        <div className="activity-filters">
+                        <div className="activity-filter-dropdown" ref={filterRef}>
                             <button
-                                className={`activity-filter-btn ${filter === 'all' ? 'active' : ''}`}
-                                onClick={() => setFilter('all')}
+                                className={`activity-filter-trigger ${!allActive ? 'has-filter' : ''}`}
+                                onClick={() => setFilterOpen(prev => !prev)}
                             >
-                                Total Activity
+                                <Filter size={14} />
+                                {allActive ? 'Filter' : `Filter (${activeTypes.size})`}
+                                <ChevronDown size={12} className={`trigger-chevron ${filterOpen ? 'open' : ''}`} />
                             </button>
-                            <button
-                                className={`activity-filter-btn ${filter === 'buys' ? 'active' : ''}`}
-                                onClick={() => setFilter('buys')}
-                            >
-                                <TrendingUp size={14} />
-                                Buys
-                            </button>
-                            <button
-                                className={`activity-filter-btn ${filter === 'sells' ? 'active' : ''}`}
-                                onClick={() => setFilter('sells')}
-                            >
-                                <TrendingDown size={14} />
-                                Sells
-                            </button>
+                            {filterOpen && (
+                                <div className="filter-dropdown-panel">
+                                    {ALL_ACTIVITY_TYPES.map(type => (
+                                        <button
+                                            key={type}
+                                            className={`filter-dropdown-item ${activeTypes.has(type) ? 'active' : ''}`}
+                                            onClick={() => toggleType(type)}
+                                        >
+                                            <span className={`chip-dot ${type.toLowerCase()}-dot`} />
+                                            <span className="filter-item-label">{type}</span>
+                                            {activeTypes.has(type) && <Check size={14} className="filter-check" />}
+                                        </button>
+                                    ))}
+                                    <div className="filter-dropdown-divider" />
+                                    <button
+                                        className="filter-dropdown-item reset-item"
+                                        onClick={() => { resetFilters(); setFilterOpen(false); }}
+                                    >
+                                        Reset All
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <button className="activity-export-btn" onClick={openExportModal} title="Export to CSV">
                             <Download size={16} />
