@@ -35,6 +35,7 @@ const formatQ = (dateStr: string) => {
 export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik }) => {
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
+    const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
 
     const handleMouseEnter = (e: React.MouseEvent, title: string, content: React.ReactNode) => {
         setTooltip({
@@ -115,6 +116,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     issuer_name: curr.issuer_name,
                     val_change: curr.value,
                     weight_change: curr.weight,
+                    shares_change: curr.shares,
                     curr_weight: curr.weight,
                     pct_change: 100
                 });
@@ -122,12 +124,14 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 // Determine change
                 const valChange = curr.value - prev.value;
                 const weightChange = curr.weight - prev.weight;
+                const sharesChange = curr.shares - prev.shares;
 
                 movers.push({
                     ticker: curr.ticker,
                     issuer_name: curr.issuer_name,
                     val_change: valChange,
                     weight_change: weightChange,
+                    shares_change: sharesChange,
                     curr_weight: curr.weight,
                     pct_change: prev.value > 0 ? ((curr.value - prev.value) / prev.value) * 100 : 0
                 });
@@ -487,17 +491,59 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
                     {/* Big Movers */}
                     <section className="dashboard-section compact">
-                        <div className="section-header">
-                            <TrendingUp className="section-icon-small" />
-                            <div>
-                                <h3 className="section-title-small">Top Movers</h3>
-                                <p className="section-desc-small">Largest changes QoQ</p>
+                        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <TrendingUp className="section-icon-small" />
+                                <div>
+                                    <h3 className="section-title-small">Top Movers</h3>
+                                    <p className="section-desc-small">Largest changes QoQ</p>
+                                </div>
+                            </div>
+                            
+                            <div className="toggle-group" style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.5)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <button 
+                                    className={`control-btn-mini ${moversMode === 'value' ? 'active' : ''}`}
+                                    onClick={() => setMoversMode('value')}
+                                    style={{ 
+                                        padding: '4px 8px', 
+                                        fontSize: '10px', 
+                                        fontWeight: 700, 
+                                        borderRadius: '4px', 
+                                        border: 'none', 
+                                        cursor: 'pointer',
+                                        backgroundColor: moversMode === 'value' ? '#38bdf8' : 'transparent',
+                                        color: moversMode === 'value' ? '#0f172a' : '#64748b'
+                                    }}
+                                >
+                                    VALUE
+                                </button>
+                                <button 
+                                    className={`control-btn-mini ${moversMode === 'shares' ? 'active' : ''}`}
+                                    onClick={() => setMoversMode('shares')}
+                                    style={{ 
+                                        padding: '4px 8px', 
+                                        fontSize: '10px', 
+                                        fontWeight: 700, 
+                                        borderRadius: '4px', 
+                                        border: 'none', 
+                                        cursor: 'pointer',
+                                        backgroundColor: moversMode === 'shares' ? '#38bdf8' : 'transparent',
+                                        color: moversMode === 'shares' ? '#0f172a' : '#64748b'
+                                    }}
+                                >
+                                    SHARES
+                                </button>
                             </div>
                         </div>
 
                         <div className="movers-list scrollable">
-                            {movers.slice(0, 10).map((mover, i) => {
-                                const isPositive = mover.val_change >= 0;
+                            {movers
+                                .sort((a, b) => {
+                                    if (moversMode === 'value') return Math.abs(b.val_change) - Math.abs(a.val_change);
+                                    return Math.abs(b.shares_change) - Math.abs(a.shares_change);
+                                })
+                                .slice(0, 10).map((mover, i) => {
+                                const isPositive = moversMode === 'value' ? mover.val_change >= 0 : mover.shares_change >= 0;
                                 return (
                                     <div key={i} className="mover-item">
                                         <div className="mover-info">
@@ -506,10 +552,17 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                         </div>
                                         <div className={`mover-delta ${isPositive ? 'positive' : 'negative'}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                                            <span style={{ fontWeight: 600 }}>{formatCurrency(mover.val_change)}</span>
-                                            <span style={{ fontSize: '0.75em', opacity: 0.8, marginLeft: '2px' }}>
-                                                ({(isPositive ? '+' : '')}{mover.weight_change?.toFixed(1)}%)
+                                            <span style={{ fontWeight: 600 }}>
+                                                {moversMode === 'value' 
+                                                    ? formatCurrency(mover.val_change) 
+                                                    : Math.abs(mover.shares_change).toLocaleString()
+                                                }
                                             </span>
+                                            {moversMode === 'value' && (
+                                                <span style={{ fontSize: '0.75em', opacity: 0.8, marginLeft: '2px' }}>
+                                                    ({(isPositive ? '+' : '')}{mover.weight_change?.toFixed(1)}%)
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 );
