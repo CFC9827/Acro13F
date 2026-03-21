@@ -107,6 +107,7 @@ class DatabaseManager:
                 ticker TEXT,
                 date TEXT,
                 price REAL,
+                dividends REAL DEFAULT 0,
                 UNIQUE(ticker, date)
             )
             """,
@@ -389,12 +390,14 @@ class DatabaseManager:
         try:
             cur = conn.cursor()
             query = """
-                INSERT INTO prices (ticker, date, price) VALUES (%s, %s, %s)
-                ON CONFLICT (ticker, date) DO UPDATE SET price = EXCLUDED.price
+                INSERT INTO prices (ticker, date, price, dividends) VALUES (%s, %s, %s, %s)
+                ON CONFLICT (ticker, date) DO UPDATE SET 
+                    price = EXCLUDED.price,
+                    dividends = EXCLUDED.dividends
             """ if self.is_postgres else """
-                INSERT OR REPLACE INTO prices (ticker, date, price) VALUES (?, ?, ?)
+                INSERT OR REPLACE INTO prices (ticker, date, price, dividends) VALUES (?, ?, ?, ?)
             """
-            data = [(ticker, p['date'], p['price']) for p in price_data]
+            data = [(ticker, p['date'], p['price'], p.get('dividends', 0)) for p in price_data]
             cur.executemany(query, data)
             conn.commit()
         finally:
@@ -663,6 +666,60 @@ class DatabaseManager:
         cik = self.normalize_cik(cik)
         return self._execute("SELECT * FROM sync_status WHERE cik = ?", (cik,), fetch='one')
 
+    def search_all(self, query: str) -> Dict:
+        """Global search for funds and tickers."""
+        query = query.strip().upper()
+        if not query:
+            return {"funds": [], "tickers": []}
+
+        # 1. Search Funds
+        funds = self._execute("""
+            SELECT cik, name FROM funds 
+            WHERE UPPER(name) LIKE ? OR cik LIKE ?
+            LIMIT 10
+        """, (f"%{query}%", f"%{query}%"), fetch='all')
+
+        # 2. Search Tickers (latest holdings only)
+        # We find which funds hold this ticker in their most recent filing
+        tickers = self._execute("""
+            SELECT DISTINCT h.ticker, h.issuer_name
+            FROM holdings h
+            WHERE UPPER(h.ticker) LIKE ? OR UPPER(h.issuer_name) LIKE ?
+            LIMIT 10
+        """, (f"%{query}%", f"%{query}%"), fetch='all')
+
+        # For each ticker, find who holds it
+        ticker_results = []
+        for t in tickers:
+            symbol = t['ticker']
+            if not symbol: continue
+            
+            holders = self._execute("""
+                SELECT f.name, f.cik, h.value, h.shares
+                FROM holdings h
+                JOIN filings fl ON h.accession_number = fl.accession_number
+                JOIN funds f ON fl.cik = f.cik
+                WHERE h.ticker = ?
+                AND fl.accession_number = (
+                    SELECT accession_number FROM filings 
+                    WHERE cik = f.cik 
+                    ORDER BY period_of_report DESC LIMIT 1
+                )
+                ORDER BY h.value DESC
+                LIMIT 5
+            """, (symbol,), fetch='all')
+            
+            ticker_results.append({
+                "ticker": symbol,
+                "issuer": t['issuer_name'],
+                "holders": holders
+            })
+
+        return {
+            "funds": funds,
+            "tickers": ticker_results
+        }
+
     def get_sector_attribution(self, cik: str):
         """Calculates portfolio weighting by sector across all periods."""
         cik = self.normalize_cik(cik)
@@ -855,7 +912,7 @@ class DatabaseManager:
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            query = "SELECT date, price FROM prices WHERE ticker = ?"
+            query = "SELECT date, price, dividends FROM prices WHERE ticker = ?"
             params = [ticker]
             
             if start_date:

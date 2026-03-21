@@ -104,6 +104,46 @@ class CUSIPMapper:
             
         return self.mappings.get(clean_cusip)
 
+    def resolve_ticker(self, cusip: str, issuer_name: str = None) -> Optional[str]:
+        """
+        Attempts to find a ticker for a CUSIP. 
+        If not in local mappings, tries an online fallback if issuer_name is provided.
+        """
+        # 1. Check local mappings
+        ticker = self.get_ticker(cusip)
+        if ticker:
+            return ticker
+            
+        # 2. Try Yahoo Finance search as fallback (if name is provided)
+        if issuer_name:
+            # Clean name for better search (remove common suffix)
+            search_name = issuer_name.split('/')[0].split(' - ')[0]
+            search_name = search_name.replace(' INC', '').replace(' CORP', '').replace(' LTD', '').replace(' PLC', '').strip()
+            
+            import requests
+            try:
+                # Yahoo's autocomplete API is quite robust for finding tickers
+                url = f"https://query2.finance.yahoo.com/v1/finance/search?q={search_name}"
+                headers = {"User-Agent": "Mozilla/5.0"}
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.ok:
+                    data = resp.json()
+                    quotes = data.get('quotes', [])
+                    if quotes:
+                        # Pick the first US stock or ETF
+                        for q in quotes:
+                            if q.get('quoteType') in ['EQUITY', 'ETF'] and ('.' not in q.get('symbol', '') or q.get('symbol', '').endswith('.N') or q.get('symbol', '').endswith('.O')):
+                                sym = q['symbol'].split('.')[0] # Clean suffix
+                                # Save to cache for future
+                                self.add_mapping(cusip, sym)
+                                import logging
+                                logging.info(f"RESOLVED CUSIP: {cusip} ({issuer_name}) -> {sym} via Yahoo Search")
+                                return sym
+            except Exception as e:
+                pass
+                
+        return None
+
     def add_mapping(self, cusip: str, ticker: str):
         clean_cusip = cusip.replace('-', '').replace(' ', '').upper()
         if len(clean_cusip) == 8:

@@ -61,29 +61,24 @@ class MimicPerformanceCalculator:
         mimic_series = []
         trades_log = []
         
-        # Helper to get price for a specific date
-        def get_price(symbol, date):
+        # Helper to get price and dividends for a specific date range
+        def get_price_data(symbol, start_date, end_date):
             prices = price_cache.get(symbol, [])
-            if prices:
-                # Find price on or before date
-                found = next((p['price'] for p in reversed(prices) if p['date'] <= date), None)
-                if found: return found
-                # Fallback to first available
-                return prices[0]['price']
-            return 0.0
-
-        # Helper to get filing-implied price with normalization
-        def get_implied_price(h, ticker):
-            if h['shares'] <= 0: return 0.0
-            p = h['value'] / h['shares']
-            # Normalization: Most SEC data is in thousands. 
-            # If unscaled price is < $0.50, it almost certainly needs * 1000
-            if p < 0.50:
-                p = p * 1000
-            # If price is insane (>5k) and not a known monster, it's 1000x error
-            elif p > 5000 and ticker not in ['BRK.A', 'BRK-A', 'NVR', 'SEB']:
-                p = p / 1000
-            return p
+            if not prices: return 0.0, 0.0
+            
+            # 1. Get ending price (on or before end_date)
+            p_end = next((p['price'] for p in reversed(prices) if p['date'] <= end_date), 0.0)
+            if p_end <= 0: p_end = prices[0]['price']
+            
+            # 2. Get starting price (on or before start_date)
+            p_start = next((p['price'] for p in reversed(prices) if p['date'] <= start_date), 0.0)
+            if p_start <= 0: p_start = prices[0]['price']
+            
+            # 3. Sum dividends paid BETWEEN start_date and end_date
+            # (Assumes dividend is received if held between these two filing dates)
+            total_divs = sum(p.get('dividends', 0) for p in prices if start_date < p['date'] <= end_date)
+            
+            return p_start, p_end, total_divs
 
         # Simulation Loop
         current_holdings = {} # symbol -> shares
@@ -93,25 +88,38 @@ class MimicPerformanceCalculator:
             curr_filing = periods_map[period]
             c_date = curr_filing['filing_date']
             
-            # A. Calculate Period Return (based on current_holdings moving from prev_date to c_date)
+            # A. Split Detection & Adjustment
+            if i > 0:
+                prev_date = periods_map[sorted_periods[i-1]]['filing_date']
+                for h in curr_filing['holdings']:
+                    symbol = get_best_label(h)
+                    if symbol in current_holdings and h['shares'] > 0:
+                        prev_s = current_holdings[symbol]
+                        curr_s = h['shares']
+                        share_ratio = curr_s / prev_s
+                        
+                        if share_ratio > 1.2:
+                            p_start, p_end, _ = get_price_data(symbol, prev_date, c_date)
+                            if p_start > 0 and p_end > 0:
+                                price_ratio = p_end / p_start
+                                if 0.7 < (price_ratio * share_ratio) < 1.3:
+                                    current_holdings[symbol] = curr_s
+
+            # B. Calculate Period Return (Total Return = Price Change + Dividends)
             if i > 0:
                 prev_date = periods_map[sorted_periods[i-1]]['filing_date']
                 p_returns = []
                 for ticker, shares in current_holdings.items():
-                    p_start = get_price(ticker, prev_date)
-                    p_end = get_price(ticker, c_date)
+                    p_start, p_end, divs = get_price_data(ticker, prev_date, c_date)
                     if p_start > 0:
                         p_returns.append({
                             "start_val": shares * p_start,
-                            "end_val": shares * p_end
+                            "end_val": shares * (p_end + divs) # Dividends added to end value
                         })
                 
                 total_s = sum(v['start_val'] for v in p_returns)
                 total_e = sum(v['end_val'] for v in p_returns)
-                if total_s > 0:
-                    period_ret = (total_e / total_s) - 1
-                else:
-                    period_ret = 0.0
+                period_ret = (total_e / total_s) - 1 if total_s > 0 else 0.0
                 cumulative_return *= (1 + period_ret)
 
             # B. Establish Target State (Weights based on Shares * Prices)
@@ -126,7 +134,7 @@ class MimicPerformanceCalculator:
             
             # Calculate total fund value using real prices
             for symbol, shares in target_holdings_shares.items():
-                p = get_price(symbol, c_date)
+                _, p, _ = get_price_data(symbol, c_date, c_date)
                 if p <= 0:
                     # Fallback to filing implied price
                     h_file = next((x for x in curr_filing['holdings'] if get_best_label(x) == symbol), None)
@@ -163,7 +171,8 @@ class MimicPerformanceCalculator:
                     
                     # Execution Price (on filing date)
                     p_exec = next((h['price'] for h in target_holdings_detailed if h['ticker'] == ticker), 0.0)
-                    if p_exec <= 0: p_exec = get_price(ticker, c_date)
+                    if p_exec <= 0:
+                        _, p_exec, _ = get_price_data(ticker, c_date, c_date)
                     
                     trades_log.append({
                         "date": c_date,

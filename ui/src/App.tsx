@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink } from 'lucide-react'
+import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
 import { GlobalDashboard } from './components/GlobalDashboard'
 import { FundSummary } from './components/FundSummary'
+import { CommandPalette } from './components/CommandPalette'
 import { AboutPage } from './components/AboutPage'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
@@ -149,6 +150,19 @@ function App() {
     const [draggedFundCik, setDraggedFundCik] = useState<string | null>(null)
     const [showOnboarding, setShowOnboarding] = useState(false)
     const [isConfigured, setIsConfigured] = useState(true) // Default to true until checked
+    const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+    // Keyboard shortcut for Command Palette
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                setShowCommandPalette(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Auto-clear notification after 5s
     useEffect(() => {
@@ -616,6 +630,35 @@ function App() {
                         }}>Abrams13F</span>
                     </div>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <button
+                            onClick={() => setShowCommandPalette(true)}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: 'rgba(51, 65, 85, 0.5)',
+                                color: '#94a3b8',
+                                border: '1px solid rgba(148, 163, 184, 0.2)',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.borderColor = '#3b82f6'}
+                            onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)'}
+                        >
+                            <Search size={16} />
+                            <span style={{ opacity: 0.7 }}>Search...</span>
+                            <span style={{ 
+                                marginLeft: '8px', 
+                                background: '#1e293b', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px', 
+                                fontSize: '10px',
+                                border: '1px solid #334155'
+                            }}>CTRL K</span>
+                        </button>
                         <button
                             onClick={handleGlobalRefresh}
                             disabled={loading}
@@ -1187,6 +1230,11 @@ function App() {
                 }} />
             )
             }
+            <CommandPalette 
+                isOpen={showCommandPalette} 
+                onClose={() => setShowCommandPalette(false)} 
+                onNavigate={navigate} 
+            />
         </>
     )
 }

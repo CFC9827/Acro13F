@@ -652,11 +652,14 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
                 ) : (
                     <>
                         <div className="summary-card">
-                            <div className="summary-label">Mimic Portfolio Return ({timeRange})</div>
+                            <div className="summary-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                Mimic Portfolio Return ({timeRange})
+                                <span style={{ fontSize: '9px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: '2px 6px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>TOTAL RETURN</span>
+                            </div>
                             <div className={`summary-value ${stats.totalReturn >= 0 ? 'positive' : 'negative'}`}>
                                 {stats.totalReturn >= 0 ? '+' : ''}{stats.totalReturn.toFixed(2)}%
                             </div>
-                            <div className="summary-subtext">Return for selected period</div>
+                            <div className="summary-subtext">Price appreciation + dividends</div>
                         </div>
 
                         <div className="summary-card">

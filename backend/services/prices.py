@@ -99,7 +99,8 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         for date, row in hist.iterrows():
             new_prices.append({
                 "date": date.strftime("%Y-%m-%d"),
-                "price": round(float(row['Close']), 2)
+                "price": round(float(row['Close']), 2),
+                "dividends": round(float(row.get('Dividends', 0)), 4)
             })
         
         # 3. Save to DB for next time

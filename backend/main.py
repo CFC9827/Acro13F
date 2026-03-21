@@ -84,6 +84,14 @@ async def update_config(config: Dict[str, str]):
 async def get_funds():
     return db.get_funds()
 
+@api.get("/search")
+async def global_search(q: str):
+    """Global search for funds and tickers."""
+    try:
+        return db.search_all(q)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api.post("/funds/reorder")
 async def reorder_funds(orders: Dict[str, int]):
     try:
