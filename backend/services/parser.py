@@ -62,13 +62,35 @@ class InfTableParser:
                 "put_call": put_call  # Guaranteed uppercase if present
             })
 
-        # SEC 13F values are ALWAYS reported in thousands of dollars.
-        # We convert to actual dollars for consistent storage.
+        # SEC 13F values are GENERALLY reported in thousands of dollars.
+        # However, some funds report in actual dollars. We use a robust median-based 
+        # heuristic to detect the correct scale, ignoring extreme outliers like Berkshire.
         
+        test_prices = []
+        for h in raw_holdings:
+            if h['shares'] > 0:
+                raw_p = h['raw_value'] / h['shares']
+                # Ignore ultra-penny or ultra-high prices for the scale test
+                if 0.0001 < raw_p < 10000:
+                    test_prices.append(raw_p)
+        
+        should_scale = True
+        if test_prices:
+            test_prices.sort()
+            median_raw_price = test_prices[len(test_prices)//2]
+            
+            # If the median stock price is > $2.00, it's almost certainly already in dollars.
+            # (If it were in thousands, a $50 stock would show as $0.05).
+            if median_raw_price > 2.0:
+                should_scale = False
+                logging.info(f"SMART SCALING: Detected values already in dollars (median raw price ${median_raw_price:.2f}).")
+            else:
+                logging.info(f"SMART SCALING: Detected values in thousands (median raw price ${median_raw_price:.4f}). Applying 1000x multiplier.")
+
         holdings = []
         for h in raw_holdings:
             final_h = h.copy()
-            final_h['value'] = h['raw_value'] * 1000  # Convert from thousands to dollars
+            final_h['value'] = h['raw_value'] * 1000 if should_scale else h['raw_value']
             del final_h['raw_value']
             holdings.append(final_h)
         

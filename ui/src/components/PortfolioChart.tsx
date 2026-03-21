@@ -927,14 +927,17 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                                         dataKey="date"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#94a3b8', fontSize: 10 }}
+                                        tick={{ fill: '#94a3b8', fontSize: 9 }}
                                         tickFormatter={(val) => {
                                             const d = new Date(val);
                                             const q = Math.floor(d.getMonth() / 3) + 1;
                                             const year = d.getFullYear().toString().slice(2);
-                                            return `Q${q} '${year}`;
+                                            return `Q${q}'${year}`;
                                         }}
-                                        minTickGap={20}
+                                        // Force EVERY tick to show regardless of gap
+                                        interval={0}
+                                        minTickGap={0}
+                                        ticks={chartData.map(d => d.date)}
                                     />
                                     <YAxis
                                         axisLine={false}

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, APIRouter
+from fastapi import FastAPI, HTTPException, Request, APIRouter, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -181,15 +181,47 @@ async def get_history(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@api.post("/funds/{cik}/refresh")
-async def refresh_fund(cik: str, limit: int = None, force_all: bool = False):
+def background_sync_task(cik: str, limit: int = None, force_all: bool = False, backfill: bool = False):
+    """Worker function for background synchronization."""
     try:
-        # Dynamic refresh: Automatically detects news vs existing.
-        # If limit is explicitly provided, we assume the user wants to fetch *older* history (backfill),
-        # so we disable the "caught up" optimization.
-        backfill = limit is not None
+        db.update_sync_status(cik, "processing")
         result = orch.process_fund(cik, limit=limit, force_refresh_all=force_all, backfill=backfill)
-        return result
+        db.update_sync_status(cik, "completed", newly_added=len(result.get("newly_added", [])))
+    except Exception as e:
+        import logging
+        logging.error(f"Background sync failed for {cik}: {e}")
+        db.update_sync_status(cik, "failed", error=str(e))
+
+@api.post("/funds/{cik}/refresh")
+async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False):
+    try:
+        # Check if already processing
+        status = db.get_sync_status(cik)
+        if status and status.get("status") == "processing":
+            return {"status": "already_processing", "message": "Sync is already in progress for this fund."}
+
+        backfill = limit is not None
+        db.update_sync_status(cik, "pending")
+        background_tasks.add_task(background_sync_task, cik, limit, force_all, backfill)
+        
+        return {"status": "accepted", "message": "Sync started in background."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api.get("/funds/{cik}/sync-status")
+async def get_sync_status(cik: str):
+    """Returns the current background sync status for a fund."""
+    status = db.get_sync_status(cik)
+    if not status:
+        return {"status": "not_started"}
+    return status
+
+@api.get("/funds/{cik}/sector-attribution")
+async def get_sector_attribution(cik: str):
+    """Returns sector-level portfolio weighting and shifts over time."""
+    try:
+        attribution = db.get_sector_attribution(cik)
+        return attribution
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

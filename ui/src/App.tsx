@@ -288,40 +288,69 @@ function App() {
         }
     }
 
+    const pollSyncStatus = async (cik: string): Promise<any> => {
+        return new Promise((resolve, reject) => {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/funds/${cik}/sync-status`)
+                    if (res.ok) {
+                        const status = await res.json()
+                        if (status.status === 'completed') {
+                            clearInterval(interval)
+                            resolve(status)
+                        } else if (status.status === 'failed') {
+                            clearInterval(interval)
+                            reject(new Error(status.error_message || "Sync failed"))
+                        } else if (status.status === 'processing') {
+                            setLoadingMessage("SEC Data found. Parsing filings and mapping tickers...")
+                        }
+                    }
+                } catch (err) {
+                    clearInterval(interval)
+                    reject(err)
+                }
+            }, 2000)
+        })
+    }
+
     const handleRefresh = async (cikToAdd?: string) => {
         const cik = cikToAdd || refreshCik;
         if (!cik) return
         setLoading(true)
         setIsAddingFund(true)
-        setLoadingMessage("Syncing fund data from SEC EDGAR...")
+        setLoadingMessage("Initializing background sync with SEC EDGAR...")
         setError(null)
         setNotification(null)
         try {
-            // New fund: Orchestrator automatically detects and pulls history.
             const res = await fetch(`/api/funds/${cik}/refresh`, { method: 'POST' })
             if (res.ok) {
-                const result = await res.json()
-                const addedCount = result.newly_added?.length || 0
+                const initResult = await res.json()
+                
+                // If it was already completed or just started, we poll for the final result
+                setLoadingMessage("Waiting for SEC response...")
+                const result = await pollSyncStatus(cik)
+                
+                const addedCount = result.newly_added_count || 0
                 setRefreshCik('')
                 await fetchFunds()
-                navigate('summary', result.cik || refreshCik)
-                let msg = `Successfully added ${result.fund_name}. ${addedCount} historical filings processed.`
-                const skippedLegacy = result.skipped_legacy || 0
-                if (skippedLegacy > 0) {
-                    const start = result.skipped_legacy_start ? formatQ(result.skipped_legacy_start) : '';
-                    const end = result.skipped_legacy_end ? formatQ(result.skipped_legacy_end) : '';
-                    msg += ` Note: ${skippedLegacy} more (${start} - ${end}) were legacy format and skipped.`
+                
+                // After sync, we need to refresh the UI data if this was the selected fund
+                if (selectedCik === cik) {
+                    await handleCurrentRefresh(true) // skip the initial post
                 }
+
                 setNotification({
-                    message: msg,
+                    message: `Successfully synced fund. ${addedCount} filings processed.`,
                     type: 'success'
                 })
+                
+                if (cikToAdd) navigate('summary', cik)
             } else {
                 const errData = await res.json()
-                setError(errData.detail || "Failed to add fund")
+                setError(errData.detail || "Failed to start sync")
             }
-        } catch (err) {
-            setError("Network error adding fund")
+        } catch (err: any) {
+            setError(err.message || "Network error adding fund")
         } finally {
             setLoading(false)
             setLoadingMessage("")
@@ -329,61 +358,49 @@ function App() {
         }
     }
 
-    const handleCurrentRefresh = async () => {
+    const handleCurrentRefresh = async (skipPost = false) => {
         if (!selectedCik) return
         setLoading(true)
         setLoadingMessage("Checking for new filings and updates...")
         setError(null)
         setNotification(null)
         try {
-            // Refreshing existing: Automatic point-in-time sync.
-            const res = await fetch(`/api/funds/${selectedCik}/refresh`, { method: 'POST' })
-            if (res.ok) {
-                const result = await res.json()
-                const addedCount = result.newly_added?.length || 0
-                const verifiedCount = result.verified_count || 0
-
-                const p1 = fetch(`/api/funds/${selectedCik}/holdings`)
-                    .then(res => res.json())
-                    .then(data => setHoldings(data))
-
-                const p2 = fetch(`/api/funds/${selectedCik}/history`)
-                    .then(res => res.json())
-                    .then(data => setHistory(data))
-
-                const p3 = fetch(`/api/funds/${selectedCik}/filing-range`)
-                    .then(res => res.json())
-                    .then(data => setFilingRange(data))
-
-                await Promise.all([p1, p2, p3])
-
-                const skippedLegacy = result.skipped_legacy || 0
-
-                let msg = "";
-                if (addedCount > 0) {
-                    msg = `Sync complete: Added ${addedCount} new filing(s).`
-                } else if (verifiedCount > 0) {
-                    msg = `Everything up to date! Verified last ${verifiedCount} filings.`
+            if (!skipPost) {
+                const res = await fetch(`/api/funds/${selectedCik}/refresh`, { method: 'POST' })
+                if (res.ok) {
+                    setLoadingMessage("Syncing in progress...")
+                    await pollSyncStatus(selectedCik)
                 } else {
-                    msg = "Sync complete! No new filings found."
+                    const errData = await res.json()
+                    setError(errData.detail || "Failed to refresh fund")
+                    setLoading(false)
+                    return
                 }
+            }
 
-                if (skippedLegacy > 0) {
-                    const start = result.skipped_legacy_start ? formatQ(result.skipped_legacy_start) : '';
-                    const end = result.skipped_legacy_end ? formatQ(result.skipped_legacy_end) : '';
-                    msg += ` Skipped ${skippedLegacy} legacy filings (${start} - ${end}).`
-                }
+            // After sync (either skipped or completed), fetch fresh data
+            const p1 = fetch(`/api/funds/${selectedCik}/holdings`)
+                .then(res => res.json())
+                .then(data => setHoldings(data))
 
+            const p2 = fetch(`/api/funds/${selectedCik}/history`)
+                .then(res => res.json())
+                .then(data => setHistory(data))
+
+            const p3 = fetch(`/api/funds/${selectedCik}/filing-range`)
+                .then(res => res.json())
+                .then(data => setFilingRange(data))
+
+            await Promise.all([p1, p2, p3])
+
+            if (!skipPost) {
                 setNotification({
-                    message: msg,
+                    message: "Sync complete! Data updated.",
                     type: 'success'
                 })
-            } else {
-                const errData = await res.json()
-                setError(errData.detail || "Failed to refresh fund")
             }
-        } catch (err) {
-            setError("Network error refreshing fund")
+        } catch (err: any) {
+            setError(err.message || "Network error refreshing fund")
         } finally {
             setLoading(false)
             setLoadingMessage("")
@@ -429,24 +446,19 @@ function App() {
                 setLoadingMessage(`Refreshing ${fund.name} (${totalProcessed + 1}/${funds.length})...`)
                 const res = await fetch(`/api/funds/${fund.cik}/refresh`, { method: 'POST' })
                 if (res.ok) {
-                    const result = await res.json()
-                    if ((result.newly_added?.length || 0) > 0) {
-                        updatedCount++
-                    }
+                    await pollSyncStatus(fund.cik)
+                    updatedCount++
                 }
                 totalProcessed++
             }
 
             // Reload the currently selected fund's data if it exists
             if (selectedCik) {
-                const p1 = fetch(`/api/funds/${selectedCik}/holdings`).then(res => res.json()).then(data => setHoldings(data))
-                const p2 = fetch(`/api/funds/${selectedCik}/history`).then(res => res.json()).then(data => setHistory(data))
-                const p3 = fetch(`/api/funds/${selectedCik}/filing-range`).then(res => res.json()).then(data => setFilingRange(data))
-                await Promise.all([p1, p2, p3])
+                await handleCurrentRefresh(true)
             }
 
             setNotification({
-                message: `Refresh complete. Scanned ${totalProcessed} funds. ${updatedCount > 0 ? `Updated ${updatedCount} funds with new filings.` : 'No new filings found.'}`,
+                message: `Refresh complete. Scanned ${totalProcessed} funds.`,
                 type: 'success'
             })
 

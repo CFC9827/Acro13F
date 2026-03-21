@@ -56,8 +56,10 @@ class Orchestrator:
                     
                     # Stop if we hit a wall of existing filings (caught up)
                     # BUT if backfill=True (explicit limit provided), we keep scanning to find older gaps.
-                    if not is_new and not backfill and consecutive_skips >= 4:
-                        logging.info("Caught up with existing history.")
+                    # Optimization: For regular sync, 2 consecutive matches is usually enough to know we are caught up.
+                    stop_threshold = 2 if not is_new and not backfill else 4
+                    if consecutive_skips >= stop_threshold:
+                        logging.info(f"Caught up with existing history after {consecutive_skips} matches.")
                         break
                         
                     if count >= limit:

@@ -1195,12 +1195,12 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const [searchTerm, setSearchTerm] = useState('');
     const [sortField, setSortField] = useState<SortField>('value');
     const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-    const [currentPage, setCurrentPage] = useState(1);
     const [quarterIndex, setQuarterIndex] = useState(0); // 0 = latest
     const [showQuarterDropdown, setShowQuarterDropdown] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
-    const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [itemsToShow, setItemsToShow] = useState(40);
+    const observerTarget = useRef<HTMLDivElement>(null);
 
     // 1. Extract unique sorted quarters
     const sortedQuarters = useMemo(() => {
@@ -1473,8 +1473,6 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
         });
     }, [currentQuarterData, soldOffPositions, searchTerm, sortField, sortDirection, allTickerStats]);
 
-    const totalPages = Math.ceil(processedData.length / itemsPerPage);
-
     // Metrics for the currently expanded ticker
     const expandedMetrics = useMemo(() => {
         if (!expandedTicker) return null;
@@ -1689,10 +1687,32 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
 
 
 
-    const paginatedData = processedData.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+    // Infinite Scroll Intersection Observer
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            entries => {
+                if (entries[0].isIntersecting && itemsToShow < processedData.length) {
+                    setItemsToShow(prev => prev + 40);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (observerTarget.current) {
+            observer.observe(observerTarget.current);
+        }
+
+        return () => observer.disconnect();
+    }, [processedData.length, itemsToShow]);
+
+    // Reset visible items when quarter or search changes
+    useEffect(() => {
+        setItemsToShow(40);
+    }, [quarterIndex, searchTerm, sortField, sortDirection]);
+
+    const paginatedData = useMemo(() => {
+        return processedData.slice(0, itemsToShow);
+    }, [processedData, itemsToShow]);
 
     const handleSort = (field: SortField) => {
         if (sortField === field) {
@@ -1746,7 +1766,6 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                             value={searchTerm}
                             onChange={(e) => {
                                 setSearchTerm(e.target.value);
-                                setCurrentPage(1);
                             }}
                             className="table-search-input"
                         />
@@ -2722,48 +2741,29 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                         )}
                     </tbody>
                 </table>
+
+                {/* Infinite Scroll Trigger */}
+                <div ref={observerTarget} style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {itemsToShow < processedData.length && (
+                        <div style={{ color: '#64748b', fontSize: '12px', fontStyle: 'italic' }}>
+                            Scroll for more holdings...
+                        </div>
+                    )}
+                </div>
             </div >
 
-            <div className="pagination-controls-container">
-                <div className="rows-selector">
-                    <span>Show</span>
-                    <select
-                        value={itemsPerPage === processedData.length ? 'all' : itemsPerPage}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            const newSize = val === 'all' ? processedData.length : parseInt(val);
-                            setItemsPerPage(newSize);
-                            setCurrentPage(1); // Reset to first page when changing size
-                        }}
-                        className="rows-select"
-                    >
-                        <option value={25}>25</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                        <option value="all">All</option>
-                    </select>
-                    <span>entries</span>
+            <div className="table-footer" style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ color: '#94a3b8', fontSize: '12px' }}>
+                    Showing <strong>{Math.min(itemsToShow, processedData.length)}</strong> of <strong>{processedData.length}</strong> positions
                 </div>
-
-                <div className="pagination-controls">
-                    <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="pagination-btn"
+                {itemsToShow < processedData.length && (
+                    <button 
+                        onClick={() => setItemsToShow(prev => prev + 100)}
+                        style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '4px 12px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
                     >
-                        <ChevronLeft size={16} />
+                        Load All Remaining
                     </button>
-                    <span className="page-info">
-                        Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="pagination-btn"
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
+                )}
             </div>
 
             <CsvExportModal
