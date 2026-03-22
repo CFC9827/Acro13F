@@ -1,5 +1,5 @@
 from typing import List, Dict
-from .database import DatabaseManager
+from backend.services.database import DatabaseManager
 
 class SummaryEngine:
     def __init__(self, db: DatabaseManager):

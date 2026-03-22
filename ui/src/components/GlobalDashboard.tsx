@@ -625,9 +625,15 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
     const aumChangePercent = kpis && kpis.prior_aum > 0 ? ((aumChange / kpis.prior_aum) * 100).toFixed(1) : '0';
+    
     const crowding = summary.crowding_signals;
+    const mostHeld = crowding?.most_held || [];
+    const gainingFunds = crowding?.gaining_funds || [];
+    const losingFunds = crowding?.losing_funds || [];
+
     const newPositions = summary.new_positions || [];
     const exitedPositions = summary.exited_positions || [];
+    const bigMovers = summary.big_movers || [];
     const tickerActivity = summary.ticker_fund_activity || {};
     const fundHighlights = summary.fund_highlights || [];
     const sortedFundsByAUM = [...fundHighlights].sort((a, b) => b.total_value - a.total_value);
@@ -1288,7 +1294,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                                 {!isFundSummariesMinimized && (
                                     <div className="fund-highlights-grid">
-                                        {summary.fund_highlights.map((fund) => (
+                                        {fundHighlights.map((fund) => (
                                             <div
                                                 key={fund.cik}
                                                 className="fund-summary-card"
@@ -1408,7 +1414,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 </div>
 
                                 <div className="movers-list scrollable">
-                                    {[...summary.big_movers]
+                                    {[...bigMovers]
                                         .sort((a, b) => {
                                             if (moversMode === 'percent') {
                                                 return Math.abs(b.pct_of_fund || 0) - Math.abs(a.pct_of_fund || 0);
@@ -1492,7 +1498,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             </section>
 
                             {/* Crowding Signals */}
-                            {crowding && (crowding.most_held.length > 0 || crowding.gaining_funds.length > 0) && (
+                            {crowding && (mostHeld.length > 0 || gainingFunds.length > 0) && (
                                 <section className="dashboard-section compact">
                                     <div className="section-header">
                                         <Users className="section-icon-small" />
@@ -1502,11 +1508,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         </div>
                                     </div>
 
-                                    {crowding.most_held.length > 0 && (
+                                    {mostHeld.length > 0 && (
                                         <div className="crowding-subsection">
                                             <div className="crowding-label">Most Widely Held</div>
                                             <div className="crowding-list">
-                                                {crowding.most_held.slice(0, 3).map((item, i) => {
+                                                {mostHeld.slice(0, 3).map((item, i) => {
                                                     const itemTicker = item.ticker || item.issuer_name;
                                                     return (
                                                         <div key={i} className="crowding-item">
@@ -1537,11 +1543,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
 
 
-                                    {crowding.gaining_funds.length > 0 && (
+                                    {gainingFunds.length > 0 && (
                                         <div className="crowding-subsection">
                                             <div className="crowding-label">↑ Fund Count</div>
                                             <div className="crowding-list">
-                                                {crowding.gaining_funds.slice(0, 3).map((item, i) => (
+                                                {gainingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span className="crowding-change positive">+{item.change}</span>
@@ -1551,11 +1557,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         </div>
                                     )}
 
-                                    {crowding.losing_funds.length > 0 && (
+                                    {losingFunds.length > 0 && (
                                         <div className="crowding-subsection">
                                             <div className="crowding-label">↓ Fund Count</div>
                                             <div className="crowding-list">
-                                                {crowding.losing_funds.slice(0, 3).map((item, i) => (
+                                                {losingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span className="crowding-change negative">{item.change}</span>

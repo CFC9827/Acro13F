@@ -1,5 +1,5 @@
-from services.database import DatabaseManager
-from services.cusip_mapper import CUSIPMapper
+from backend.services.database import DatabaseManager
+from backend.services.cusip_mapper import CUSIPMapper
 import logging
 
 def backfill_tickers():

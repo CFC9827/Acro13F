@@ -5,7 +5,7 @@ import io
 import csv
 from datetime import datetime
 from typing import List, Dict, Optional
-from .database import DatabaseManager
+from backend.services.database import DatabaseManager
 
 class BulkIngestor:
     BASE_URL = "https://www.sec.gov/files/dera/data/form-13f-data-sets"
@@ -116,7 +116,7 @@ class BulkIngestor:
             self.db.save_holdings(acc, holdings)
 
 if __name__ == "__main__":
-    from .database import DatabaseManager
+    from backend.services.database import DatabaseManager
     db = DatabaseManager()
     ingestor = BulkIngestor(db)
     # Test with a recent quarter

@@ -4,8 +4,8 @@ import os
 # Add current directory to path
 sys.path.append(os.getcwd())
 
-from services.database import DatabaseManager
-from services.mimic_performance import MimicPerformanceCalculator
+from backend.services.database import DatabaseManager
+from backend.services.mimic_performance import MimicPerformanceCalculator
 import json
 
 def test_dorsey():

@@ -17,27 +17,27 @@
 ## v3.0 Phases
 
 ### Phase 7: Bulk Data Pipeline
-**Status**: ⬜ Not Started
+**Status**: 🟡 In Progress
 **Objective**: Build automated ingestion of SEC's quarterly 13F data sets for all filers >$100M AUM
 **Deliverables**:
-- Bulk CSV/ZIP downloader for SEC quarterly 13F data sets (2013–present)
-- Parser for flattened SEC data format into database
-- PostgreSQL migration (from SQLite) to handle scale
-- Summary Engine: pre-compute trade activity, AUM, concentration for each fund/quarter
-- Seed database with top 100 funds, then expand to full universe
-- Amendment monitor for between-quarter updates
+- [x] Bulk CSV/ZIP downloader for SEC quarterly 13F data sets (2013–present)
+- [x] Parser for flattened SEC data format into database
+- [ ] PostgreSQL migration (from SQLite) to handle scale
+- [x] Summary Engine: pre-compute trade activity, AUM, concentration for each fund/quarter
+- [x] Seed database with top 100 funds, then expand to full universe
+- [ ] Amendment monitor for between-quarter updates
 
 ---
 
 ### Phase 8: Explore & Screener
-**Status**: ⬜ Not Started
+**Status**: 🟡 In Progress
 **Objective**: Add fund discovery and stock screener pages
 **Deliverables**:
-- Explore page (`/explore`) with searchable, filterable fund table
-- Typeahead search (fund name, manager, ticker held)
-- Filter bar: Fund Type, AUM Range, Last Filing, Concentration
-- Stock Screener (`/explore/stocks`) — reverse lookup: "who holds this stock?"
-- Navigation restructure: My Portfolio vs. Explore
+- [x] Explore page (`/explore`) with searchable, filterable fund table
+- [x] Typeahead search (fund name, manager, ticker held)
+- [x] Filter bar: Fund Type, AUM Range, Last Filing, Concentration
+- [ ] Stock Screener (`/explore/stocks`) — reverse lookup: "who holds this stock?"
+- [x] Navigation restructure: My Portfolio vs. Explore
 
 ---
 

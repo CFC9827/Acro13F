@@ -4,7 +4,7 @@ import sys
 import tempfile
 # Ensure the backend directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.database import DatabaseManager
+from backend.services.database import DatabaseManager
 
 def test_fund_quarterly_stats_schema():
     """Verify that fund_quarterly_stats table is created and supports save_quarterly_stats."""

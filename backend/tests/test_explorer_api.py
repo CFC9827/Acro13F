@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 
 # Ensure the backend directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from main import app
-from services.database import DatabaseManager
+from backend.main import app
+from backend.services.database import DatabaseManager
 
 @pytest.fixture
 def client():
@@ -16,7 +16,7 @@ def client():
         db_path = tmp.name
     
     # Overwrite the global db in main.py for testing
-    import main
+    import backend.main as main
     main.db = DatabaseManager(db_path=db_path)
     
     yield TestClient(app)
@@ -28,7 +28,7 @@ def test_explorer_search_endpoint(client):
     """Test the /api/explorer/search endpoint with various filters."""
     # 1. Seed some data
     main_db = client.app.dependency_overrides.get(None, None) # Not using DI yet, accessing via main.db
-    import main
+    import backend.main as main
     db = main.db
     
     # Berkshire

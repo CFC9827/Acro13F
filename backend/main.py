@@ -5,13 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 load_dotenv()
 from typing import List, Dict
-from services.database import DatabaseManager
-from services.orchestrator import Orchestrator
-from services.benchmark import get_benchmark_data
-from services.prices import get_historical_prices
-from services.mimic_performance import MimicPerformanceCalculator
-from services.sector_mapper import SectorMapper
-from services.sec_client import SECClient
+from backend.services.database import DatabaseManager
+from backend.services.orchestrator import Orchestrator
+from backend.services.benchmark import get_benchmark_data
+from backend.services.prices import get_historical_prices
+from backend.services.mimic_performance import MimicPerformanceCalculator
+from backend.services.sector_mapper import SectorMapper
+from backend.services.sec_client import SECClient
 import os
 
 app = FastAPI(title="Stock Screener API")

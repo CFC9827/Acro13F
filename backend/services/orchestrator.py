@@ -1,7 +1,7 @@
-from services.sec_client import SECClient
-from services.parser import InfTableParser
-from services.database import DatabaseManager
-from services.cusip_mapper import CUSIPMapper
+from backend.services.sec_client import SECClient
+from backend.services.parser import InfTableParser
+from backend.services.database import DatabaseManager
+from backend.services.cusip_mapper import CUSIPMapper
 import logging
 
 class Orchestrator:

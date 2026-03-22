@@ -3,7 +3,7 @@ import logging
 import requests
 import os
 from datetime import datetime
-from services.database import DatabaseManager
+from backend.services.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 

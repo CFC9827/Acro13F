@@ -761,31 +761,40 @@ class DatabaseManager:
             "portfolio_turnover", "avg_holding_period", "herding_score"
         ]
 
+        where_clause = ""
+        
         for f in filters:
             metric = f.get("metric")
             op_key = f.get("op")
             val = f.get("val")
+            row_logic = f.get("logic", logic).upper()
+            if row_logic not in ["AND", "OR"]:
+                row_logic = "AND"
             
-            if metric not in valid_metrics or op_key not in op_map:
+            if metric not in valid_metrics or (op_key not in op_map and op_key != "between"):
                 continue
                 
-            op = op_map[op_key]
+            op = op_map.get(op_key, "")
             
+            part = ""
             if op_key == "contains":
-                query_parts.append(f"s.{metric} LIKE ?")
+                part = f"s.{metric} LIKE ?"
                 params.append(f"%{val}%")
             elif op_key == "between" and isinstance(val, list) and len(val) == 2:
-                query_parts.append(f"s.{metric} BETWEEN ? AND ?")
+                part = f"s.{metric} BETWEEN ? AND ?"
                 params.append(val[0])
                 params.append(val[1])
             else:
-                query_parts.append(f"s.{metric} {op} ?")
+                part = f"s.{metric} {op} ?"
                 params.append(val)
 
-        if not query_parts:
-            return []
+            if where_clause:
+                where_clause += f" {row_logic} {part}"
+            else:
+                where_clause = part
 
-        where_clause = f" {logic} ".join(query_parts)
+        if not where_clause:
+            return []
         
         # We only want to search the LATEST quarterly stats per fund for the screener
         query = f"""
@@ -1017,7 +1026,7 @@ class DatabaseManager:
         sorted_all_periods = sorted(list(all_periods))
         
         # Add Benchmark (SPY)
-        from services.benchmark import get_quarterly_benchmark
+        from backend.services.benchmark import get_quarterly_benchmark
         benchmark_data = []
         if sorted_all_periods:
             benchmark_raw = get_quarterly_benchmark(sorted_all_periods[0])

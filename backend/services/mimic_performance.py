@@ -1,9 +1,9 @@
 import logging
 from datetime import datetime
 from typing import List, Dict
-from .prices import get_historical_prices
-from .benchmark import get_benchmark_data
-from .cusip_mapper import CUSIPMapper
+from backend.services.prices import get_historical_prices
+from backend.services.benchmark import get_benchmark_data
+from backend.services.cusip_mapper import CUSIPMapper
 
 logger = logging.getLogger(__name__)
 

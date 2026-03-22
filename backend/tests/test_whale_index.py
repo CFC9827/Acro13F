@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 # Ensure the backend directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.database import DatabaseManager
-from services.whale_index import WhaleIndexService
+from backend.services.database import DatabaseManager
+from backend.services.whale_index import WhaleIndexService
 
 @pytest.fixture
 def db():
