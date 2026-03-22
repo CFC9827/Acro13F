@@ -135,6 +135,26 @@ class DatabaseManager:
                 error_message TEXT,
                 newly_added_count INTEGER DEFAULT 0
             )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS fund_quarterly_stats (
+                cik TEXT,
+                period_of_report TEXT,
+                accession_number TEXT,
+                total_aum BIGINT,
+                position_count INTEGER,
+                top_10_concentration REAL,
+                avg_position_size REAL,
+                primary_sector TEXT,
+                primary_sector_weight REAL,
+                mega_cap_pct REAL,
+                mid_cap_pct REAL,
+                small_cap_pct REAL,
+                portfolio_turnover REAL,
+                avg_holding_period REAL,
+                herding_score REAL,
+                PRIMARY KEY (cik, period_of_report)
+            );
             """
         ]
 
@@ -143,7 +163,8 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_filings_cik ON filings(cik)",
             "CREATE INDEX IF NOT EXISTS idx_holdings_accession ON holdings(accession_number)",
             "CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)",
-            "CREATE INDEX IF NOT EXISTS idx_prices_ticker_date ON prices(ticker, date)"
+            "CREATE INDEX IF NOT EXISTS idx_prices_ticker_date ON prices(ticker, date)",
+            "CREATE INDEX IF NOT EXISTS idx_stats_cik ON fund_quarterly_stats(cik)"
         ]
         
         conn = self._get_connection()
@@ -575,6 +596,7 @@ class DatabaseManager:
                     summary["big_movers"].append({
                         "fund_name": fund['name'], "ticker": f"{h['ticker']} {h['put_call']}" if h.get('put_call') else h['ticker'],
                         "issuer_name": h['issuer_name'], "val_change": h['value'] - (prev_h['value'] if prev_h else 0),
+                        "shares_change": h['shares'] - (prev_h['shares'] if prev_h else 0),
                         "pct_of_fund": w_delta, "curr_weight": curr_w, "shares": h['shares'], "value": h['value']
                     })
 
@@ -665,6 +687,37 @@ class DatabaseManager:
     def get_sync_status(self, cik: str) -> Optional[Dict]:
         cik = self.normalize_cik(cik)
         return self._execute("SELECT * FROM sync_status WHERE cik = ?", (cik,), fetch='one')
+
+    def save_quarterly_stats(self, stats: Dict):
+        """Persist or update quarterly summary statistics for a fund."""
+        cik = self.normalize_cik(stats["cik"])
+        
+        fields = [
+            "cik", "period_of_report", "accession_number", "total_aum", 
+            "position_count", "top_10_concentration", "avg_position_size", 
+            "primary_sector", "primary_sector_weight", "mega_cap_pct", 
+            "mid_cap_pct", "small_cap_pct", "portfolio_turnover", 
+            "avg_holding_period", "herding_score"
+        ]
+        
+        placeholders = ", ".join(["?" for _ in fields])
+        columns = ", ".join(fields)
+        
+        if self.is_postgres:
+            update_clause = ", ".join([f"{f} = EXCLUDED.{f}" for f in fields if f not in ["cik", "period_of_report"]])
+            query = f"""
+                INSERT INTO fund_quarterly_stats ({columns})
+                VALUES ({placeholders})
+                ON CONFLICT (cik, period_of_report) DO UPDATE SET {update_clause}
+            """
+        else:
+            query = f"INSERT OR REPLACE INTO fund_quarterly_stats ({columns}) VALUES ({placeholders})"
+            
+        params = tuple(stats.get(f) for f in fields)
+        # Ensure CIK is normalized in params
+        params = (cik,) + params[1:]
+        
+        self._execute(query, params)
 
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""
