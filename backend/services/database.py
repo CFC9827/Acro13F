@@ -719,6 +719,91 @@ class DatabaseManager:
         
         self._execute(query, params)
 
+    def search_explorer(self, criteria: Dict) -> List[Dict]:
+        """
+        Executes a complex multi-factor search for the Institutional Explorer.
+        Criteria example: {"logic": "AND", "filters": [{"metric": "total_aum", "op": "gt", "val": 1000000000}]}
+        """
+        logic = criteria.get("logic", "AND").upper()
+        if logic not in ["AND", "OR"]:
+            logic = "AND"
+            
+        filters = criteria.get("filters", [])
+        if not filters:
+            # Return latest stats for all funds if no filters
+            return self._execute("""
+                SELECT f.name, f.cik, s.*
+                FROM fund_quarterly_stats s
+                JOIN funds f ON s.cik = f.cik
+                WHERE s.period_of_report = (SELECT MAX(period_of_report) FROM fund_quarterly_stats)
+                ORDER BY s.total_aum DESC
+                LIMIT 100
+            """, fetch='all')
+
+        query_parts = []
+        params = []
+        
+        op_map = {
+            "gt": ">",
+            "lt": "<",
+            "ge": ">=",
+            "le": "<=",
+            "eq": "=",
+            "ne": "!=",
+            "contains": "LIKE"
+        }
+
+        # Valid columns to prevent SQL injection
+        valid_metrics = [
+            "total_aum", "position_count", "top_10_concentration", 
+            "avg_position_size", "primary_sector", "primary_sector_weight", 
+            "mega_cap_pct", "mid_cap_pct", "small_cap_pct", 
+            "portfolio_turnover", "avg_holding_period", "herding_score"
+        ]
+
+        for f in filters:
+            metric = f.get("metric")
+            op_key = f.get("op")
+            val = f.get("val")
+            
+            if metric not in valid_metrics or op_key not in op_map:
+                continue
+                
+            op = op_map[op_key]
+            
+            if op_key == "contains":
+                query_parts.append(f"s.{metric} LIKE ?")
+                params.append(f"%{val}%")
+            elif op_key == "between" and isinstance(val, list) and len(val) == 2:
+                query_parts.append(f"s.{metric} BETWEEN ? AND ?")
+                params.append(val[0])
+                params.append(val[1])
+            else:
+                query_parts.append(f"s.{metric} {op} ?")
+                params.append(val)
+
+        if not query_parts:
+            return []
+
+        where_clause = f" {logic} ".join(query_parts)
+        
+        # We only want to search the LATEST quarterly stats per fund for the screener
+        query = f"""
+            SELECT f.name, f.cik, s.*
+            FROM fund_quarterly_stats s
+            JOIN funds f ON s.cik = f.cik
+            WHERE ({where_clause})
+            AND s.period_of_report = (
+                SELECT MAX(period_of_report) 
+                FROM fund_quarterly_stats s2 
+                WHERE s2.cik = s.cik
+            )
+            ORDER BY s.total_aum DESC
+            LIMIT 200
+        """
+        
+        return self._execute(query, tuple(params), fetch='all')
+
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""
         query = query.strip().upper()

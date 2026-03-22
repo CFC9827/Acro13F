@@ -267,6 +267,15 @@ async def get_ticker_prices(ticker: str, start: str = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@api.post("/explorer/search")
+async def explorer_search(criteria: Dict):
+    """Screener endpoint for multi-factor range search."""
+    try:
+        results = db.search_explorer(criteria)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api.post("/sectors/update")
 async def update_sectors():
     """Backfill sector data for all holdings that are missing sectors."""
