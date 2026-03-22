@@ -9,6 +9,7 @@ import { GlobalDashboard } from './components/GlobalDashboard'
 import { FundSummary } from './components/FundSummary'
 import { CommandPalette } from './components/CommandPalette'
 import { AboutPage } from './components/AboutPage'
+import { InstitutionalExplorer } from './components/InstitutionalExplorer'
 import { SplashScreen } from './components/SplashScreen'
 import { CikSearchModal } from './components/CikSearchModal'
 import { ActivityView } from './components/ActivityView'
@@ -17,7 +18,7 @@ import { calculateIRR } from './utils/performanceUtils'
 import { MimicPerformanceChart } from './components/MimicPerformanceChart'
 
 // Type for view states
-type ViewType = 'table' | 'chart' | 'performance' | 'mimic' | 'about' | 'dashboard' | 'summary' | 'activity';
+type ViewType = 'table' | 'chart' | 'performance' | 'mimic' | 'about' | 'dashboard' | 'summary' | 'activity' | 'explorer';
 
 // Parse URL path to extract view and CIK
 function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } {
@@ -29,6 +30,10 @@ function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } 
 
     if (segments[0] === 'about') {
         return { view: 'about', cik: null };
+    }
+
+    if (segments[0] === 'explorer') {
+        return { view: 'explorer', cik: null };
     }
 
     if (segments[0] === 'fund' && segments[1]) {
@@ -47,6 +52,7 @@ function parseUrlPath(pathname: string): { view: ViewType; cik: string | null } 
 function buildUrlPath(view: ViewType, cik: string | null): string {
     if (view === 'dashboard') return '/';
     if (view === 'about') return '/about';
+    if (view === 'explorer') return '/explorer';
     if (cik) {
         if (view === 'summary') return `/fund/${cik}`;
         return `/fund/${cik}/${view}`;
@@ -755,6 +761,15 @@ function App() {
                                 {!sidebarCollapsed && <span>Global Overview</span>}
                             </button>
                             <button
+                                className={`dashboard-nav-btn ${view === 'explorer' ? 'active' : ''}`}
+                                onClick={() => {
+                                    navigate('explorer', null);
+                                }}
+                            >
+                                <Database size={18} />
+                                {!sidebarCollapsed && <span>Institutional Explorer</span>}
+                            </button>
+                            <button
                                 className="sidebar-toggle"
                                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -908,6 +923,8 @@ function App() {
                                 }}
                                 allFunds={funds}
                             />
+                        ) : view === 'explorer' ? (
+                            <InstitutionalExplorer onFollow={(cik) => navigate('summary', cik)} />
                         ) : selectedCik && view !== 'about' ? (
                             <div className="holdings-view">
                                 <div className="view-header">
