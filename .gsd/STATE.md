@@ -10,12 +10,11 @@
 
 ## Last Session Summary
 
-### Institutional Explorer Implementation
-- **Whale Ingestor:** Implemented `WhaleIndexService` to sync Top 2,000 funds from SEC.
-- **Pre-computation:** Added `fund_quarterly_stats` table to cache 15+ metrics for instant screening.
-- **Search API:** Implemented `search_explorer` with multi-factor range filtering.
-- **UI Integration:** Created `InstitutionalExplorer.tsx` and integrated it into `App.tsx` with sidebar navigation.
-- **Dashboard Maintenance:** Verified global dashboard summary API integrity.
+### Institutional Explorer & Fund Separation
+- **Fund Tracking Separation:** Implemented `is_tracked` column to separate user-selected funds from the "Whale Index" universe.
+- **Clean Dashboard:** Refactored `/api/funds` to only return tracked funds for the sidebar and global overview.
+- **Track/Download Action:** Added "Track Fund" button in Institutional Explorer to move funds from the indexed universe into the personal dashboard.
+- **Whale Ingestor:** Finalized bulk sync of top 2,000 funds while keeping them in the "indexed-only" state by default.
 
 ## Next Steps
 

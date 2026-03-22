@@ -75,7 +75,8 @@ class DatabaseManager:
             CREATE TABLE IF NOT EXISTS funds (
                 cik TEXT PRIMARY KEY,
                 name TEXT,
-                sort_order INTEGER DEFAULT 0
+                sort_order INTEGER DEFAULT 0,
+                is_tracked INTEGER DEFAULT 0
             )
             """,
             """
@@ -189,6 +190,13 @@ class DatabaseManager:
 
     def _migrate(self):
         """Handle migrations and data normalization."""
+        # 0. Add is_tracked column if missing
+        try:
+            self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
+        except Exception:
+            # Column already exists or other error (e.g. Postgres might need different check)
+            pass
+
         # 1. Normalize CIKs
         funds = self._execute("SELECT cik FROM funds", fetch='all')
         if funds:
@@ -206,15 +214,23 @@ class DatabaseManager:
             # SQLite specific check for column existence (handled in init_db for PG)
             self._execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
 
-    def save_fund(self, cik: str, name: str):
+    def save_fund(self, cik: str, name: str, is_tracked: int = 0):
         cik = self.normalize_cik(cik)
         if self.is_postgres:
             self._execute("""
-                INSERT INTO funds (cik, name) VALUES (?, ?)
-                ON CONFLICT (cik) DO UPDATE SET name = EXCLUDED.name
-            """, (cik, name))
+                INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)
+                ON CONFLICT (cik) DO UPDATE SET 
+                    name = EXCLUDED.name,
+                    is_tracked = CASE WHEN EXCLUDED.is_tracked = 1 THEN 1 ELSE funds.is_tracked END
+            """, (cik, name, is_tracked))
         else:
-            self._execute("INSERT OR REPLACE INTO funds (cik, name) VALUES (?, ?)", (cik, name))
+            # SQLite doesn't have a simple way to conditionally update without overwriting
+            exists = self._execute("SELECT is_tracked FROM funds WHERE cik = ?", (cik,), fetch='one')
+            if exists:
+                final_tracked = 1 if (is_tracked == 1 or exists['is_tracked'] == 1) else 0
+                self._execute("UPDATE funds SET name = ?, is_tracked = ? WHERE cik = ?", (name, final_tracked, cik))
+            else:
+                self._execute("INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)", (cik, name, is_tracked))
 
     def save_filing(self, accession_number: str, cik: str, period: str, date: str):
         cik = self.normalize_cik(cik)
@@ -280,8 +296,12 @@ class DatabaseManager:
                 count += 1
         return count
 
-    def get_funds(self) -> List[Dict]:
-        return self._execute("SELECT * FROM funds ORDER BY sort_order, name", fetch='all')
+    def get_funds(self, tracked_only: bool = True) -> List[Dict]:
+        query = "SELECT * FROM funds"
+        if tracked_only:
+            query += " WHERE is_tracked = 1"
+        query += " ORDER BY sort_order, name"
+        return self._execute(query, fetch='all')
 
     def reorder_funds(self, orders: Dict[str, int]):
         for cik, order in orders.items():

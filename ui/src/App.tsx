@@ -126,6 +126,10 @@ function App() {
     const navigate = (newView: ViewType, newCik: string | null = null) => {
         const path = buildUrlPath(newView, newCik);
         reactNavigate(path);
+        // Refresh tracked list on major navigation to ensure state is fresh
+        if (newView === 'dashboard' || newView === 'explorer' || newView === 'summary') {
+            fetchFunds(true);
+        }
     };
 
     const [funds, setFunds] = useState<Fund[]>([])
@@ -196,9 +200,9 @@ function App() {
         }
     }
 
-    const fetchFunds = async () => {
+    const fetchFunds = async (trackedOnly: boolean = true) => {
         try {
-            const res = await fetch('/api/funds')
+            const res = await fetch(`/api/funds?tracked_only=${trackedOnly}`)
             const data = await res.json()
             setFunds(data)
         } catch (err) {

@@ -29,6 +29,7 @@ interface FundStats {
     portfolio_turnover: number;
     avg_holding_period: number;
     herding_score: number;
+    is_tracked?: number;
     // Mock sparkline data for UI
     sparkline?: { value: number }[];
 }
@@ -77,6 +78,22 @@ export function InstitutionalExplorer({ onFollow }: InstitutionalExplorerProps) 
     const [loading, setLoading] = useState(false);
     const [syncingCik, setSyncingCik] = useState<string | null>(null);
     const [logic, setLogic] = useState<'AND' | 'OR'>('AND');
+
+    const toggleTrack = async (cik: string, currentStatus: boolean) => {
+        setSyncingCik(cik);
+        try {
+            const res = await fetch(`/api/funds/${cik}/track?track=${!currentStatus}`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                setResults(prev => prev.map(f => f.cik === cik ? { ...f, is_tracked: !currentStatus ? 1 : 0 } : f));
+            }
+        } catch (err) {
+            console.error("Failed to toggle track", err);
+        } finally {
+            setSyncingCik(null);
+        }
+    };
 
     const addFilter = () => {
         setFilters([...filters, { id: Math.random().toString(), logic: 'AND', metric: 'total_aum', op: 'gt', val: 1000000000 }]);
@@ -321,7 +338,7 @@ export function InstitutionalExplorer({ onFollow }: InstitutionalExplorerProps) 
                                         <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>AUM Trend</th>
                                         <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Scale</th>
                                         <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Focus</th>
-                                        <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Primary Alpha</th>
+                                        <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Status</th>
                                         <th style={{ padding: '20px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Analysis</th>
                                     </tr>
                                 </thead>
@@ -387,10 +404,38 @@ export function InstitutionalExplorer({ onFollow }: InstitutionalExplorerProps) 
                                                 </div>
                                             </td>
                                             <td style={{ padding: '24px 32px' }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <span style={{ color: '#f8fafc', fontSize: '14px', fontWeight: 600 }}>{fund.primary_sector}</span>
-                                                    <span style={{ color: '#475569', fontSize: '11px', fontWeight: 700, marginTop: '4px' }}>{fund.primary_sector_weight.toFixed(0)}% ALLOCATION</span>
-                                                </div>
+                                                <button 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleTrack(fund.cik, !!fund.is_tracked);
+                                                    }}
+                                                    disabled={syncingCik === fund.cik}
+                                                    style={{ 
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        padding: '6px 12px',
+                                                        borderRadius: '8px',
+                                                        fontSize: '11px',
+                                                        fontWeight: 700,
+                                                        background: fund.is_tracked ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)',
+                                                        color: fund.is_tracked ? '#4ade80' : '#94a3b8',
+                                                        border: `1px solid ${fund.is_tracked ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.05)'}`,
+                                                        cursor: syncingCik === fund.cik ? 'wait' : 'pointer',
+                                                        transition: 'all 0.2s',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.05em'
+                                                    }}
+                                                >
+                                                    {syncingCik === fund.cik ? (
+                                                        <Loader2 size={12} className="animate-spin" />
+                                                    ) : fund.is_tracked ? (
+                                                        <Check size={12} />
+                                                    ) : (
+                                                        <Plus size={12} />
+                                                    )}
+                                                    {fund.is_tracked ? 'Tracked' : 'Track Fund'}
+                                                </button>
                                             </td>
                                             <td style={{ padding: '24px 32px', textAlign: 'right' }}>
                                                 <button 

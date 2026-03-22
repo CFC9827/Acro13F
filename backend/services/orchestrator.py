@@ -29,7 +29,7 @@ class Orchestrator:
         
         data = self.client.get_submissions(cik)
         fund_name = data.get('name')
-        self.db.save_fund(cik, fund_name)
+        self.db.save_fund(cik, fund_name, is_tracked=1)
         
         filings = data.get('filings', {}).get('recent', {})
         count = 0

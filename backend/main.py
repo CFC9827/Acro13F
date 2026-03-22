@@ -81,8 +81,16 @@ async def update_config(config: Dict[str, str]):
 
 
 @api.get("/funds")
-async def get_funds():
-    return db.get_funds()
+async def get_funds(tracked_only: bool = True):
+    return db.get_funds(tracked_only=tracked_only)
+
+@api.post("/funds/{cik}/track")
+async def track_fund(cik: str, track: bool = True):
+    try:
+        db.save_fund(cik, "", is_tracked=1 if track else 0)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/search")
 async def global_search(q: str):
