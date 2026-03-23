@@ -72,3 +72,22 @@
 - Full pre-computation engine for instant page loads (<100ms target)
 - PostgreSQL migration required for scale
 
+---
+
+## 2026-03-22 — Discovery Hub & Premium UI Overhaul
+
+**Session Goal:** Unify fund and stock discovery into a professional "Institutional Hub" and resolve data pollution.
+
+**Accomplished:**
+- **Unified Discovery Explorer:** Created a single destination at `/explorer` with a high-fidelity tab switcher for Institutions vs. Stock Consensus.
+- **Stock Consensus (Reverse Lookup):** Built a ranking engine to show the most popular stocks across the institutional universe, including aggregate value and average weights.
+- **Advanced Query Engine:** Refactored the fund screener to support row-level AND/OR logic and smart contextual inputs (dropdowns for sectors, formatted numeric units).
+- **Fund Tracking Separation:** Implemented `is_tracked` field in database to keep the "Whale Index" (Top 2,000 funds) separate from the user's personal dashboard.
+- **Premium UX Overhaul:** Applied a high-end dark theme with glassmorphism, readable dropdown menus, and interactive focus states for all screener parameters.
+- **Whale Ingestion Expansion:** Started background sync for Top 100 hedge funds to populate the new discovery universe.
+
+**Key Decisions:**
+- Merged separate screener pages into one unified Hub to reduce navigation friction and simplify the sidebar.
+- Defaulted all Whale Index syncs to `is_tracked=0` to ensure the personal dashboard remains clean unless a fund is explicitly "followed".
+- Used native dropdowns with explicit dark-mode styling to fix browser-default white backgrounds that made text illegible.
+

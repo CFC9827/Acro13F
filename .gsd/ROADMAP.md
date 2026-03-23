@@ -30,14 +30,16 @@
 ---
 
 ### Phase 8: Explore & Screener
-**Status**: 🟡 In Progress
+**Status**: ✅ Completed
 **Objective**: Add fund discovery and stock screener pages
 **Deliverables**:
 - [x] Explore page (`/explore`) with searchable, filterable fund table
 - [x] Typeahead search (fund name, manager, ticker held)
 - [x] Filter bar: Fund Type, AUM Range, Last Filing, Concentration
-- [ ] Stock Screener (`/explore/stocks`) — reverse lookup: "who holds this stock?"
+- [x] Stock Screener (Reverse lookup) unified into Discovery Explorer
 - [x] Navigation restructure: My Portfolio vs. Explore
+- [x] Multi-factor logic (AND/OR) per-row in builder
+- [x] Premium UI overhaul (Glassmorphism, dark mode polish)
 
 ---
 

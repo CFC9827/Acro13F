@@ -5,22 +5,24 @@
 ## Current Position
 
 **Milestone:** v3.0 — Online 13F Platform
-**Phase:** 8 (Explore & Screener)
-**Status:** 🟡 In Progress — Institutional Explorer UI implemented, Whale Ingestor implemented, Search API active.
+**Phase:** 9 (Cloud Deployment)
+**Status:** 🟢 Ready for Deployment — Discovery Explorer unified, Stock Consensus live, Fund tracking separation finalized.
 
 ## Last Session Summary
 
-### Institutional Explorer & Fund Separation
-- **Fund Tracking Separation:** Implemented `is_tracked` column to separate user-selected funds from the "Whale Index" universe.
-- **Clean Dashboard:** Refactored `/api/funds` to only return tracked funds for the sidebar and global overview.
-- **Track/Download Action:** Added "Track Fund" button in Institutional Explorer to move funds from the indexed universe into the personal dashboard.
-- **Whale Ingestor:** Finalized bulk sync of top 2,000 funds while keeping them in the "indexed-only" state by default.
+### Discovery Explorer Unification & UX Overhaul
+- **Unified Hub:** Merged the Stock Screener and Institutional Explorer into a single "Discovery Explorer" with a high-fidelity tab switcher.
+- **Stock Consensus:** Implemented "Stock Consensus" tab showing most popular whale holdings by fund count and aggregate value.
+- **Advanced Query Builder:** Refactored fund screener to support row-level AND/OR logic and smart contextual inputs (e.g., sector dropdowns).
+- **Fund Tracking Fix:** Implemented `is_tracked` separation to prevent Whale Index syncs from polluting the personal dashboard.
+- **Premium UI:** Applied glassmorphism, dark-mode readable dropdowns, and high-fidelity focus glows to all screener inputs.
+- **Whale Ingestion:** Started background sync for Top 100 hedge funds to expand the discovery universe.
 
 ## Next Steps
 
-1. **Verify Dashboard Load:** Resolve "failed to load dashboard" error (likely backend connection issue).
-2. **Reverse Lookup:** Implement Stock Screener (`/explore/stocks`) to find which funds hold a specific ticker.
-3. **PostgreSQL Migration:** Migrate from SQLite to PostgreSQL for production scalability.
+1. **Who Holds This? Details:** Implement a modal in the Stock Consensus view to show specific holders for a selected ticker.
+2. **PostgreSQL Migration:** Move from SQLite to PostgreSQL to handle the expanding fund universe (Phase 7 tail-end).
+3. **Containerization:** Create Dockerfile for backend and frontend serving (Phase 9 initialization).
 
 ## Key Files for Context Restoration
 
