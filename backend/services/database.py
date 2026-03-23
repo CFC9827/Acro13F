@@ -742,17 +742,32 @@ class DatabaseManager:
     def search_explorer(self, criteria: Dict) -> List[Dict]:
         """
         Executes a complex multi-factor search for the Institutional Explorer.
-        Criteria example: {"logic": "AND", "filters": [{"metric": "total_aum", "op": "gt", "val": 1000000000}]}
+        Supports global logic (Match All/Any) and row-level logic (AND/OR).
         """
-        logic = criteria.get("logic", "AND").upper()
-        if logic not in ["AND", "OR"]:
-            logic = "AND"
+        global_logic = criteria.get("global_logic", "AND").upper()
+        if global_logic not in ["AND", "OR"]:
+            global_logic = "AND"
             
         filters = criteria.get("filters", [])
+        
+        # Valid columns to prevent SQL injection
+        valid_metrics = [
+            "total_aum", "position_count", "top_10_concentration", 
+            "avg_position_size", "primary_sector", "primary_sector_weight", 
+            "mega_cap_pct", "mid_cap_pct", "small_cap_pct", 
+            "portfolio_turnover", "avg_holding_period", "herding_score",
+            "holds_ticker"
+        ]
+
+        op_map = {
+            "gt": ">", "lt": "<", "ge": ">=", "le": "<=", 
+            "eq": "=", "ne": "!=", "contains": "LIKE", "not_contains": "NOT LIKE"
+        }
+
         if not filters:
             # Return latest stats for all funds if no filters
             return self._execute("""
-                SELECT f.name, f.cik, s.*
+                SELECT f.name, f.cik, f.is_tracked, s.*
                 FROM fund_quarterly_stats s
                 JOIN funds f ON s.cik = f.cik
                 WHERE s.period_of_report = (SELECT MAX(period_of_report) FROM fund_quarterly_stats)
@@ -763,62 +778,57 @@ class DatabaseManager:
         query_parts = []
         params = []
         
-        op_map = {
-            "gt": ">",
-            "lt": "<",
-            "ge": ">=",
-            "le": "<=",
-            "eq": "=",
-            "ne": "!=",
-            "contains": "LIKE"
-        }
-
-        # Valid columns to prevent SQL injection
-        valid_metrics = [
-            "total_aum", "position_count", "top_10_concentration", 
-            "avg_position_size", "primary_sector", "primary_sector_weight", 
-            "mega_cap_pct", "mid_cap_pct", "small_cap_pct", 
-            "portfolio_turnover", "avg_holding_period", "herding_score"
-        ]
-
-        where_clause = ""
-        
-        for f in filters:
+        for i, f in enumerate(filters):
             metric = f.get("metric")
+            if metric not in valid_metrics: continue
+            
             op_key = f.get("op")
+            op = op_map.get(op_key, "=")
             val = f.get("val")
-            row_logic = f.get("logic", logic).upper()
+            
+            # Row level logic (AND/OR) connects this filter to the PREVIOUS one
+            row_logic = f.get("logic", global_logic).upper()
             if row_logic not in ["AND", "OR"]:
-                row_logic = "AND"
+                row_logic = global_logic
             
-            if metric not in valid_metrics or (op_key not in op_map and op_key != "between"):
-                continue
-                
-            op = op_map.get(op_key, "")
+            prefix = ""
+            if i > 0:
+                prefix = f" {row_logic} "
             
-            part = ""
-            if op_key == "contains":
-                part = f"s.{metric} LIKE ?"
-                params.append(f"%{val}%")
-            elif op_key == "between" and isinstance(val, list) and len(val) == 2:
-                part = f"s.{metric} BETWEEN ? AND ?"
-                params.append(val[0])
-                params.append(val[1])
+            # Handle non-numeric vs numeric
+            if metric == "primary_sector":
+                if op_key in ["contains", "not_contains"]:
+                    query_parts.append(f"{prefix}UPPER(s.{metric}) {op} ?")
+                    params.append(f"%{str(val).upper()}%")
+                else:
+                    query_parts.append(f"{prefix}UPPER(s.{metric}) {op} ?")
+                    params.append(str(val).upper())
+            elif metric == "holds_ticker":
+                # Special sub-query for ticker check in the specific filing
+                query_parts.append(f"""
+                    {prefix}EXISTS (
+                        SELECT 1 FROM holdings h2 
+                        WHERE h2.accession_number = s.accession_number 
+                        AND UPPER(h2.ticker) = ?
+                    )
+                """)
+                params.append(str(val).upper())
             else:
-                part = f"s.{metric} {op} ?"
-                params.append(val)
+                try:
+                    num_val = float(val)
+                    query_parts.append(f"{prefix}s.{metric} {op} ?")
+                    params.append(num_val)
+                except (ValueError, TypeError):
+                    continue
 
-            if where_clause:
-                where_clause += f" {row_logic} {part}"
-            else:
-                where_clause = part
-
-        if not where_clause:
+        if not query_parts:
             return []
+
+        where_clause = "".join(query_parts)
         
-        # We only want to search the LATEST quarterly stats per fund for the screener
+        # We always want the LATEST quarterly stats per fund for the screener
         query = f"""
-            SELECT f.name, f.cik, s.*
+            SELECT f.name, f.cik, f.is_tracked, s.*
             FROM fund_quarterly_stats s
             JOIN funds f ON s.cik = f.cik
             WHERE ({where_clause})
@@ -832,6 +842,44 @@ class DatabaseManager:
         """
         
         return self._execute(query, tuple(params), fetch='all')
+
+    def get_whale_favorites(self, limit: int = 100) -> List[Dict]:
+        """
+        Finds the most popular stocks across all funds in their latest filings.
+        Returns ticker, issuer, count of funds, total value, and avg weight.
+        """
+        query = """
+            WITH LatestFilings AS (
+                SELECT cik, MAX(period_of_report) as latest_period
+                FROM filings
+                GROUP BY cik
+            ),
+            WhaleHoldings AS (
+                SELECT h.*
+                FROM holdings h
+                JOIN filings f ON h.accession_number = f.accession_number
+                JOIN LatestFilings lf ON f.cik = lf.cik AND f.period_of_report = lf.latest_period
+            ),
+            TickerStats AS (
+                SELECT 
+                    ticker, 
+                    issuer_name,
+                    COUNT(DISTINCT accession_number) as whale_count,
+                    SUM(value) as total_value,
+                    AVG(CAST(value AS FLOAT) * 100.0 / (
+                        SELECT SUM(value) 
+                        FROM holdings h3 
+                        WHERE h3.accession_number = WhaleHoldings.accession_number
+                    )) as avg_weight
+                FROM WhaleHoldings
+                WHERE ticker IS NOT NULL
+                GROUP BY ticker
+            )
+            SELECT * FROM TickerStats
+            ORDER BY whale_count DESC, total_value DESC
+            LIMIT ?
+        """
+        return self._execute(query, (limit,), fetch='all')
 
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""

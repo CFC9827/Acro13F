@@ -197,11 +197,11 @@ async def get_history(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def background_sync_task(cik: str, limit: int = None, force_all: bool = False, backfill: bool = False):
+def background_sync_task(cik: str, limit: int = None, force_all: bool = False, backfill: bool = False, is_tracked: bool = False):
     """Worker function for background synchronization."""
     try:
         db.update_sync_status(cik, "processing")
-        result = orch.process_fund(cik, limit=limit, force_refresh_all=force_all, backfill=backfill)
+        result = orch.process_fund(cik, limit=limit, force_refresh_all=force_all, backfill=backfill, is_tracked=is_tracked)
         db.update_sync_status(cik, "completed", newly_added=len(result.get("newly_added", [])))
     except Exception as e:
         import logging
@@ -209,7 +209,7 @@ def background_sync_task(cik: str, limit: int = None, force_all: bool = False, b
         db.update_sync_status(cik, "failed", error=str(e))
 
 @api.post("/funds/{cik}/refresh")
-async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False):
+async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False, is_tracked: bool = False):
     try:
         # Check if already processing
         status = db.get_sync_status(cik)
@@ -218,7 +218,7 @@ async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int =
 
         backfill = limit is not None
         db.update_sync_status(cik, "pending")
-        background_tasks.add_task(background_sync_task, cik, limit, force_all, backfill)
+        background_tasks.add_task(background_sync_task, cik, limit, force_all, backfill, is_tracked)
         
         return {"status": "accepted", "message": "Sync started in background."}
     except Exception as e:
@@ -281,6 +281,14 @@ async def explorer_search(criteria: Dict):
     try:
         results = db.search_explorer(criteria)
         return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api.get("/explorer/stocks/favorites")
+async def get_whale_favorites():
+    """Returns the most popular stocks across the institutional universe."""
+    try:
+        return db.get_whale_favorites()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

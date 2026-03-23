@@ -771,7 +771,7 @@ function App() {
                                 }}
                             >
                                 <Database size={18} />
-                                {!sidebarCollapsed && <span>Institutional Explorer</span>}
+                                {!sidebarCollapsed && <span>Discovery Explorer</span>}
                             </button>
                             <button
                                 className="sidebar-toggle"
