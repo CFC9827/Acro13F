@@ -1,14 +1,20 @@
 import sqlite3
 import os
+import logging
+from contextlib import contextmanager
 from datetime import datetime
 import psycopg2
+import psycopg2.pool
 from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Any, Optional
 from urllib.parse import urlparse
 
+logger = logging.getLogger(__name__)
+
 class DatabaseManager:
     def __init__(self, db_path: str = None):
         self.db_url = os.environ.get("DATABASE_URL")
+        self._pool = None
         if not self.db_url:
             if db_path is None:
                 # Default to 'data/tracker.db' relative to the 'backend' root
@@ -19,20 +25,33 @@ class DatabaseManager:
             self.is_postgres = False
         else:
             self.is_postgres = True
+            self._pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=2, maxconn=10, dsn=self.db_url
+            )
+            logger.info("PostgreSQL connection pool initialized (2-10 connections)")
             
         self._init_db()
         self._migrate()
 
+    @contextmanager
     def _get_connection(self):
+        """Context manager that yields a connection. For PG, uses the pool."""
         if self.is_postgres:
-            return psycopg2.connect(self.db_url)
+            conn = self._pool.getconn()
+            try:
+                yield conn
+            finally:
+                self._pool.putconn(conn)
         else:
-            return sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path)
+            try:
+                yield conn
+            finally:
+                conn.close()
 
     def _execute(self, query: str, params: tuple = (), fetch: str = None) -> Any:
         """Helper to execute queries and handle connection/cursor cleanup."""
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             if self.is_postgres:
                 # Use RealDictCursor for PostgreSQL to match sqlite3.Row behavior
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -52,8 +71,6 @@ class DatabaseManager:
                 if fetch == 'all':
                     return [dict(row) for row in cur.fetchall()]
                 conn.commit()
-        finally:
-            conn.close()
 
     def normalize_cik(self, cik: str) -> str:
         """Ensure CIK is a 10-digit padded string (SEC standard)."""
@@ -68,7 +85,6 @@ class DatabaseManager:
         # Note: id SERIAL for PG, id INTEGER PRIMARY KEY AUTOINCREMENT for SQLite
         
         id_type = "SERIAL PRIMARY KEY" if self.is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
-        unique_ignore = "" # SQLite uses INSERT OR IGNORE, PG uses ON CONFLICT DO NOTHING
         
         queries = [
             """
@@ -168,34 +184,37 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_stats_cik ON fund_quarterly_stats(cik)"
         ]
         
-        conn = self._get_connection()
-        try:
-            with conn.cursor() if self.is_postgres else conn as cur:
-                for q in queries:
-                    if self.is_postgres:
-                        cur.execute(q)
-                    else:
-                        conn.execute(q)
-                
-                # Execute indexes separately to avoid transaction issues in some environments
-                for idx_q in index_queries:
-                    if self.is_postgres:
-                        cur.execute(idx_q)
-                    else:
-                        conn.execute(idx_q)
+        with self._get_connection() as conn:
             if self.is_postgres:
+                with conn.cursor() as cur:
+                    for q in queries:
+                        cur.execute(q)
+                    for idx_q in index_queries:
+                        cur.execute(idx_q)
                 conn.commit()
-        finally:
-            conn.close()
+            else:
+                for q in queries:
+                    conn.execute(q)
+                for idx_q in index_queries:
+                    conn.execute(idx_q)
+                conn.commit()
 
     def _migrate(self):
         """Handle migrations and data normalization."""
         # 0. Add is_tracked column if missing
-        try:
-            self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
-        except Exception:
-            # Column already exists or other error (e.g. Postgres might need different check)
-            pass
+        if self.is_postgres:
+            # PostgreSQL: check information_schema before ALTER
+            col_exists = self._execute("""
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'funds' AND column_name = 'is_tracked'
+            """, fetch='one')
+            if not col_exists:
+                self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
+        else:
+            try:
+                self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
+            except Exception:
+                pass
 
         # 1. Normalize CIKs
         funds = self._execute("SELECT cik FROM funds", fetch='all')
@@ -208,11 +227,7 @@ class DatabaseManager:
                     self._execute("UPDATE filings SET cik = ? WHERE cik = ?", (new_cik, old_cik))
 
         # 2. Normalize Put/Call
-        if self.is_postgres:
-            self._execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
-        else:
-            # SQLite specific check for column existence (handled in init_db for PG)
-            self._execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
+        self._execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
 
     def save_fund(self, cik: str, name: str, is_tracked: int = 0):
         cik = self.normalize_cik(cik)
@@ -220,15 +235,15 @@ class DatabaseManager:
             self._execute("""
                 INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)
                 ON CONFLICT (cik) DO UPDATE SET 
-                    name = EXCLUDED.name,
-                    is_tracked = CASE WHEN EXCLUDED.is_tracked = 1 THEN 1 ELSE funds.is_tracked END
+                    name = CASE WHEN EXCLUDED.name != '' THEN EXCLUDED.name ELSE funds.name END,
+                    is_tracked = EXCLUDED.is_tracked
             """, (cik, name, is_tracked))
         else:
             # SQLite doesn't have a simple way to conditionally update without overwriting
-            exists = self._execute("SELECT is_tracked FROM funds WHERE cik = ?", (cik,), fetch='one')
+            exists = self._execute("SELECT name, is_tracked FROM funds WHERE cik = ?", (cik,), fetch='one')
             if exists:
-                final_tracked = 1 if (is_tracked == 1 or exists['is_tracked'] == 1) else 0
-                self._execute("UPDATE funds SET name = ?, is_tracked = ? WHERE cik = ?", (name, final_tracked, cik))
+                final_name = name if name != "" else exists['name']
+                self._execute("UPDATE funds SET name = ?, is_tracked = ? WHERE cik = ?", (final_name, is_tracked, cik))
             else:
                 self._execute("INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)", (cik, name, is_tracked))
 
@@ -262,8 +277,7 @@ class DatabaseManager:
         # Clear old holdings for this specific filing if re-running
         self._execute("DELETE FROM holdings WHERE accession_number = ?", (accession_number,))
         
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             cur = conn.cursor()
             query = """
                 INSERT INTO holdings (accession_number, issuer_name, cusip, ticker, shares, value, put_call)
@@ -279,8 +293,6 @@ class DatabaseManager:
             ]
             cur.executemany(query, data)
             conn.commit()
-        finally:
-            conn.close()
 
     def backfill_tickers(self, mapper_func) -> int:
         missing_cusips = self._execute("SELECT DISTINCT cusip FROM holdings WHERE ticker IS NULL OR ticker = ''", fetch='all')
@@ -427,8 +439,7 @@ class DatabaseManager:
         return res
 
     def save_prices(self, ticker: str, price_data: List[Dict]):
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             cur = conn.cursor()
             query = """
                 INSERT INTO prices (ticker, date, price, dividends) VALUES (%s, %s, %s, %s)
@@ -441,8 +452,6 @@ class DatabaseManager:
             data = [(ticker, p['date'], p['price'], p.get('dividends', 0)) for p in price_data]
             cur.executemany(query, data)
             conn.commit()
-        finally:
-            conn.close()
 
     def create_group(self, name: str) -> int:
         min_order_res = self._execute("SELECT MIN(sort_order) as min_order FROM fund_groups", fetch='one')
@@ -453,13 +462,11 @@ class DatabaseManager:
             res = self._execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?) RETURNING id", (name, new_order), fetch='one')
             return res['id']
         else:
-            conn = self._get_connection()
-            cur = conn.cursor()
-            cur.execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?)", (name, new_order))
-            conn.commit()
-            last_id = cur.lastrowid
-            conn.close()
-            return last_id
+            with self._get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?)", (name, new_order))
+                conn.commit()
+                return cur.lastrowid
 
     def get_groups(self):
         groups = self._execute("SELECT * FROM fund_groups ORDER BY sort_order ASC, id ASC", fetch='all')
@@ -659,7 +666,8 @@ class DatabaseManager:
         return summary
 
     def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:
-        query = "SELECT date, price FROM prices WHERE ticker = ?"
+        """Returns historical prices for a ticker."""
+        query = "SELECT date, price, dividends FROM prices WHERE ticker = ?"
         params = [ticker]
         if start_date:
             query += " AND date >= ?"
@@ -744,7 +752,7 @@ class DatabaseManager:
         Executes a complex multi-factor search for the Institutional Explorer.
         Supports global logic (Match All/Any) and row-level logic (AND/OR).
         """
-        global_logic = criteria.get("global_logic", "AND").upper()
+        global_logic = criteria.get("global_logic", criteria.get("logic", "AND")).upper()
         if global_logic not in ["AND", "OR"]:
             global_logic = "AND"
             
@@ -848,6 +856,7 @@ class DatabaseManager:
         Finds the most popular stocks across all funds in their latest filings.
         Returns ticker, issuer, count of funds, total value, and avg weight.
         """
+        # Rewritten to avoid correlated subquery referencing outer CTE (PG-incompatible)
         query = """
             WITH LatestFilings AS (
                 SELECT cik, MAX(period_of_report) as latest_period
@@ -855,25 +864,29 @@ class DatabaseManager:
                 GROUP BY cik
             ),
             WhaleHoldings AS (
-                SELECT h.*
+                SELECT h.ticker, h.issuer_name, h.value, h.accession_number
                 FROM holdings h
                 JOIN filings f ON h.accession_number = f.accession_number
                 JOIN LatestFilings lf ON f.cik = lf.cik AND f.period_of_report = lf.latest_period
+                WHERE h.ticker IS NOT NULL
+            ),
+            FilingTotals AS (
+                SELECT accession_number, SUM(value) as filing_total
+                FROM WhaleHoldings
+                GROUP BY accession_number
             ),
             TickerStats AS (
                 SELECT 
-                    ticker, 
-                    issuer_name,
-                    COUNT(DISTINCT accession_number) as whale_count,
-                    SUM(value) as total_value,
-                    AVG(CAST(value AS FLOAT) * 100.0 / (
-                        SELECT SUM(value) 
-                        FROM holdings h3 
-                        WHERE h3.accession_number = WhaleHoldings.accession_number
-                    )) as avg_weight
-                FROM WhaleHoldings
-                WHERE ticker IS NOT NULL
-                GROUP BY ticker
+                    wh.ticker, 
+                    MAX(wh.issuer_name) as issuer_name,
+                    COUNT(DISTINCT wh.accession_number) as whale_count,
+                    SUM(wh.value) as total_value,
+                    AVG(CASE WHEN ft.filing_total > 0 
+                        THEN CAST(wh.value AS FLOAT) * 100.0 / ft.filing_total 
+                        ELSE 0 END) as avg_weight
+                FROM WhaleHoldings wh
+                JOIN FilingTotals ft ON wh.accession_number = ft.accession_number
+                GROUP BY wh.ticker
             )
             SELECT * FROM TickerStats
             ORDER BY whale_count DESC, total_value DESC
@@ -1001,16 +1014,11 @@ class DatabaseManager:
     def get_all_funds_performance(self, group_id: int = None) -> Dict:
         """Calculates TWR performance for all funds (or group) over time for comparison."""
         if group_id:
-            all_funds = []
-            with self._get_connection() as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT f.* FROM funds f
-                    JOIN fund_group_members m ON f.cik = m.cik
-                    WHERE m.group_id = ?
-                """, (group_id,))
-                all_funds = [dict(row) for row in cursor.fetchall()]
+            all_funds = self._execute("""
+                SELECT f.* FROM funds f
+                JOIN fund_group_members m ON f.cik = m.cik
+                WHERE m.group_id = ?
+            """, (group_id,), fetch='all')
         else:
             all_funds = self.get_funds()
         performance_data = {} # cik -> data
@@ -1122,21 +1130,7 @@ class DatabaseManager:
             "funds": [f['name'] for f in all_funds if f['cik'] in performance_data] + ["S&P 500"]
         }
 
-    def get_prices(self, ticker: str, start_date: str = None) -> List[Dict]:
-        """Returns historical prices for a ticker."""
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            query = "SELECT date, price, dividends FROM prices WHERE ticker = ?"
-            params = [ticker]
-            
-            if start_date:
-                query += " AND date >= ?"
-                params.append(start_date)
-            
-            query += " ORDER BY date ASC"
-            cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+
 
 if __name__ == "__main__":
     db = DatabaseManager()

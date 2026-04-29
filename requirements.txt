@@ -6,3 +6,5 @@ pandas
 python-dotenv
 yfinance
 pywebview
+psycopg2-binary
+httpx

@@ -64,7 +64,7 @@ class InfTableParser:
 
         # SEC 13F values are GENERALLY reported in thousands of dollars.
         # However, some funds report in actual dollars. We use a robust median-based 
-        # heuristic to detect the correct scale, ignoring extreme outliers like Berkshire.
+        # heuristic to detect the correct scale, with a secondary sanity check.
         
         test_prices = []
         for h in raw_holdings:
@@ -87,6 +87,37 @@ class InfTableParser:
             else:
                 logging.info(f"SMART SCALING: Detected values in thousands (median raw price ${median_raw_price:.4f}). Applying 1000x multiplier.")
 
+        # --- SECONDARY SANITY CHECK ---
+        # After the initial decision, verify the resulting implied prices are reasonable.
+        # If scaling produces absurd prices, flip the decision.
+        def _compute_median_implied(holdings_raw, scale):
+            implied = []
+            for h in holdings_raw:
+                if h['shares'] > 0:
+                    p = (h['raw_value'] * scale) / h['shares']
+                    if 0.001 < p < 1_000_000:
+                        implied.append(p)
+            if not implied:
+                return 0
+            implied.sort()
+            return implied[len(implied)//2]
+        
+        scale_factor = 1000 if should_scale else 1
+        median_implied = _compute_median_implied(raw_holdings, scale_factor)
+        
+        if median_implied > 50_000 or (median_implied < 0.01 and median_implied > 0):
+            # The initial scaling decision produced unreasonable prices — flip it
+            alt_scale = 1 if should_scale else 1000
+            alt_median = _compute_median_implied(raw_holdings, alt_scale)
+            
+            logging.warning(
+                f"SCALING AUTO-CORRECT: Initial scale (x{scale_factor}) produced median price "
+                f"${median_implied:.2f}. Flipping to x{alt_scale} (median ${alt_median:.2f})."
+            )
+            should_scale = not should_scale
+            scale_factor = alt_scale
+            median_implied = alt_median
+
         holdings = []
         for h in raw_holdings:
             final_h = h.copy()
@@ -94,15 +125,20 @@ class InfTableParser:
             del final_h['raw_value']
             holdings.append(final_h)
         
-        # Post-parse validation: check for anomalous implied prices
-        # This catches cases where values may have been double-scaled or wrong
+        # Post-parse validation: log any remaining anomalous implied prices
+        anomaly_count = 0
         for h in holdings:
             if h['shares'] > 0:
                 implied_price = h['value'] / h['shares']
                 if implied_price > 50000:
-                    logging.warning(f"ANOMALY DETECTED: {h['issuer_name']} has implied price ${implied_price:.2f}/share (value=${h['value']:,}, shares={h['shares']:,})")
+                    anomaly_count += 1
+                    logging.warning(f"ANOMALY: {h['issuer_name']} implied ${implied_price:.2f}/sh (val=${h['value']:,}, sh={h['shares']:,})")
                 elif implied_price < 0.01:
-                    logging.warning(f"ANOMALY DETECTED: {h['issuer_name']} has very low implied price ${implied_price:.4f}/share")
+                    anomaly_count += 1
+                    logging.warning(f"ANOMALY: {h['issuer_name']} implied ${implied_price:.4f}/sh")
+        
+        if anomaly_count > 0:
+            logging.warning(f"SCALING SUMMARY: {anomaly_count} anomalous holdings after x{scale_factor} scaling (median implied ${median_implied:.2f}).")
             
         return holdings
 

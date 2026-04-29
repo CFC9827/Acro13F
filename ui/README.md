@@ -7,45 +7,38 @@ The frontend is a modern Single Page Application (SPA) built with **React** and 
 The application is structured around a main layout (`App.tsx`) with specialized view components:
 
 ### Core Views
-*   **`GlobalDashboard.tsx`**: The landing page. Displays high-level cards for "Fund Highlights", "Crowding Signals", and "Big Movers". Aggregates data from all tracked funds.
-*   **`FundSummary.tsx`**: A detailed "Fact Sheet" for a single fund. Shows top holdings, concentration metrics, and recent activity.
-*   **`HoldingsTable.tsx`**: A powerful data grid showing every position.
-    *   **Features/Logic**: Supports "Diffing" against the previous quarter to show Changed/New/Exited positions.
-*   **`PortfolioChart.tsx`**: Visualizes asset allocation (Sector/Industry) and historical value trends over time.
+*   **`GlobalDashboard.tsx`**: The landing page. Displays KPI tiles (fund count, AUM, new/exited positions), fund highlight cards, "Big Movers", "Crowding Signals" (most-held, gaining/losing), new/exited position lists, and a comparative performance chart with S&P 500 benchmark overlay. Supports fund groups with drag-and-drop reordering.
+*   **`FundSummary.tsx`**: A detailed "Fact Sheet" for a single fund. Shows KPI tiles (positions, AUM, new/exited counts), top 10 holdings with weight bars, top movers (value/shares toggle), swoop opportunities (conviction price dips), sector allocation bars, and key metrics (concentration, turnover).
+*   **`HoldingsTable.tsx`**: A powerful data grid showing every position with QoQ diffing (Changed/New/Exited), expandable position history, search filtering, and sortable columns. Supports both value and shares delta modes.
+*   **`PortfolioChart.tsx`**: Historical stacked area chart showing position-level composition over time. Features time range controls (2Q/YTD/1Y/3Y/5Y/10Y/MAX/CUSTOM), quarter-by-quarter navigation, and detailed tooltips with per-position values. Also contains the position performance table with IRR calculations.
+*   **`MimicPerformanceChart.tsx`**: Simulates retail investor returns by replaying a fund's 13F trades. Configurable initial investment, recurring contributions, and includes detailed trade-by-trade breakdown with portfolio value tracking.
+*   **`InstitutionalExplorer.tsx`**: Multi-factor fund screener with dynamic filter builder (AND/OR logic), searchable results table, and support for all fund metrics (AUM, concentration, sector, cap DNA, turnover).
 
 ### Shared Components
-*   **`CikSearchModal.tsx`**: A modal dialog for searching and adding new funds. Connects to the backend `/search-cik` endpoint.
+*   **`CikSearchModal.tsx`**: Modal dialog for searching and adding new funds. Connects to the backend `/search-cik` endpoint.
 *   **`SplashScreen.tsx`**: Initial loading animation.
+
+### Shared Utilities
+*   **`formatCurrency()`**: Formats numbers as `$1.2B`, `$350.5M`, `$12.3K`, etc. Exported from `PortfolioChart.tsx` and reused across components.
+*   **`formatQ()`**: Converts date strings (YYYY-MM-DD) to quarter strings (e.g., "1Q '25").
 
 ## 🎨 Styling & Design System
 
-The app uses **raw CSS modules** (imported in `index.css` and component-specific styles) rather than a utility library like Tailwind. This allows for fine-grained control over the "Financial Terminal" aesthetic.
+The app uses **raw CSS** (`index.css` and component-level styles) for fine-grained control over the "Financial Terminal" aesthetic.
 
 *   **Theme**: Dark mode by default (Slate/Gray palette).
 *   **Colors**: Semantic colors for financial data:
     *   Green (`#10b981`): Positive change.
     *   Red (`#ef4444`): Negative change.
     *   Blue (`#3b82f6`): Neutral/Info.
+    *   Amber (`#eab308`): Warning/Swoop opportunities.
 
 ## 🔄 State Management
 
-State is primarily managed via React's `useState` and `useEffect` within `App.tsx` and propagated down via props.
+State is managed via React's `useState` and `useEffect` within `App.tsx` and propagated down via props.
 *   **`funds`**: List of all available funds.
-*   **`selectedCik`**: The currently active fund being viewed.
-*   **`view`**: The current active tab ('dashboard', 'summary', 'table', 'chart').
-
-For larger scale state in the future, we might consider Context API or Redux, but the current prop-drilling is sufficient for the app's complexity.
-
-## 🚀 Development Tips
-
-### Adding a New Chart
-Use **Recharts** for all visualizations.
-1.  Import the chart components (e.g., `<BarChart>`, `<PieChart>`).
-2.  Format your data into a flat array of objects (e.g., `[{name: 'Tech', value: 100}, ...]`).
-3.  Add the component to `ui/src/components/`.
-
-### Date Formatting
-Use the standard helper `formatQ` (in `App.tsx`) to convert date strings (YYYY-MM-DD) into Quarter strings (e.g., "Q4 '24").
+*   **`selectedCik`**: The currently active fund.
+*   **`view`**: The current active tab (`dashboard`, `summary`, `table`, `chart`, `mimic`, `explorer`).
 
 ## 📦 Scripts
 *   `npm run dev`: Start dev server.

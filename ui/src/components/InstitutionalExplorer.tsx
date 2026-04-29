@@ -5,6 +5,7 @@ import { ResponsiveContainer, AreaChart, Area, YAxis } from 'recharts';
 
 interface InstitutionalExplorerProps {
     onFollow: (cik: string) => void;
+    onTrackToggle?: (cik: string, isTracked: boolean) => void;
 }
 
 interface FilterRow {
@@ -123,7 +124,7 @@ const DnaBadge = ({ label, icon, color }: { label: string, icon: React.ReactNode
     </div>
 );
 
-export function InstitutionalExplorer({ onFollow }: InstitutionalExplorerProps) {
+export function InstitutionalExplorer({ onFollow, onTrackToggle }: InstitutionalExplorerProps) {
     const [activeTab, setActiveTab] = useState<'funds' | 'stocks'>('funds');
     const [filters, setFilters] = useState<FilterRow[]>([
         { id: Math.random().toString(), logic: 'AND', metric: 'total_aum', op: 'gt', val: 1000000000 }
@@ -142,6 +143,9 @@ export function InstitutionalExplorer({ onFollow }: InstitutionalExplorerProps) 
             });
             if (res.ok) {
                 setFundResults(prev => prev.map(f => f.cik === cik ? { ...f, is_tracked: !currentStatus ? 1 : 0 } : f));
+                if (onTrackToggle) {
+                    onTrackToggle(cik, !currentStatus);
+                }
             }
         } catch (err) {
             console.error("Failed to toggle track", err);

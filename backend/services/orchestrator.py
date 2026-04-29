@@ -2,6 +2,7 @@ from backend.services.sec_client import SECClient
 from backend.services.parser import InfTableParser
 from backend.services.database import DatabaseManager
 from backend.services.cusip_mapper import CUSIPMapper
+from backend.services.whale_index import WhaleIndexService
 import logging
 
 class Orchestrator:
@@ -104,11 +105,26 @@ class Orchestrator:
         
         logging.info(f"Sync complete for {fund_name}. Added: {len(newly_added)}, Verified: {verified_existing}")
         
+        # Auto-calculate quarterly metrics for the Institutional Explorer
+        if newly_added:
+            try:
+                whale_svc = WhaleIndexService(self.db)
+                filings = self.db._execute(
+                    "SELECT accession_number FROM filings WHERE cik = ? ORDER BY period_of_report DESC LIMIT 4",
+                    (cik,), fetch='all'
+                )
+                for f in filings:
+                    metrics = whale_svc.calculate_fund_metrics(cik, f['accession_number'])
+                    if metrics:
+                        whale_svc.save_metrics(metrics)
+                logging.info(f"Auto-calculated quarterly stats for {fund_name} ({len(filings)} quarters).")
+            except Exception as e:
+                logging.warning(f"Failed to auto-calculate metrics for {fund_name}: {e}")
+        
         return {
             "status": "success",
             "fund_name": fund_name,
             "cik": cik,
-            "newly_added": newly_added,
             "newly_added": newly_added,
             "verified_count": verified_existing,
             "skipped_legacy": skipped_legacy_count,

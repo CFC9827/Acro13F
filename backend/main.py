@@ -85,9 +85,14 @@ async def get_funds(tracked_only: bool = True):
     return db.get_funds(tracked_only=tracked_only)
 
 @api.post("/funds/{cik}/track")
-async def track_fund(cik: str, track: bool = True):
+async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = True):
     try:
         db.save_fund(cik, "", is_tracked=1 if track else 0)
+        if track:
+            status = db.get_sync_status(cik)
+            if not status or status.get("status") != "processing":
+                db.update_sync_status(cik, "pending")
+                background_tasks.add_task(background_sync_task, cik, None, False, False, True)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -252,8 +257,9 @@ async def get_market_benchmark(start: str, end: str = None):
 @api.delete("/funds/{cik}")
 async def delete_fund(cik: str):
     try:
-        db.delete_fund(cik)
-        return {"status": "success", "message": f"Fund {cik} and its holdings deleted."}
+        # Instead of hard deleting, we just untrack it so it remains in the explorer
+        db.save_fund(cik, "", is_tracked=0)
+        return {"status": "success", "message": f"Fund {cik} untracked."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -272,15 +278,6 @@ async def get_ticker_prices(ticker: str, start: str = None):
     try:
         prices = get_historical_prices(ticker, db, start)
         return prices
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@api.post("/explorer/search")
-async def explorer_search(criteria: Dict):
-    """Screener endpoint for multi-factor range search."""
-    try:
-        results = db.search_explorer(criteria)
-        return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -413,6 +410,16 @@ async def search_cik(q: str, limit: int = 20):
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@api.post("/explorer/search")
+async def explorer_search(request: Request):
+    """Multi-factor search for the Institutional Explorer."""
+    criteria = await request.json()
+    try:
+        results = db.search_explorer(criteria)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Explorer search failed: {str(e)}")
 
 # --- UI Serving ---
 # This serves the built React frontend from the ui/dist directory

@@ -928,7 +928,10 @@ function App() {
                                 allFunds={funds}
                             />
                         ) : view === 'explorer' ? (
-                            <InstitutionalExplorer onFollow={(cik) => navigate('summary', cik)} />
+                            <InstitutionalExplorer 
+                                onFollow={(cik) => navigate('summary', cik)} 
+                                onTrackToggle={async () => { await fetchFunds(true); await fetchDashboardSummary(); }}
+                            />
                         ) : selectedCik && view !== 'about' ? (
                             <div className="holdings-view">
                                 <div className="view-header">
