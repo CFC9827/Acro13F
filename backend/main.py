@@ -433,6 +433,25 @@ async def explorer_search(request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Explorer search failed: {str(e)}")
 
+@api.get("/explorer/stocks/favorites")
+async def get_whale_favorites(limit: int = 100):
+    """Returns the top stocks held by 'whale' funds."""
+    try:
+        results = db.get_whale_favorites(limit)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api.get("/explorer/stock/{ticker}/holders")
+async def get_stock_holders(ticker: str):
+    """Returns a list of funds that hold a specific stock."""
+    try:
+        results = db.get_stock_holders(ticker)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # --- UI Serving ---
 # This serves the built React frontend from the ui/dist directory
 # html=True mode enables automatic index.html serving for / and SPA routing

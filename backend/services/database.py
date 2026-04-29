@@ -834,21 +834,21 @@ class DatabaseManager:
 
         where_clause = "".join(query_parts)
         
-        # We always want the LATEST quarterly stats per fund for the screener
+        # Optimization: Use a CTE to find latest periods instead of a correlated subquery
         query = f"""
+            WITH LatestStats AS (
+                SELECT cik, MAX(period_of_report) as latest_period
+                FROM fund_quarterly_stats
+                GROUP BY cik
+            )
             SELECT f.name, f.cik, f.is_tracked, s.*
             FROM fund_quarterly_stats s
             JOIN funds f ON s.cik = f.cik
+            JOIN LatestStats ls ON s.cik = ls.cik AND s.period_of_report = ls.latest_period
             WHERE ({where_clause})
-            AND s.period_of_report = (
-                SELECT MAX(period_of_report) 
-                FROM fund_quarterly_stats s2 
-                WHERE s2.cik = s.cik
-            )
             ORDER BY s.total_aum DESC
             LIMIT 200
         """
-        
         return self._execute(query, tuple(params), fetch='all')
 
     def get_whale_favorites(self, limit: int = 100) -> List[Dict]:
@@ -870,22 +870,17 @@ class DatabaseManager:
                 JOIN LatestFilings lf ON f.cik = lf.cik AND f.period_of_report = lf.latest_period
                 WHERE h.ticker IS NOT NULL
             ),
-            FilingTotals AS (
-                SELECT accession_number, SUM(value) as filing_total
-                FROM WhaleHoldings
-                GROUP BY accession_number
-            ),
             TickerStats AS (
                 SELECT 
                     wh.ticker, 
                     MAX(wh.issuer_name) as issuer_name,
                     COUNT(DISTINCT wh.accession_number) as whale_count,
                     SUM(wh.value) as total_value,
-                    AVG(CASE WHEN ft.filing_total > 0 
-                        THEN CAST(wh.value AS FLOAT) * 100.0 / ft.filing_total 
+                    AVG(CASE WHEN qs.total_aum > 0 
+                        THEN CAST(wh.value AS FLOAT) * 100.0 / qs.total_aum 
                         ELSE 0 END) as avg_weight
                 FROM WhaleHoldings wh
-                JOIN FilingTotals ft ON wh.accession_number = ft.accession_number
+                LEFT JOIN fund_quarterly_stats qs ON wh.accession_number = qs.accession_number
                 GROUP BY wh.ticker
             )
             SELECT * FROM TickerStats
@@ -893,6 +888,39 @@ class DatabaseManager:
             LIMIT ?
         """
         return self._execute(query, (limit,), fetch='all')
+
+    def get_stock_holders(self, ticker: str) -> List[Dict]:
+        """
+        Returns a list of funds that hold the given ticker in their latest filing.
+        Includes weight and value information. Uses pre-calculated AUM for performance.
+        """
+        ticker = str(ticker).strip().upper()
+        query = """
+            WITH LatestFilings AS (
+                SELECT cik, MAX(period_of_report) as latest_period
+                FROM filings
+                GROUP BY cik
+            ),
+            TargetHoldings AS (
+                SELECT h.ticker, h.value, h.shares, h.put_call, h.accession_number, f.cik
+                FROM holdings h
+                JOIN filings f ON h.accession_number = f.accession_number
+                JOIN LatestFilings lf ON f.cik = lf.cik AND f.period_of_report = lf.latest_period
+                WHERE TRIM(UPPER(h.ticker)) = ?
+            )
+            SELECT 
+                COALESCE(f.name, 'Unknown Fund (' || th.cik || ')') as fund_name,
+                th.cik,
+                th.shares,
+                th.value,
+                th.put_call,
+                (CAST(th.value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
+            FROM TargetHoldings th
+            LEFT JOIN funds f ON th.cik = f.cik
+            LEFT JOIN fund_quarterly_stats qs ON th.accession_number = qs.accession_number
+            ORDER BY th.value DESC
+        """
+        return self._execute(query, (ticker,), fetch='all')
 
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""

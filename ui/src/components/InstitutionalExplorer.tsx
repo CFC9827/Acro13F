@@ -125,6 +125,10 @@ const DnaBadge = ({ label, icon, color }: { label: string, icon: React.ReactNode
 );
 
 export function InstitutionalExplorer({ onFollow, onTrackToggle }: InstitutionalExplorerProps) {
+    const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+    const [holders, setHolders] = useState<any[]>([]);
+    const [loadingHolders, setLoadingHolders] = useState(false);
+
     const [activeTab, setActiveTab] = useState<'funds' | 'stocks'>('funds');
     const [filters, setFilters] = useState<FilterRow[]>([
         { id: Math.random().toString(), logic: 'AND', metric: 'total_aum', op: 'gt', val: 1000000000 }
@@ -200,13 +204,19 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
                 })
             });
             const data = await res.json();
-            const enhanced = data.map((f: FundStats) => ({
-                ...f,
-                sparkline: Array.from({ length: 8 }, () => ({ value: Math.random() * 100 + 50 }))
-            }));
-            setFundResults(enhanced);
+            if (Array.isArray(data)) {
+                const enhanced = data.map((f: FundStats) => ({
+                    ...f,
+                    sparkline: Array.from({ length: 8 }, () => ({ value: Math.random() * 100 + 50 }))
+                }));
+                setFundResults(enhanced);
+            } else {
+                console.error("Fund search returned non-array", data);
+                setFundResults([]);
+            }
         } catch (err) {
             console.error("Fund search failed", err);
+            setFundResults([]);
         } finally {
             setLoading(false);
         }
@@ -217,11 +227,37 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
         try {
             const res = await fetch('/api/explorer/stocks/favorites');
             const data = await res.json();
-            setStockResults(data);
+            if (Array.isArray(data)) {
+                setStockResults(data);
+            } else {
+                console.error("Whale favorites returned non-array", data);
+                setStockResults([]);
+            }
         } catch (err) {
             console.error("Failed to fetch whale favorites", err);
+            setStockResults([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchStockHolders = async (ticker: string) => {
+        setSelectedTicker(ticker);
+        setLoadingHolders(true);
+        try {
+            const res = await fetch(`/api/explorer/stock/${encodeURIComponent(ticker)}/holders`);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setHolders(data);
+            } else {
+                console.error("Failed to fetch holders: data is not an array", data);
+                setHolders([]);
+            }
+        } catch (err) {
+            console.error("Failed to fetch holders", err);
+            setHolders([]);
+        } finally {
+            setLoadingHolders(false);
         }
     };
 
@@ -233,13 +269,72 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
         }
     }, [activeTab]);
 
-    const filteredStocks = stockResults.filter(s => 
-        s.ticker?.toLowerCase().includes(stockSearchQuery.toLowerCase()) ||
-        s.issuer_name?.toLowerCase().includes(stockSearchQuery.toLowerCase())
+    const filteredStocks = (stockResults || []).filter(s => 
+        (s.ticker || '').toLowerCase().includes(stockSearchQuery.toLowerCase()) ||
+        (s.issuer_name || '').toLowerCase().includes(stockSearchQuery.toLowerCase())
     );
 
     return (
         <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#020617' }}>
+            {/* Holders Modal */}
+            {selectedTicker && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(12px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                    padding: '40px'
+                }} onClick={() => setSelectedTicker(null)}>
+                    <div style={{
+                        background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '32px', width: '100%', maxWidth: '900px', maxHeight: '80vh',
+                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
+                    }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                                    <h2 style={{ margin: 0, fontSize: '24px', color: '#f8fafc', fontWeight: 900 }}>{selectedTicker}</h2>
+                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>INSTITUTIONAL HOLDERS</div>
+                                </div>
+                                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Showing all whale funds holding this position in their latest filing.</p>
+                            </div>
+                            <button onClick={() => setSelectedTicker(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#64748b', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}><X size={20} /></button>
+                        </div>
+                        
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead style={{ position: 'sticky', top: 0, background: '#0f172a', zIndex: 10 }}>
+                                    <tr>
+                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Fund Name</th>
+                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Shares</th>
+                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Value</th>
+                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Weight</th>
+                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingHolders ? (
+                                        <tr><td colSpan={5} style={{ padding: '100px', textAlign: 'center' }}><Loader2 size={32} className="animate-spin" style={{ color: '#38bdf8' }} /></td></tr>
+                                    ) : holders.length === 0 ? (
+                                        <tr><td colSpan={5} style={{ padding: '100px', textAlign: 'center', color: '#475569' }}>No institutional holders found in database.</td></tr>
+                                    ) : holders.map((h, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                            <td style={{ padding: '20px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 700 }}>{h.fund_name}</div><div style={{ fontSize: '11px', color: '#475569' }}>CIK: {h.cik}</div></td>
+                                            <td style={{ padding: '20px 32px', color: '#94a3b8', fontSize: '14px' }}>{h.shares?.toLocaleString()}</td>
+                                            <td style={{ padding: '20px 32px', color: '#f8fafc', fontWeight: 700 }}>{formatCurrency(h.value)}</td>
+                                            <td style={{ padding: '20px 32px' }}><div style={{ color: '#38bdf8', fontWeight: 800 }}>{h.weight?.toFixed(2)}%</div></td>
+                                            <td style={{ padding: '20px 32px', textAlign: 'right' }}>
+                                                <button onClick={() => { onFollow(h.cik); setSelectedTicker(null); }} style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '6px 16px', borderRadius: '8px', fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}>ANALYZE</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Premium Header */}
             <div className="dashboard-header" style={{ padding: '32px 48px', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'linear-gradient(to bottom, rgba(15, 23, 24, 0.4), transparent)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -422,8 +517,8 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
                                         <td style={{ padding: '24px 32px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}><div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 800, color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.2)' }}>{stock.ticker?.slice(0, 4)}</div><div><div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '16px' }}>{stock.ticker || 'UNKNOWN'}</div><div style={{ color: '#64748b', fontSize: '12px', marginTop: '2px' }}>{stock.issuer_name}</div></div></div></td>
                                         <td style={{ padding: '24px 32px' }}><div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ color: '#f8fafc', fontWeight: 800, fontSize: '18px' }}>{stock.whale_count}</div><div style={{ display: 'flex', gap: '2px' }}>{Array.from({ length: Math.min(5, Math.ceil(stock.whale_count / 5)) }).map((_, i) => <Users key={i} size={12} color="#38bdf8" fill="#38bdf8" opacity={0.5} />)}</div></div><div style={{ color: '#475569', fontSize: '11px', fontWeight: 700, marginTop: '4px', textTransform: 'uppercase' }}>Funds Holding</div></td>
                                         <td style={{ padding: '24px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{formatCurrency(stock.total_value)}</div><div style={{ color: '#475569', fontSize: '11px', fontWeight: 700, marginTop: '4px', textTransform: 'uppercase' }}>Aggregate Value</div></td>
-                                        <td style={{ padding: '24px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.avg_weight.toFixed(2)}%</div><div style={{ width: '80px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(stock.avg_weight * 10, 100)}%`, background: '#38bdf8' }} /></div></td>
-                                        <td style={{ padding: '24px 32px', textAlign: 'right' }}><button onClick={() => { /* Potential: Open detail view of who holds this stock */ }} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', padding: '10px 20px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'inline-flex', alignItems: 'center', gap: '10px' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#38bdf8'; e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#38bdf8'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#f8fafc'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}><MousePointer2 size={16} /> WHO HOLDS THIS?</button></td>
+                                        <td style={{ padding: '24px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.avg_weight?.toFixed(2) || '0.00'}%</div><div style={{ width: '80px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min((stock.avg_weight || 0) * 10, 100)}%`, background: '#38bdf8' }} /></div></td>
+                                        <td style={{ padding: '24px 32px', textAlign: 'right' }}><button onClick={() => fetchStockHolders(stock.ticker)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', padding: '10px 20px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'inline-flex', alignItems: 'center', gap: '10px' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#38bdf8'; e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#38bdf8'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#f8fafc'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}><MousePointer2 size={16} /> WHO HOLDS THIS?</button></td>
                                     </tr>
                                 ))}
                             </tbody>

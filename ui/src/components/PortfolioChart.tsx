@@ -60,6 +60,7 @@ const COLORS = [
 ];
 
 export const formatCurrency = (value: number): string => {
+    if (value === null || value === undefined || isNaN(value)) return '$0';
     const absValue = Math.abs(value);
     if (absValue >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
     if (absValue >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
