@@ -263,6 +263,18 @@ async def delete_fund(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@api.get("/fund-info/{cik}")
+def get_fund_info(cik: str):
+    """Returns basic info (name, is_tracked) for a specific fund."""
+    normalized_cik = db.normalize_cik(cik)
+    funds = db.get_funds(tracked_only=False)
+    for f in funds:
+        if f['cik'] == normalized_cik:
+            return dict(f)
+    
+    # If not in the local database, return a generic placeholder
+    return {"cik": normalized_cik, "name": f"Fund {normalized_cik}", "is_tracked": 0}
+
 @api.get("/funds/{cik}/filing-range")
 async def get_filing_range(cik: str):
     """Returns the date range and count of filings stored for a fund."""

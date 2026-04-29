@@ -146,6 +146,7 @@ function App() {
     const [refreshCik, setRefreshCik] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
+    const [activeFundName, setActiveFundName] = useState<string | null>(null)
     const [dashboardSummary, setDashboardSummary] = useState<any>(null)
     const [timeRange, setTimeRange] = useState('1Y')
     const [offset, setOffset] = useState(0) // Number of quarters to offset from latest
@@ -236,6 +237,17 @@ function App() {
             setLoading(true)
             setError(null)
             setLegacyInfo(null)
+
+            if (!funds.some(f => f.cik.replace(/^0+/, '') === selectedCik.replace(/^0+/, ''))) {
+                fetch(`/api/fund-info/${selectedCik}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.name) setActiveFundName(data.name);
+                    })
+                    .catch(e => console.error("Failed to fetch fund info", e));
+            } else {
+                setActiveFundName(null);
+            }
 
             const p1 = fetch(`/api/funds/${selectedCik}/holdings`)
                 .then(res => res.json())
@@ -941,7 +953,7 @@ function App() {
                                             margin: 0,
                                             lineHeight: 1.3
                                         }}>
-                                            Holdings for {funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name}
+                                            Holdings for {(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name)}
                                         </h2>
                                         {selectedCik && (
                                             <a
@@ -1170,7 +1182,7 @@ function App() {
                                 ) : view === 'summary' ? (
                                     <FundSummary
                                         history={history}
-                                        fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
+                                        fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Fund'}
                                         cik={selectedCik || undefined}
                                     />
                                 ) : (view === 'performance' || view === 'mimic') ? (
@@ -1187,17 +1199,17 @@ function App() {
                                             ) : (
                                                 <MimicPerformanceChart
                                                     cik={selectedCik || ''}
-                                                    fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'}
+                                                    fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Fund'}
                                                 />
                                             )}
                                         </div>
                                     </div>
                                 ) : view === 'activity' ? (
-                                    <ActivityView history={history} fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Fund'} />
+                                    <ActivityView history={history} fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Fund'} />
                                 ) : (
                                     <HoldingsTable
                                         history={history}
-                                        fundName={funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name || 'Hedge Fund Portfolio'}
+                                        fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Hedge Fund Portfolio'}
                                     />
                                 )}
                             </div>
