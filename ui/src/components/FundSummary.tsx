@@ -8,6 +8,9 @@ interface FundSummaryProps {
     history: HistoricalHolding[];
     fundName: string;
     cik?: string;
+    onOpenHoldings?: () => void;
+    onOpenActivity?: () => void;
+    onOpenComposition?: () => void;
 }
 
 interface TooltipState {
@@ -32,7 +35,7 @@ const formatQ = (dateStr: string) => {
     return `${q}Q '${d.getFullYear().toString().slice(2)}`;
 };
 
-export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik }) => {
+export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik, onOpenHoldings, onOpenActivity, onOpenComposition }) => {
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
     const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
@@ -48,6 +51,14 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
     const handleMouseLeave = () => {
         setTooltip(null);
+    };
+
+    const handleNavigationKeyDown = (e: React.KeyboardEvent, action?: () => void) => {
+        if (!action) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            action();
+        }
     };
 
     const {
@@ -258,6 +269,10 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 {/* POSITIONS TILE */}
                 <div
                     className="kpi-tile has-tooltip"
+                    role={onOpenActivity ? 'button' : undefined}
+                    tabIndex={onOpenActivity ? 0 : undefined}
+                    onClick={onOpenActivity}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
                     onMouseEnter={(e) => handleMouseEnter(e, 'Position Changes', (
                         <div>
                             {newPositions.length > 0 && (
@@ -288,6 +303,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         </div>
                     ))}
                     onMouseLeave={handleMouseLeave}
+                    style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon"><Briefcase size={18} /></div>
                     <div className="kpi-content">
@@ -310,7 +326,14 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 </div>
 
                 {/* AUM TILE */}
-                <div className="kpi-tile">
+                <div
+                    className="kpi-tile"
+                    role={onOpenComposition ? 'button' : undefined}
+                    tabIndex={onOpenComposition ? 0 : undefined}
+                    onClick={onOpenComposition}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenComposition)}
+                    style={{ cursor: onOpenComposition ? 'pointer' : 'default' }}
+                >
                     <div className="kpi-icon"><DollarSign size={18} /></div>
                     <div className="kpi-content">
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
@@ -332,6 +355,10 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 {/* NEW POSITIONS TILE */}
                 <div
                     className="kpi-tile has-tooltip"
+                    role={onOpenActivity ? 'button' : undefined}
+                    tabIndex={onOpenActivity ? 0 : undefined}
+                    onClick={onOpenActivity}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
                     onMouseEnter={(e) => handleMouseEnter(e, 'New Positions', (
                         <div>
                             {newPositions.slice(0, 8).map(p => (
@@ -351,6 +378,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         </div>
                     ))}
                     onMouseLeave={handleMouseLeave}
+                    style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon positive"><PlusCircle size={18} /></div>
                     <div className="kpi-content">
@@ -369,6 +397,10 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 {/* EXITED POSITIONS TILE */}
                 <div
                     className="kpi-tile has-tooltip"
+                    role={onOpenActivity ? 'button' : undefined}
+                    tabIndex={onOpenActivity ? 0 : undefined}
+                    onClick={onOpenActivity}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
                     onMouseEnter={(e) => handleMouseEnter(e, 'Exited Positions', (
                         <div>
                             {exitedPositions.slice(0, 8).map(p => (
@@ -388,6 +420,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         </div>
                     ))}
                     onMouseLeave={handleMouseLeave}
+                    style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon negative"><MinusCircle size={18} /></div>
                     <div className="kpi-content">
@@ -439,7 +472,20 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             </div>
                         </div>
 
-                        <div className="fund-summary-card" style={{ cursor: 'default' }}>
+                        <div
+                            className="fund-summary-card"
+                            role={onOpenHoldings ? 'button' : undefined}
+                            tabIndex={onOpenHoldings ? 0 : undefined}
+                            onClick={onOpenHoldings}
+                            onKeyDown={(e) => {
+                                if (!onOpenHoldings) return;
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    onOpenHoldings();
+                                }
+                            }}
+                            style={{ cursor: onOpenHoldings ? 'pointer' : 'default' }}
+                        >
                             <div className="top-holdings-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 {topHoldings.map((h, i) => (
                                     <div key={i} className="mini-holding" style={{

@@ -154,6 +154,13 @@ class DatabaseManager:
             )
             """,
             """
+            CREATE TABLE IF NOT EXISTS ticker_metadata (
+                ticker TEXT PRIMARY KEY,
+                status TEXT,
+                last_updated TEXT
+            )
+            """,
+            """
             CREATE TABLE IF NOT EXISTS fund_quarterly_stats (
                 cik TEXT,
                 period_of_report TEXT,
@@ -210,10 +217,24 @@ class DatabaseManager:
             """, fetch='one')
             if not col_exists:
                 self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
+            
+            # Check for dividends column in prices
+            price_col_exists = self._execute("""
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'prices' AND column_name = 'dividends'
+            """, fetch='one')
+            if not price_col_exists:
+                self._execute("ALTER TABLE prices ADD COLUMN dividends REAL DEFAULT 0")
         else:
             try:
                 self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
             except Exception:
+                pass
+                
+            try:
+                self._execute("ALTER TABLE prices ADD COLUMN dividends REAL DEFAULT 0")
+            except Exception:
+                # Column likely already exists
                 pass
 
         # 1. Normalize CIKs
@@ -675,6 +696,43 @@ class DatabaseManager:
         query += " ORDER BY date ASC"
         return self._execute(query, tuple(params), fetch='all')
 
+    def save_prices(self, ticker: str, prices: List[Dict]):
+        """Bulk saves price data for a ticker."""
+        if not prices:
+            return
+
+        # Prepare records for insertion
+        records = [(ticker, p['date'], p['price'], p.get('dividends', 0)) for p in prices]
+        
+        if self.is_postgres:
+            # PostgreSQL batch insert with conflict handling
+            # Use a smaller template to reduce string processing overhead
+            query = """
+                INSERT INTO prices (ticker, date, price, dividends)
+                VALUES %s
+                ON CONFLICT (ticker, date) DO UPDATE SET 
+                    price = EXCLUDED.price,
+                    dividends = EXCLUDED.dividends
+            """
+            with self._get_connection() as conn:
+                with conn.cursor() as cur:
+                    from psycopg2.extras import execute_values
+                    # execute_values is faster, but we'll use a page_size to manage memory
+                    execute_values(cur, query, records, page_size=1000)
+                conn.commit()
+        else:
+            # SQLite batch insert
+            self._execute_many("""
+                INSERT OR REPLACE INTO prices (ticker, date, price, dividends)
+                VALUES (?, ?, ?, ?)
+            """, records)
+
+    def _execute_many(self, query: str, params_list: List[tuple]):
+        """Helper for bulk SQLite inserts."""
+        with self._get_connection() as conn:
+            conn.executemany(query, params_list)
+            conn.commit()
+
     def delete_group(self, group_id: int):
         self._execute("DELETE FROM fund_groups WHERE id = ?", (group_id,))
 
@@ -715,6 +773,28 @@ class DatabaseManager:
     def get_sync_status(self, cik: str) -> Optional[Dict]:
         cik = self.normalize_cik(cik)
         return self._execute("SELECT * FROM sync_status WHERE cik = ?", (cik,), fetch='one')
+
+    def get_ticker_metadata(self, ticker: str) -> Optional[Dict]:
+        return self._execute("SELECT * FROM ticker_metadata WHERE ticker = ?", (ticker,), fetch='one')
+
+    def save_ticker_metadata(self, ticker: str, status: str):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if self.is_postgres:
+            self._execute("""
+                INSERT INTO ticker_metadata (ticker, status, last_updated)
+                VALUES (?, ?, ?)
+                ON CONFLICT (ticker) DO UPDATE SET 
+                    status = EXCLUDED.status,
+                    last_updated = EXCLUDED.last_updated
+            """, (ticker, status, now))
+        else:
+            self._execute("""
+                INSERT OR REPLACE INTO ticker_metadata (ticker, status, last_updated)
+                VALUES (?, ?, ?)
+            """, (ticker, status, now))
+
+    def delete_ticker_metadata(self, ticker: str):
+        self._execute("DELETE FROM ticker_metadata WHERE ticker = ?", (ticker,))
 
     def save_quarterly_stats(self, stats: Dict):
         """Persist or update quarterly summary statistics for a fund."""

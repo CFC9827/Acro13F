@@ -22,7 +22,7 @@
 **Deliverables**:
 - [x] Bulk CSV/ZIP downloader for SEC quarterly 13F data sets (2013–present)
 - [x] Parser for flattened SEC data format into database
-- [ ] PostgreSQL migration (from SQLite) to handle scale
+- [x] PostgreSQL migration (from SQLite) to handle scale
 - [x] Summary Engine: pre-compute trade activity, AUM, concentration for each fund/quarter
 - [x] Seed database with top 100 funds, then expand to full universe
 - [ ] Amendment monitor for between-quarter updates

@@ -1184,6 +1184,9 @@ function App() {
                                         history={history}
                                         fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Fund'}
                                         cik={selectedCik || undefined}
+                                        onOpenHoldings={() => navigate('table', selectedCik)}
+                                        onOpenActivity={() => navigate('activity', selectedCik)}
+                                        onOpenComposition={() => navigate('chart', selectedCik)}
                                     />
                                 ) : (view === 'performance' || view === 'mimic') ? (
                                     <div className="performance-view-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

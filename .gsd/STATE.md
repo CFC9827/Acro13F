@@ -1,12 +1,12 @@
 # STATE.md — Project State
 
-> Last updated: 2026-03-22
+> Last updated: 2026-04-30
 
 ## Current Position
 
 **Milestone:** v3.0 — Online 13F Platform
-**Phase:** 9 (Cloud Deployment)
-**Status:** 🟢 Ready for Deployment — Discovery Explorer unified, Stock Consensus live, Fund tracking separation finalized.
+**Phase:** Maintenance & Stability
+**Status**: 🟢 Charting Stabilized — Resolved price API crashes and restored premium Institutional Explorer UI.
 
 ## Last Session Summary
 

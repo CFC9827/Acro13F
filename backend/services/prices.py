@@ -31,17 +31,13 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
             return prices
     
     # Check if we have a "failed" marker or old data
-    with db._get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS ticker_metadata (ticker TEXT PRIMARY KEY, status TEXT, last_updated TEXT)")
-        cursor.execute("SELECT last_updated FROM ticker_metadata WHERE ticker = ? AND status = 'failed'", (ticker,))
-        fail_res = cursor.fetchone()
-        if fail_res:
-            last_fail = datetime.strptime(fail_res[0], "%Y-%m-%d %H:%M:%S")
-            # If we failed within the last 30 days, don't try again
-            if (datetime.now() - last_fail).days < 30:
-                logger.debug(f"Skipping recently failed ticker: {ticker}")
-                return prices
+    fail_res = db.get_ticker_metadata(ticker)
+    if fail_res and fail_res.get('status') == 'failed':
+        last_fail = datetime.strptime(fail_res['last_updated'], "%Y-%m-%d %H:%M:%S")
+        # If we failed within the last 30 days, don't try again
+        if (datetime.now() - last_fail).days < 30:
+            logger.debug(f"Skipping recently failed ticker: {ticker}")
+            return prices
 
     # Check if cached data is usable:
     if prices:
@@ -68,12 +64,8 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     try:
         logger.info(f"Fetching historical prices for {ticker} from Yahoo Finance")
         
-        # Identify the request
-        user_agent = os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
-        session = requests.Session()
-        session.headers.update({'User-Agent': user_agent})
-        
-        stock = yf.Ticker(ticker, session=session)
+        # Fetch from Yahoo Finance (yfinance handles its own session now)
+        stock = yf.Ticker(ticker)
         
         # If no start date, fetch a reasonable history (e.g. 10 years)
         fetch_start = start_date if start_date else "2015-01-01"
@@ -83,17 +75,11 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         if hist.empty:
             logger.warning(f"No price data found for {ticker}")
             # Mark as failed in metadata
-            with db._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("CREATE TABLE IF NOT EXISTS ticker_metadata (ticker TEXT PRIMARY KEY, status TEXT, last_updated TEXT)")
-                cursor.execute("INSERT OR REPLACE INTO ticker_metadata (ticker, status, last_updated) VALUES (?, ?, ?)", 
-                               (ticker, 'failed', datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            db.save_ticker_metadata(ticker, 'failed')
             return prices # Return whatever we had in DB (even if empty)
         
         # Clear failure marker if it exists
-        with db._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM ticker_metadata WHERE ticker = ?", (ticker,))
+        db.delete_ticker_metadata(ticker)
 
         new_prices = []
         for date, row in hist.iterrows():
