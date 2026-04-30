@@ -34,8 +34,8 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     fail_res = db.get_ticker_metadata(ticker)
     if fail_res and fail_res.get('status') == 'failed':
         last_fail = datetime.strptime(fail_res['last_updated'], "%Y-%m-%d %H:%M:%S")
-        # If we failed within the last 30 days, don't try again
-        if (datetime.now() - last_fail).days < 30:
+        # If we failed within the last 1 day, don't try again
+        if (datetime.now() - last_fail).days < 1:
             logger.debug(f"Skipping recently failed ticker: {ticker}")
             return prices
 
