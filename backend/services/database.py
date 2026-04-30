@@ -892,33 +892,28 @@ class DatabaseManager:
     def get_stock_holders(self, ticker: str) -> List[Dict]:
         """
         Returns a list of funds that hold the given ticker in their latest filing.
-        Includes weight and value information. Uses pre-calculated AUM for performance.
         """
         ticker = str(ticker).strip().upper()
         query = """
-            WITH LatestFilings AS (
-                SELECT cik, MAX(period_of_report) as latest_period
+            WITH LatestPeriods AS (
+                SELECT cik, MAX(period_of_report) as max_period
                 FROM filings
                 GROUP BY cik
-            ),
-            TargetHoldings AS (
-                SELECT h.ticker, h.value, h.shares, h.put_call, h.accession_number, f.cik
-                FROM holdings h
-                JOIN filings f ON h.accession_number = f.accession_number
-                JOIN LatestFilings lf ON f.cik = lf.cik AND f.period_of_report = lf.latest_period
-                WHERE TRIM(UPPER(h.ticker)) = ?
             )
             SELECT 
-                COALESCE(f.name, 'Unknown Fund (' || th.cik || ')') as fund_name,
-                th.cik,
-                th.shares,
-                th.value,
-                th.put_call,
-                (CAST(th.value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
-            FROM TargetHoldings th
-            LEFT JOIN funds f ON th.cik = f.cik
-            LEFT JOIN fund_quarterly_stats qs ON th.accession_number = qs.accession_number
-            ORDER BY th.value DESC
+                COALESCE(f.name, 'Unknown Fund (' || fi.cik || ')') as fund_name,
+                fi.cik,
+                h.shares,
+                h.value,
+                h.put_call,
+                (CAST(h.value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
+            FROM holdings h
+            JOIN filings fi ON h.accession_number = fi.accession_number
+            JOIN LatestPeriods lp ON fi.cik = lp.cik AND fi.period_of_report = lp.max_period
+            LEFT JOIN funds f ON fi.cik = f.cik
+            LEFT JOIN fund_quarterly_stats qs ON fi.accession_number = qs.accession_number
+            WHERE UPPER(h.ticker) = ?
+            ORDER BY h.value DESC
         """
         return self._execute(query, (ticker,), fetch='all')
 
