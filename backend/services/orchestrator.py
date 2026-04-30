@@ -118,6 +118,10 @@ class Orchestrator:
                     if metrics:
                         whale_svc.save_metrics(metrics)
                 logging.info(f"Auto-calculated quarterly stats for {fund_name} ({len(filings)} quarters).")
+                
+                # NEW: Auto-fetch prices for all tickers in the fund
+                self.sync_fund_prices(cik)
+                
             except Exception as e:
                 logging.warning(f"Failed to auto-calculate metrics for {fund_name}: {e}")
         
@@ -132,6 +136,48 @@ class Orchestrator:
             "skipped_legacy_end": max(skipped_legacy_dates) if skipped_legacy_dates else None,
             "is_new": is_new
         }
+
+    def sync_fund_prices(self, cik: str):
+        """Fetches historical prices for all unique tickers held by the fund."""
+        from backend.services.prices import get_historical_prices
+        
+        logging.info(f"Starting background price sync for fund CIK: {cik}")
+        
+        # 1. Get all unique tickers held by this fund across all history
+        tickers = self.db._execute("""
+            SELECT DISTINCT ticker 
+            FROM holdings h
+            JOIN filings f ON h.accession_number = f.accession_number
+            WHERE f.cik = ? AND h.ticker IS NOT NULL AND h.ticker != ''
+        """, (cik,), fetch='all')
+        
+        if not tickers:
+            return
+            
+        ticker_list = [t['ticker'] for t in tickers]
+        logging.info(f"Found {len(ticker_list)} unique tickers to sync for {cik}")
+        
+        # 2. Get the earliest filing date to know how far back to fetch prices
+        range_info = self.db.get_filing_range(cik)
+        start_date = None
+        if range_info.get('earliest'):
+            # Go back a bit further than the earliest filing
+            from datetime import datetime, timedelta
+            earliest = datetime.strptime(range_info['earliest'], "%Y-%m-%d")
+            start_date = (earliest - timedelta(days=120)).strftime("%Y-%m-%d")
+
+        # 3. Fetch prices for each ticker
+        # Note: In a production environment, this should be queued as a background task
+        # But for now, we'll do it sequentially
+        success_count = 0
+        for ticker in ticker_list:
+            try:
+                get_historical_prices(ticker, self.db, start_date)
+                success_count += 1
+            except Exception as e:
+                logging.error(f"Failed to sync prices for {ticker}: {e}")
+                
+        logging.info(f"Price sync complete for {cik}. Successfully synced {success_count}/{len(ticker_list)} tickers.")
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
