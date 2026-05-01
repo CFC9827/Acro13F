@@ -682,6 +682,25 @@ class DatabaseManager:
         
         summary["new_positions"] = sorted(all_new_positions, key=lambda x: x["value"], reverse=True)[:100]
         summary["exited_positions"] = sorted(all_exited_positions, key=lambda x: x["value"], reverse=True)[:100]
+        
+        # Build full consensus list for the new tab
+        consensus_list = []
+        for ticker_key, data in current_ticker_funds.items():
+            cc = len(data["funds"])
+            pc = len(prior_ticker_funds.get(ticker_key, set()))
+            consensus_list.append({
+                "ticker": data["ticker"],
+                "issuer_name": data["issuer"],
+                "fund_count": cc,
+                "prev_fund_count": pc,
+                "change": cc - pc,
+                "total_value": data["total_value"],
+                "funds": list(data["funds"])
+            })
+        
+        # Sort by fund count descending, then value
+        summary["consensus_stocks"] = sorted(consensus_list, key=lambda x: (x["fund_count"], x["total_value"]), reverse=True)
+        
         summary["fund_periods"] = sorted(list(all_latest_periods), reverse=True)
         summary["periods_aligned"] = len(all_latest_periods) <= 1
         return summary
@@ -969,12 +988,25 @@ class DatabaseManager:
         """
         return self._execute(query, (limit,), fetch='all')
 
-    def get_stock_holders(self, ticker: str) -> List[Dict]:
+    def get_stock_holders(self, ticker: str, group_id: int = None) -> List[Dict]:
         """
         Returns a list of funds that hold the given ticker in their latest filing.
+        If group_id is provided, only returns funds in that group.
+        Otherwise, only returns funds that are marked as 'is_tracked'.
         """
         ticker = str(ticker).strip().upper()
-        query = """
+        
+        # Build the dynamic filtering clause
+        filter_clause = "WHERE UPPER(h.ticker) = ?"
+        params = [ticker]
+        
+        if group_id:
+            filter_clause += " AND fi.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
+            params.append(group_id)
+        else:
+            filter_clause += " AND f.is_tracked = 1"
+
+        query = f"""
             WITH LatestPeriods AS (
                 SELECT cik, MAX(period_of_report) as max_period
                 FROM filings
@@ -992,10 +1024,10 @@ class DatabaseManager:
             JOIN LatestPeriods lp ON fi.cik = lp.cik AND fi.period_of_report = lp.max_period
             LEFT JOIN funds f ON fi.cik = f.cik
             LEFT JOIN fund_quarterly_stats qs ON fi.accession_number = qs.accession_number
-            WHERE UPPER(h.ticker) = ?
+            {filter_clause}
             ORDER BY h.value DESC
         """
-        return self._execute(query, (ticker,), fetch='all')
+        return self._execute(query, tuple(params), fetch='all')
 
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""

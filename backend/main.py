@@ -443,10 +443,10 @@ async def get_whale_favorites(limit: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/explorer/stock/{ticker}/holders")
-async def get_stock_holders(ticker: str):
+async def get_stock_holders(ticker: str, group_id: int = None):
     """Returns a list of funds that hold a specific stock."""
     try:
-        results = db.get_stock_holders(ticker)
+        results = db.get_stock_holders(ticker, group_id=group_id)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

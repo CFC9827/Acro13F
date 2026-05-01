@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical, Search, MousePointer2, Loader2, X } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 
 interface Holding {
@@ -113,6 +113,16 @@ interface SwoopOpportunity {
     fund_name: string;
 }
 
+interface ConsensusItem {
+    ticker?: string;
+    issuer_name: string;
+    fund_count: number;
+    prev_fund_count?: number;
+    change?: number;
+    total_value: number;
+    funds: string[];
+}
+
 interface SectorItem {
     sector: string;
     value: number;
@@ -132,6 +142,7 @@ interface DashboardSummary {
     new_positions?: NewPosition[];
     exited_positions?: ExitedPosition[];
     ticker_fund_activity?: TickerFundActivity;
+    consensus_stocks?: ConsensusItem[];
 }
 
 interface Group {
@@ -608,8 +619,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+    const [loading, setLoading] = useState(false);
     const [moversMode, setMoversMode] = useState<MoversMode>('dollar');
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
@@ -621,6 +632,31 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
     const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
     const [isFundSummariesMinimized, setIsFundSummariesMinimized] = useState(false);
+    const [activeTab, setActiveTab] = useState<'overview' | 'consensus'>('overview');
+    const [stockSearchQuery, setStockSearchQuery] = useState('');
+    const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+    const [holders, setHolders] = useState<any[]>([]);
+    const [loadingHolders, setLoadingHolders] = useState(false);
+
+    const fetchStockHolders = async (ticker: string) => {
+        setSelectedTicker(ticker);
+        setLoadingHolders(true);
+        try {
+            const url = `/api/explorer/stock/${encodeURIComponent(ticker)}/holders${selectedGroupId ? `?group_id=${selectedGroupId}` : ''}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setHolders(data);
+            } else {
+                setHolders([]);
+            }
+        } catch (err) {
+            console.error("Failed to fetch holders", err);
+            setHolders([]);
+        } finally {
+            setLoadingHolders(false);
+        }
+    };
 
     const kpis = summary.kpis;
     const aumChange = kpis ? kpis.total_aum - kpis.prior_aum : 0;
@@ -885,15 +921,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     useEffect(() => {
         if (selectedGroupId !== null) {
             fetchFilteredSummary(selectedGroupId);
+        } else {
+            // Always prefer initialSummary from App.tsx when on "All Funds"
+            // but fetch if it seems empty or missing consensus
+            if (initialSummary && initialSummary.latest_period && initialSummary.consensus_stocks) {
+                setSummary(initialSummary);
+            } else {
+                fetchFilteredSummary(null);
+            }
         }
-    }, [selectedGroupId]);
-
-    // Keep summary in sync with prop when no group selected
-    useEffect(() => {
-        if (selectedGroupId === null) {
-            setSummary(initialSummary);
-        }
-    }, [initialSummary, selectedGroupId]);
+    }, [selectedGroupId, initialSummary]);
 
     // Fetch sector allocation data
     useEffect(() => {
@@ -1122,7 +1159,53 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </button>
                     </div>
 
-                    {/* KPI Tiles */}
+                    {/* Tab Switcher */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: 'rgba(15, 23, 42, 0.4)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
+                        <button
+                            onClick={() => setActiveTab('overview')}
+                            style={{
+                                padding: '8px 24px',
+                                borderRadius: '10px',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                background: activeTab === 'overview' ? '#38bdf8' : 'transparent',
+                                color: activeTab === 'overview' ? '#0f172a' : '#64748b',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <LayoutGrid size={16} />
+                            Overview
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('consensus')}
+                            style={{
+                                padding: '8px 24px',
+                                borderRadius: '10px',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                background: activeTab === 'consensus' ? '#38bdf8' : 'transparent',
+                                color: activeTab === 'consensus' ? '#0f172a' : '#64748b',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px'
+                            }}
+                        >
+                            <TrendingUp size={16} />
+                            Stock Consensus
+                        </button>
+                    </div>
+
+                    {activeTab === 'overview' ? (
+                        <>
+                            {/* KPI Tiles */}
                     {kpis && (
                         <div className="kpi-tiles-row">
                             {/* Tracked Funds */}
@@ -1816,8 +1899,198 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </div>
                     )}
                 </>
-            )
-            }
+            ) : (
+                <div className="consensus-view" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                            <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', margin: 0 }}>Stock Consensus</h2>
+                            <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
+                                Aggregated holdings across {selectedGroupId ? `"${groups.find(g => g.id === selectedGroupId)?.name}"` : 'all tracked funds'}
+                            </p>
+                        </div>
+                        <div style={{ position: 'relative', width: '300px' }}>
+                            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search tickers or companies..."
+                                value={stockSearchQuery}
+                                onChange={(e) => setStockSearchQuery(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 12px 12px 42px',
+                                    background: 'rgba(15, 23, 42, 0.6)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    borderRadius: '12px',
+                                    color: '#f8fafc',
+                                    fontSize: '14px',
+                                    outline: 'none',
+                                    transition: 'all 0.2s'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fund Count</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agg. Value</th>
+                                    <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(() => {
+                                    const filtered = (summary.consensus_stocks || [])
+                                        .filter(s => 
+                                            (s.ticker || '').toLowerCase().includes(stockSearchQuery.toLowerCase()) || 
+                                            (s.issuer_name || '').toLowerCase().includes(stockSearchQuery.toLowerCase())
+                                        );
+                                    
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <tr>
+                                                <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
+                                                        <Search size={40} style={{ color: '#38bdf8' }} />
+                                                        <p style={{ fontSize: '16px', fontWeight: 500, color: '#f8fafc' }}>
+                                                            {loading ? 'Refreshing consensus data...' : 'No consensus data found.'}
+                                                        </p>
+                                                        {!loading && <p style={{ fontSize: '14px', color: '#94a3b8' }}>Try syncing more funds or checking your filters.</p>}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
+
+                                    return filtered.map((stock, idx) => (
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }} className="consensus-row">
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#38bdf8', fontSize: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                                                    {stock.ticker?.slice(0, 4) || 'N/A'}
+                                                </div>
+                                                <span style={{ color: '#f8fafc', fontWeight: 700 }}>{stock.ticker || 'N/A'}</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '14px' }}>{stock.issuer_name}</td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: '16px' }}>{stock.fund_count}</span>
+                                                <div style={{ display: 'flex', gap: '2px' }}>
+                                                    {Array.from({ length: Math.min(3, stock.fund_count) }).map((_, i) => (
+                                                        <Users key={i} size={12} style={{ color: '#38bdf8', opacity: 0.6 }} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px', color: '#f8fafc', fontWeight: 600 }}>{formatCurrency(stock.total_value)}</td>
+                                        <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                                            <button 
+                                                onClick={() => fetchStockHolders(stock.ticker || '')}
+                                                style={{ 
+                                                    background: 'rgba(56, 189, 248, 0.1)', 
+                                                    border: '1px solid rgba(56, 189, 248, 0.2)', 
+                                                    color: '#38bdf8', 
+                                                    padding: '6px 12px', 
+                                                    borderRadius: '8px', 
+                                                    fontSize: '12px', 
+                                                    fontWeight: 700, 
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}
+                                            >
+                                                <Search size={14} />
+                                                Holders
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    ));
+                                })()}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+            </>
+        )}
+
+            {/* Who Holds This? Modal */}
+            {selectedTicker && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(12px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                    padding: '20px'
+                }} onClick={() => setSelectedTicker(null)}>
+                    <div style={{
+                        background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '24px', width: '100%', maxWidth: '800px', maxHeight: '80vh',
+                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
+                    }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                                    <h2 style={{ margin: 0, fontSize: '20px', color: '#f8fafc', fontWeight: 800 }}>{selectedTicker}</h2>
+                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>HOLDERS IN OVERVIEW</div>
+                                </div>
+                                <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Current fund allocations within your selected overview.</p>
+                            </div>
+                            <button onClick={() => setSelectedTicker(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#64748b', padding: '8px', borderRadius: '50%', cursor: 'pointer' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div style={{ overflowY: 'auto', padding: '0 24px 24px' }}>
+                            {loadingHolders ? (
+                                <div style={{ padding: '60px', textAlign: 'center' }}>
+                                    <Loader2 size={32} className="spin" style={{ color: '#38bdf8', marginBottom: '16px' }} />
+                                    <p style={{ color: '#64748b' }}>Fetching institutional holders...</p>
+                                </div>
+                            ) : holders.length === 0 ? (
+                                <div style={{ padding: '60px', textAlign: 'center' }}>
+                                    <AlertCircle size={32} style={{ color: '#64748b', marginBottom: '16px' }} />
+                                    <p style={{ color: '#64748b' }}>No holders found in the current group.</p>
+                                </div>
+                            ) : (
+                                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
+                                    <thead>
+                                        <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Fund Name</th>
+                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Shares</th>
+                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Market Value</th>
+                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Weight</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {holders.map((h, i) => (
+                                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                                <td style={{ padding: '16px 0', color: '#f8fafc', fontWeight: 600 }}>{h.fund_name}</td>
+                                                <td style={{ padding: '16px 0', color: '#94a3b8' }}>{h.shares?.toLocaleString()}</td>
+                                                <td style={{ padding: '16px 0', color: '#f8fafc' }}>{formatCurrency(h.value)}</td>
+                                                <td style={{ padding: '16px 0', textAlign: 'right' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>{h.weight?.toFixed(2)}%</span>
+                                                        <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '4px' }}>
+                                                            <div style={{ height: '100%', width: `${Math.min(h.weight * 5, 100)}%`, background: '#38bdf8', borderRadius: '2px' }} />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

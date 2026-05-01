@@ -64,12 +64,12 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
     try:
         logger.info(f"Fetching historical prices for {ticker} from Yahoo Finance")
         
-        import requests
-        user_agent = os.environ.get("SEC_USER_AGENT", "MyTrackerApp/1.0 (contact@example.com)")
-        session = requests.Session()
-        session.headers.update({'User-Agent': user_agent})
+        # Let yfinance handle its own session for anti-bot protection
+        stock = yf.Ticker(ticker)
         
-        stock = yf.Ticker(ticker, session=session)
+        # Add a small delay to avoid rate limiting
+        import time
+        time.sleep(0.5) 
         
         # If no start date, fetch a reasonable history (e.g. 10 years)
         fetch_start = start_date if start_date else "2015-01-01"

@@ -933,7 +933,7 @@ function App() {
                             </div>
                         ) : view === 'dashboard' ? (
                             <GlobalDashboard
-                                summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [] }}
+                                summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [], consensus_stocks: [], kpis: { fund_count: 0, total_aum: 0, prior_aum: 0 } }}
                                 onSelectFund={(cik) => {
                                     navigate('summary', cik);
                                 }}
