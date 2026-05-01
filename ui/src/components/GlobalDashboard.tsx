@@ -876,8 +876,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 return `${mover.shares_change !== undefined && mover.shares_change >= 0 ? '+' : ''}${(mover.shares_change || 0).toLocaleString()}`;
             case 'funds':
                 if (activity) {
-                    const total = activity.buying + activity.selling;
-                    return `${total} ${total === 1 ? 'Fund' : 'Funds'}`;
+                    return `${activity.buying}B / ${activity.selling}S`;
                 }
                 return '-';
             default:
@@ -890,7 +889,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             case 'shares':
                 return 'Share count change';
             case 'funds':
-                return 'Institutional involvement';
+                return 'Buying / Selling';
             default:
                 return 'Dollar value change';
         }
