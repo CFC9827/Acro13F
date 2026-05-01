@@ -1569,40 +1569,44 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                 className="tooltip-content visible"
                                                                 style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15, zIndex: 1000 }}
                                                             >
-                                                                <span className="tooltip-row buying">
+                                                                <div className="tooltip-row buying">
                                                                     <strong>Buying:</strong>
                                                                     {(activity?.buying_funds || []).length > 0 ? (
-                                                                        (activity?.buying_funds || []).map((fund, idx) => (
-                                                                            <span 
-                                                                                key={idx} 
-                                                                                className="fund-line clickable"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    onSelectFund(fund.cik);
-                                                                                }}
-                                                                            >{fund.name}</span>
-                                                                        ))
+                                                                        <div className="fund-list-simple">
+                                                                            {(activity?.buying_funds || []).map((fund, idx) => (
+                                                                                <div 
+                                                                                    key={idx} 
+                                                                                    className="fund-item-simple clickable"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onSelectFund(fund.cik);
+                                                                                    }}
+                                                                                >{fund.name}</div>
+                                                                            ))}
+                                                                        </div>
                                                                     ) : (
-                                                                        <span className="fund-line">None</span>
+                                                                        <div className="fund-item-simple">None</div>
                                                                     )}
-                                                                </span>
-                                                                <span className="tooltip-row selling">
+                                                                </div>
+                                                                <div className="tooltip-row selling">
                                                                     <strong>Selling:</strong>
                                                                     {(activity?.selling_funds || []).length > 0 ? (
-                                                                        (activity?.selling_funds || []).map((fund, idx) => (
-                                                                            <span 
-                                                                                key={idx} 
-                                                                                className="fund-line clickable"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    onSelectFund(fund.cik);
-                                                                                }}
-                                                                            >{fund.name}</span>
-                                                                        ))
+                                                                        <div className="fund-list-simple">
+                                                                            {(activity?.selling_funds || []).map((fund, idx) => (
+                                                                                <div 
+                                                                                    key={idx} 
+                                                                                    className="fund-item-simple clickable"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onSelectFund(fund.cik);
+                                                                                    }}
+                                                                                >{fund.name}</div>
+                                                                            ))}
+                                                                        </div>
                                                                     ) : (
-                                                                        <span className="fund-line">None</span>
+                                                                        <div className="fund-item-simple">None</div>
                                                                     )}
-                                                                </span>
+                                                                </div>
                                                             </span>
                                                         )}
 
