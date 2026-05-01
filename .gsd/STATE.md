@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-01 14:02
+> Last updated: 2026-05-01 17:10
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -13,12 +13,14 @@
 - [x] Performance CSV Export: Standardized export for fund performance tab
 - [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
 - [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
+- [x] Consensus View Integration: Clickable tickers across Dashboard routing to Stock Consensus view
 
 ## Last Session Summary
 
 ### UI Refinement & Navigation
 - **Frictionless Navigation:** Implemented clickable fund links across all Global Dashboard sections (Holders, Big Movers, New Positions, Crowding tooltips).
-- **Aesthetic Polish:** Removed underlines from fund links and standardized font sizes (0.7rem) for "New" and "Exited" positions to match "Big Movers".
+- **Aesthetic Polish:** Removed underlines from fund links and standardized font sizes (0.7rem) for "New", "Exited", and "Swoop" positions to match "Big Movers".
+- **Consensus Integration:** Enabled ticker click-through navigation across the dashboard, routing directly to the Stock Consensus view with automatic filtering and terminology alignment.
 - **Track Fund Toggle:** Added high-fidelity tracking button in the fund analysis header with background sync.
 - **Performance Chart:** Increased vertical space to 600px to accommodate large fund legends.
 

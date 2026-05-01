@@ -1557,7 +1557,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             return (
                                                 <div key={i} className="mover-item">
                                                     <div className="mover-info">
-                                                        <span className="mover-ticker">{mover.ticker || mover.issuer_name}</span>
+                                                        <span className="mover-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(mover.ticker || mover.issuer_name)); }}>{mover.ticker || mover.issuer_name}</span>
                                                         {!showTooltip && (
                                                             <span 
                                                                 className="mover-fund"
@@ -1658,7 +1658,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     const itemTicker = item.ticker || item.issuer_name;
                                                     return (
                                                         <div key={i} className="crowding-item">
-                                                            <span className="crowding-ticker">{itemTicker}</span>
+                                                            <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(itemTicker)); }}>{itemTicker}</span>
                                                             <span
                                                                 className="crowding-count has-tooltip"
                                                                 onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker, 'widely_held')}
@@ -1702,7 +1702,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {gainingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change positive has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'gaining')}
@@ -1753,7 +1753,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {losingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change negative has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'losing')}
@@ -1827,7 +1827,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayNewPositions.map((pos, i) => (
                                             <div key={i} className="new-position-item">
                                                 <div className="new-position-info">
-                                                    <span className="new-position-ticker">{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="new-position-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="new-position-fund"
                                                         onClick={() => pos.cik && onSelectFund(pos.cik)}
@@ -1873,7 +1873,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayExitedPositions.map((pos, i) => (
                                             <div key={i} className="exited-position-item">
                                                 <div className="exited-position-info">
-                                                    <span className="exited-position-ticker">{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="exited-position-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="exited-position-fund"
                                                         onClick={() => pos.cik && onSelectFund(pos.cik)}
@@ -1928,8 +1928,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         swoopOpportunities.map((op, i) => (
                                             <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
                                                 <div className="mover-info">
-                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || op.issuer_name}</div>
-                                                    <div className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
+                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }} onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(op.ticker || op.issuer_name)); }}>{op.ticker || op.issuer_name}</div>
+                                                    <div className="mover-fund" style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
                                                         {op.fund_name}
                                                     </div>
                                                 </div>
@@ -2195,7 +2195,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
                                     <h2 style={{ margin: 0, fontSize: '20px', color: '#f8fafc', fontWeight: 800 }}>{selectedTicker}</h2>
-                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>HOLDERS IN OVERVIEW</div>
+                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>STOCK CONSENSUS</div>
                                 </div>
                                 <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Current fund allocations within your selected overview.</p>
                             </div>

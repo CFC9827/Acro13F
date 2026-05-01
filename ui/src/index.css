@@ -2308,6 +2308,13 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
   color: #f1f5f9;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.mover-ticker:hover,
+.shift-ticker:hover {
+  color: #38bdf8;
 }
 
 .mover-fund,
@@ -2576,6 +2583,12 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   color: #f1f5f9;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.crowding-ticker:hover {
+  color: #38bdf8;
 }
 
 .crowding-count {
@@ -2628,6 +2641,12 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   color: #f1f5f9;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.new-position-ticker:hover {
+  color: #38bdf8;
 }
 
 .new-position-fund {
@@ -2687,6 +2706,12 @@ body {
   font-size: 0.8rem;
   font-weight: 700;
   color: #f1f5f9;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.exited-position-ticker:hover {
+  color: #38bdf8;
 }
 
 .exited-position-fund {
