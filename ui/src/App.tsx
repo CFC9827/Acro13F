@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command, Check, Plus, Loader2 } from 'lucide-react'
+import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command, Check, Plus, Loader2, Download } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
@@ -16,6 +16,7 @@ import { ActivityView } from './components/ActivityView'
 import { Onboarding } from './components/Onboarding'
 import { calculateIRR } from './utils/performanceUtils'
 import { MimicPerformanceChart } from './components/MimicPerformanceChart'
+import { PerformanceExportModal } from './components/PerformanceExportModal'
 
 // Type for view states
 type ViewType = 'table' | 'chart' | 'performance' | 'mimic' | 'about' | 'dashboard' | 'summary' | 'activity' | 'explorer';
@@ -1259,6 +1260,7 @@ function App() {
                                                     onTimeRangeChange={(r) => { setTimeRange(r); setOffset(0); }}
                                                     offset={offset}
                                                     onOffsetChange={setOffset}
+                                                    fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Fund'}
                                                 />
                                             ) : (
                                                 <MimicPerformanceChart
@@ -1339,12 +1341,13 @@ function App() {
     )
 }
 
-function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffsetChange }: {
+function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffsetChange, fundName }: {
     data: HistoricalHolding[],
     timeRange: string,
     onTimeRangeChange: (r: string) => void,
     offset: number,
-    onOffsetChange: (o: number) => void
+    onOffsetChange: (o: number) => void,
+    fundName: string
 }) {
     const [showBenchmark, setShowBenchmark] = useState(false);
     const [benchmarkData, setBenchmarkData] = useState<BenchmarkData[]>([]);
@@ -1352,6 +1355,7 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
     const [linkToPortfolio, setLinkToPortfolio] = useState(false);
     const [metricTooltip, setMetricTooltip] = useState<{ key: string; x: number; y: number } | null>(null);
     const [showMethodologyTooltip, setShowMethodologyTooltip] = useState<{ x: number; y: number } | null>(null);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
     // Custom date range state
     const [customStartQuarter, setCustomStartQuarter] = useState<string>('');
@@ -1993,6 +1997,15 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                             <TrendingUp size={14} style={{ marginRight: 6 }} />
                             {linkToPortfolio ? 'Unlink Stocks' : 'Link to Portfolio'}
                         </button>
+                        <button
+                            className="download-csv-btn"
+                            onClick={() => setIsExportModalOpen(true)}
+                            title="Download Performance CSV"
+                            style={{ marginLeft: '8px' }}
+                        >
+                            <Download size={14} />
+                            <span>Export CSV</span>
+                        </button>
                     </div>
                     <div style={{ width: '1px', height: '24px', background: '#e2e8f0', margin: '0 16px' }}></div>
                     <div className="time-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2366,6 +2379,13 @@ function PerformanceChart({ data, timeRange, onTimeRangeChange, offset, onOffset
                 customEnd={customEndQuarter}
             />
             {/* Footer removed to avoid duplication as PortfolioChart already includes it */}
+            <PerformanceExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                data={filteredData}
+                stats={stats}
+                fundName={fundName}
+            />
         </div>
     );
 }

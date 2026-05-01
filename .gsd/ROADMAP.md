@@ -42,6 +42,7 @@
 - [x] Premium UI overhaul (Glassmorphism, dark mode polish)
 - [x] Frictionless Navigation: Clickable fund names across Global Dashboard
 - [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
+- [x] Performance CSV Export: Standardized export for fund performance tab
 
 ---
 
