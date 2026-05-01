@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-01
+> Last updated: 2026-05-01 13:50
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -11,6 +11,7 @@
 - [x] Frictionless Navigation: Clickable fund names across Global Dashboard
 - [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
 - [x] Performance CSV Export: Standardized export for fund performance tab
+- [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
 
 ## Last Session Summary
 

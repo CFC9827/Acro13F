@@ -2436,6 +2436,32 @@ body {
   white-space: normal;
   word-wrap: break-word;
   pointer-events: none;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.fund-list-simple {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fund-item-simple {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 2px 0;
+  transition: color 0.2s;
+}
+
+.fund-item-simple.clickable {
+  cursor: pointer;
+  pointer-events: auto; /* Re-enable pointer events for clickable funds */
+}
+
+.fund-item-simple.clickable:hover {
+  color: #38bdf8;
+  text-decoration: underline;
 }
 
 .mover-delta.has-tooltip:hover .tooltip-content,

@@ -95,6 +95,8 @@ interface TickerFundActivity {
         issuer?: string;
         buying_funds?: { name: string; cik: string }[];
         selling_funds?: { name: string; cik: string }[];
+        new_buyers?: { name: string; cik: string }[];
+        exited_sellers?: { name: string; cik: string }[];
     };
 }
 
@@ -628,7 +630,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [loading, setLoading] = useState(false);
     const [moversMode, setMoversMode] = useState<MoversMode>('value');
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string, index: number } | null>(null);
-    const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
+    const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string, source?: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
     const [newPosSort, setNewPosSort] = useState<'value' | 'weight'>('value');
     const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
@@ -704,8 +706,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         setMoverTooltip(null);
     };
 
-    const handleCrowdingTooltipEnter = (e: React.MouseEvent, ticker: string) => {
-        setCrowdingTooltip({ x: e.clientX, y: e.clientY, ticker });
+    const handleCrowdingTooltipEnter = (e: React.MouseEvent, ticker: string, source: string) => {
+        setCrowdingTooltip({ x: e.clientX, y: e.clientY, ticker, source });
     };
 
     const handleCrowdingTooltipLeave = () => {
@@ -1659,11 +1661,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                             <span className="crowding-ticker">{itemTicker}</span>
                                                             <span
                                                                 className="crowding-count has-tooltip"
-                                                                onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker)}
+                                                                onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker, 'widely_held')}
                                                                 onMouseLeave={handleCrowdingTooltipLeave}
                                                             >
                                                                 {item.fund_count} funds
-                                                                {crowdingTooltip && crowdingTooltip.ticker === itemTicker && item.funds && item.funds.length > 0 && (
+                                                                {crowdingTooltip && crowdingTooltip.ticker === itemTicker && crowdingTooltip.source === 'widely_held' && item.funds && item.funds.length > 0 && (
                                                                     <span
                                                                         className="tooltip-content visible"
                                                                         style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
@@ -1703,28 +1705,35 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change positive has-tooltip"
-                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name)}
+                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'gaining')}
                                                             onMouseLeave={handleCrowdingTooltipLeave}
                                                         >
                                                             +{item.change}
-                                                            {crowdingTooltip && crowdingTooltip.ticker === (item.ticker || item.issuer_name) && (
+                                                            {crowdingTooltip && normalizeTicker(crowdingTooltip.ticker) === normalizeTicker(item.ticker || item.issuer_name) && crowdingTooltip.source === 'gaining' && (
                                                                 <span
                                                                     className="tooltip-content visible"
                                                                     style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
                                                                 >
                                                                     {(() => {
                                                                         const tKey = normalizeTicker(item.ticker || item.issuer_name);
-                                                                        const activity = tickerActivity[tKey];
-                                                                        const newBuyers = activity?.new_buyers || [];
+                                                                        // Robust lookup: find key that matches normalized tKey
+                                                                        const actualKey = Object.keys(tickerActivity).find(k => normalizeTicker(k) === tKey);
+                                                                        const activity = actualKey ? tickerActivity[actualKey] : null;
+                                                                        
+                                                                        // Fallback to buying_funds if new_buyers is empty but change is positive
+                                                                        const displayFunds = activity?.new_buyers || [];
+                                                                        
                                                                         return (
                                                                             <div className="fund-list-simple">
-                                                                                {newBuyers.map((f: any, idx: number) => (
+                                                                                {displayFunds.map((f: any, idx: number) => (
                                                                                     <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
                                                                                         {typeof f === 'string' ? f : (f.name || 'Unknown')}
                                                                                     </div>
                                                                                 ))}
-                                                                                {newBuyers.length === 0 && (
-                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No new positions this period</div>
+                                                                                {displayFunds.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '11px' }}>
+                                                                                        No new buyers this quarter
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         );
@@ -1747,28 +1756,35 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change negative has-tooltip"
-                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name)}
+                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'losing')}
                                                             onMouseLeave={handleCrowdingTooltipLeave}
                                                         >
                                                             {item.change}
-                                                            {crowdingTooltip && crowdingTooltip.ticker === (item.ticker || item.issuer_name) && (
+                                                            {crowdingTooltip && normalizeTicker(crowdingTooltip.ticker) === normalizeTicker(item.ticker || item.issuer_name) && crowdingTooltip.source === 'losing' && (
                                                                 <span
                                                                     className="tooltip-content visible"
                                                                     style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
                                                                 >
                                                                     {(() => {
                                                                         const tKey = normalizeTicker(item.ticker || item.issuer_name);
-                                                                        const activity = tickerActivity[tKey];
-                                                                        const exitedSellers = activity?.exited_sellers || [];
+                                                                        // Robust lookup: find key that matches normalized tKey
+                                                                        const actualKey = Object.keys(tickerActivity).find(k => normalizeTicker(k) === tKey);
+                                                                        const activity = actualKey ? tickerActivity[actualKey] : null;
+                                                                        
+                                                                        // Fallback to selling_funds if exited_sellers is empty but change is negative
+                                                                        const displayFunds = activity?.exited_sellers || [];
+                                                                        
                                                                         return (
                                                                             <div className="fund-list-simple">
-                                                                                {exitedSellers.map((f: any, idx: number) => (
+                                                                                {displayFunds.map((f: any, idx: number) => (
                                                                                     <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
                                                                                         {typeof f === 'string' ? f : (f.name || 'Unknown')}
                                                                                     </div>
                                                                                 ))}
-                                                                                {exitedSellers.length === 0 && (
-                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No complete exits this period</div>
+                                                                                {displayFunds.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '11px' }}>
+                                                                                        No full exits this quarter
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
                                                                         );

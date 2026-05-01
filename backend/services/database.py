@@ -530,8 +530,8 @@ class DatabaseManager:
         }
 
         all_latest_periods = set()
-        current_ticker_funds = {}
-        prior_ticker_funds = {}
+        current_ticker_funds = {} # {ticker: {funds: set((name, cik)), ticker: str, issuer: str, total_value: float}}
+        prior_ticker_funds = {}   # {ticker: set(cik)}
         all_new_positions = []
         all_exited_positions = []
 
@@ -567,13 +567,6 @@ class DatabaseManager:
             latest_holdings = aggregate_holdings(latest_holdings_raw)
             total_value = sum(h['value'] for h in latest_holdings)
             summary["kpis"]["total_aum"] += total_value
-
-            for h in latest_holdings:
-                key = h['ticker'] or h['cusip']
-                if key not in current_ticker_funds:
-                    current_ticker_funds[key] = {"funds": [], "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
-                current_ticker_funds[key]["funds"].append({"name": fund['name'], "cik": fund['cik']})
-                current_ticker_funds[key]["total_value"] += h['value']
 
             top_3_raw = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
             top_3 = []
@@ -613,15 +606,32 @@ class DatabaseManager:
                 latest_keys = set(((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')) for h in latest_holdings)
                 prev_keys = set(prev_map.keys())
 
+                # Base keys for new/exited (ignoring put/call)
+                latest_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in latest_holdings if h.get('ticker') or h.get('cusip'))
+                prev_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in prev_holdings_list if h.get('ticker') or h.get('cusip'))
+                new_base_keys = latest_base_keys - prev_base_keys
+                exited_base_keys = prev_base_keys - latest_base_keys
+
+                for h in latest_holdings:
+                    t_raw = h.get('ticker') or h.get('cusip')
+                    if not t_raw: continue
+                    key = t_raw.strip().upper()
+                    if key not in current_ticker_funds:
+                        current_ticker_funds[key] = {"funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
+                    current_ticker_funds[key]["funds"].add((fund['name'], fund['cik']))
+                    current_ticker_funds[key]["total_value"] += h['value']
+
                 for h in prev_holdings_list:
-                    key = h['ticker'] or h['cusip']
-                    if key not in prior_ticker_funds: prior_ticker_funds[key] = []
-                    prior_ticker_funds[key].append({"name": fund['name'], "cik": fund['cik']})
+                    t_raw = h.get('ticker') or h.get('cusip')
+                    if not t_raw: continue
+                    key = t_raw.strip().upper()
+                    if key not in prior_ticker_funds: prior_ticker_funds[key] = set()
+                    prior_ticker_funds[key].add(fund['cik'])
 
                 new_keys, exited_keys = latest_keys - prev_keys, prev_keys - latest_keys
-                summary["kpis"]["new_positions"] += len(new_keys)
-                summary["kpis"]["exited_positions"] += len(exited_keys)
-                fund_highlight["new_count"], fund_highlight["exit_count"] = len(new_keys), len(exited_keys)
+                summary["kpis"]["new_positions"] += len(new_base_keys)
+                summary["kpis"]["exited_positions"] += len(exited_base_keys)
+                fund_highlight["new_count"], fund_highlight["exit_count"] = len(new_base_keys), len(exited_base_keys)
 
                 prev_top_3_raw = sorted(prev_holdings_list, key=lambda x: x['value'], reverse=True)[:3]
                 prev_concentration = (sum(h['value'] for h in prev_top_3_raw) * 100.0 / prev_total_value) if prev_total_value else 0
@@ -648,7 +658,10 @@ class DatabaseManager:
                         "pct_of_fund": w_delta, "curr_weight": curr_w, "shares": h['shares'], "value": h['value']
                     })
 
-                    t_key = h['ticker'] or h['cusip']
+                    t_raw = h.get('ticker') or h.get('cusip')
+                    if not t_raw: continue
+                    t_key = t_raw.strip().upper()
+                    
                     if t_key not in summary["ticker_fund_activity"]:
                         summary["ticker_fund_activity"][t_key] = {
                             "buying": 0, "selling": 0, 
@@ -660,7 +673,7 @@ class DatabaseManager:
                     if v_change > 0:
                         summary["ticker_fund_activity"][t_key]["buying"] += 1
                         summary["ticker_fund_activity"][t_key]["buying_funds"].append({"name": fund['name'], "cik": fund['cik']})
-                        if key in new_keys:
+                        if t_key in new_base_keys:
                             summary["ticker_fund_activity"][t_key]["new_buyers"].append({"name": fund['name'], "cik": fund['cik']})
                     elif v_change < 0:
                         summary["ticker_fund_activity"][t_key]["selling"] += 1
@@ -670,10 +683,10 @@ class DatabaseManager:
                         summary["portfolio_shifts"].append({"fund_name": fund['name'], "cik": fund['cik'], "ticker": h['ticker'], "issuer_name": h['issuer_name'], "weight_delta": w_delta, "curr_weight": curr_w, "prev_weight": prev_w})
 
                 for h in prev_holdings_list:
-                    key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
+                    t_key = h['ticker'] or h['cusip']
+                    key = t_key + ('_' + h['put_call'] if h.get('put_call') else '')
                     if key in exited_keys:
                         all_exited_positions.append({"ticker": h['ticker'], "issuer_name": h.get('issuer_name', 'Unknown'), "fund_name": fund['name'], "cik": fund['cik'], "value": h['value'], "weight": (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0})
-                        t_key = h['ticker'] or h['cusip']
                         if t_key not in summary["ticker_fund_activity"]:
                              summary["ticker_fund_activity"][t_key] = {
                                 "buying": 0, "selling": 0, 
@@ -681,20 +694,47 @@ class DatabaseManager:
                                 "buying_funds": [], "selling_funds": [],
                                 "new_buyers": [], "exited_sellers": []
                             }
-                        summary["ticker_fund_activity"][t_key]["exited_sellers"].append({"name": fund['name'], "cik": fund['cik']})
+                        if t_key in exited_base_keys:
+                            # Only add to exited_sellers if they exited the name entirely
+                            if {"name": fund['name'], "cik": fund['cik']} not in summary["ticker_fund_activity"][t_key]["exited_sellers"]:
+                                summary["ticker_fund_activity"][t_key]["exited_sellers"].append({"name": fund['name'], "cik": fund['cik']})
 
         summary["big_movers"] = sorted(summary["big_movers"], key=lambda x: abs(x['val_change']), reverse=True)[:20]
         summary["portfolio_shifts"].sort(key=lambda x: abs(x['weight_delta']), reverse=True)
         
         most_held = sorted(current_ticker_funds.items(), key=lambda x: len(x[1]["funds"]), reverse=True)[:5]
-        summary["crowding_signals"]["most_held"] = [{"ticker": v["ticker"], "issuer_name": v["issuer"], "fund_count": len(v["funds"]), "funds": list(v["funds"])} for k, v in most_held]
+        summary["crowding_signals"]["most_held"] = [{"ticker": v["ticker"], "issuer_name": v["issuer"], "fund_count": len(v["funds"]), "funds": [{"name": f[0], "cik": f[1]} for f in v["funds"]]} for k, v in most_held]
         
-        f_changes = []
-        for t, d in current_ticker_funds.items():
-            cc, pc = len(d["funds"]), len(prior_ticker_funds.get(t, []))
-            f_changes.append({"ticker": d["ticker"], "issuer_name": d["issuer"], "curr_count": cc, "prev_count": pc, "change": cc - pc})
-        summary["crowding_signals"]["gaining_funds"] = sorted([x for x in f_changes if x["change"] > 0], key=lambda x: x["change"], reverse=True)[:5]
-        summary["crowding_signals"]["losing_funds"] = sorted([x for x in f_changes if x["change"] < 0], key=lambda x: x["change"])[:5]
+        # Crowding signals based on absolute new entries/exits
+        activity_list = []
+        for t, act in summary["ticker_fund_activity"].items():
+            activity_list.append({
+                "ticker": act["ticker"],
+                "issuer_name": act["issuer"],
+                "new_buyers_count": len(act["new_buyers"]),
+                "exited_sellers_count": len(act["exited_sellers"])
+            })
+
+        summary["crowding_signals"]["gaining_funds"] = sorted(
+            [x for x in activity_list if x["new_buyers_count"] > 0],
+            key=lambda x: x["new_buyers_count"],
+            reverse=True
+        )[:5]
+        # Map back to the expected format for the UI
+        summary["crowding_signals"]["gaining_funds"] = [
+            {"ticker": x["ticker"], "issuer_name": x["issuer_name"], "change": x["new_buyers_count"]}
+            for x in summary["crowding_signals"]["gaining_funds"]
+        ]
+
+        summary["crowding_signals"]["losing_funds"] = sorted(
+            [x for x in activity_list if x["exited_sellers_count"] > 0],
+            key=lambda x: x["exited_sellers_count"],
+            reverse=True
+        )[:5]
+        summary["crowding_signals"]["losing_funds"] = [
+            {"ticker": x["ticker"], "issuer_name": x["issuer_name"], "change": -x["exited_sellers_count"]}
+            for x in summary["crowding_signals"]["losing_funds"]
+        ]
         
         summary["new_positions"] = sorted(all_new_positions, key=lambda x: x["value"], reverse=True)[:100]
         summary["exited_positions"] = sorted(all_exited_positions, key=lambda x: x["value"], reverse=True)[:100]
