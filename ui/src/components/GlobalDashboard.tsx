@@ -1632,7 +1632,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     </div>
                                                 </div>
                                             );
-                                        })}
+                                        });
+                                    })()}
                                 </div>
                             </section>
 
