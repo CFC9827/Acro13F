@@ -1567,50 +1567,42 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                         {showTooltip && moverTooltip && moverTooltip.index === i && (
                                                             <span
                                                                 className="tooltip-content visible"
-                                                                style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
+                                                                style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15, zIndex: 1000 }}
                                                             >
-                                                                {(() => {
-                                                                    const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
-                                                                    const tAct = tickerActivity[tKey];
-                                                                    return (
-                                                                        <>
-                                                                            <span className="tooltip-row buying">
-                                                                                <strong>Buying:</strong>
-                                                                                {(tAct?.buying_funds || []).length > 0 ? (
-                                                                                    (tAct?.buying_funds || []).map((fund, idx) => (
-                                                                                        <span 
-                                                                                            key={idx} 
-                                                                                            className="fund-line clickable"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                onSelectFund(fund.cik);
-                                                                                            }}
-                                                                                        >{fund.name}</span>
-                                                                                    ))
-                                                                                ) : (
-                                                                                    <span className="fund-line">None</span>
-                                                                                )}
-                                                                            </span>
-                                                                            <span className="tooltip-row selling">
-                                                                                <strong>Selling:</strong>
-                                                                                {(tAct?.selling_funds || []).length > 0 ? (
-                                                                                    (tAct?.selling_funds || []).map((fund, idx) => (
-                                                                                        <span 
-                                                                                            key={idx} 
-                                                                                            className="fund-line clickable"
-                                                                                            onClick={(e) => {
-                                                                                                e.stopPropagation();
-                                                                                                onSelectFund(fund.cik);
-                                                                                            }}
-                                                                                        >{fund.name}</span>
-                                                                                    ))
-                                                                                ) : (
-                                                                                    <span className="fund-line">None</span>
-                                                                                )}
-                                                                            </span>
-                                                                        </>
-                                                                    );
-                                                                })()}
+                                                                <span className="tooltip-row buying">
+                                                                    <strong>Buying:</strong>
+                                                                    {(activity?.buying_funds || []).length > 0 ? (
+                                                                        (activity?.buying_funds || []).map((fund, idx) => (
+                                                                            <span 
+                                                                                key={idx} 
+                                                                                className="fund-line clickable"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    onSelectFund(fund.cik);
+                                                                                }}
+                                                                            >{fund.name}</span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="fund-line">None</span>
+                                                                    )}
+                                                                </span>
+                                                                <span className="tooltip-row selling">
+                                                                    <strong>Selling:</strong>
+                                                                    {(activity?.selling_funds || []).length > 0 ? (
+                                                                        (activity?.selling_funds || []).map((fund, idx) => (
+                                                                            <span 
+                                                                                key={idx} 
+                                                                                className="fund-line clickable"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    onSelectFund(fund.cik);
+                                                                                }}
+                                                                            >{fund.name}</span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="fund-line">None</span>
+                                                                    )}
+                                                                </span>
                                                             </span>
                                                         )}
 
