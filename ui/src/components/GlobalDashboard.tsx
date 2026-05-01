@@ -627,7 +627,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [newGroupName, setNewGroupName] = useState('');
     const [loading, setLoading] = useState(false);
     const [moversMode, setMoversMode] = useState<MoversMode>('value');
-    const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
+    const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string, index: number } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
     const [newPosSort, setNewPosSort] = useState<'value' | 'weight'>('value');
@@ -690,8 +690,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         exitPosSort === 'value' ? b.value - a.value : b.weight - a.weight
     );
 
-    const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string) => {
-        setMoverTooltip({ x: e.clientX, y: e.clientY, ticker });
+    const handleMoverTooltipEnter = (e: React.MouseEvent, ticker: string, index: number) => {
+        setMoverTooltip({ x: e.clientX, y: e.clientY, ticker, index });
     };
 
     const handleMoverTooltipLeave = () => {
@@ -1550,7 +1550,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     </div>
                                                     <div
                                                         className={`mover-delta ${showTooltip ? 'has-tooltip' : ''} ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}
-                                                        onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker) : undefined}
+                                                        onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker, i) : undefined}
                                                         onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
                                                     >
                                                         {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
@@ -1558,7 +1558,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                         {moversMode === 'percent' && mover.curr_weight !== undefined && (
                                                             <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
                                                         )}
-                                                        {showTooltip && moverTooltip && moverTooltip.ticker === ticker && (
+                                                        {showTooltip && moverTooltip && moverTooltip.index === i && (
                                                             <span
                                                                 className="tooltip-content visible"
                                                                 style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
