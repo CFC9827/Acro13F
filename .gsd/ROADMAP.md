@@ -40,6 +40,8 @@
 - [x] Navigation restructure: My Portfolio vs. Explore
 - [x] Multi-factor logic (AND/OR) per-row in builder
 - [x] Premium UI overhaul (Glassmorphism, dark mode polish)
+- [x] Frictionless Navigation: Clickable fund names across Global Dashboard
+- [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
 
 ---
 

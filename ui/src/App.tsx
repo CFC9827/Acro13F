@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command } from 'lucide-react'
+import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command, Check, Plus, Loader2 } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { HoldingsTable } from './components/HoldingsTable'
@@ -148,6 +148,37 @@ function App() {
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
     const [activeFundName, setActiveFundName] = useState<string | null>(null)
     const [dashboardSummary, setDashboardSummary] = useState<any>(null)
+    const [isTrackingSyncing, setIsTrackingSyncing] = useState(false)
+
+    const isCurrentFundTracked = useMemo(() => {
+        if (!selectedCik || !funds) return false;
+        const cleanCik = selectedCik.replace(/^0+/, '');
+        return funds.some(f => f.cik.replace(/^0+/, '') === cleanCik);
+    }, [selectedCik, funds]);
+
+    const toggleTrack = async (cik: string, currentStatus: boolean) => {
+        setIsTrackingSyncing(true);
+        try {
+            const res = await fetch(`/api/funds/${cik}/track?track=${!currentStatus}`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                await fetchFunds(true); // Always refresh tracked list
+                setNotification({ 
+                    message: !currentStatus ? "Fund added to tracked list" : "Fund removed from tracked list", 
+                    type: 'success' 
+                });
+                // If we added it, we should probably refresh dashboard summary too
+                if (!currentStatus) fetchDashboardSummary();
+            }
+        } catch (err) {
+            console.error("Failed to toggle track", err);
+            setError("Failed to update tracking status");
+        } finally {
+            setIsTrackingSyncing(false);
+        }
+    };
+
     const [timeRange, setTimeRange] = useState('1Y')
     const [offset, setOffset] = useState(0) // Number of quarters to offset from latest
     const [filingRange, setFilingRange] = useState<{ earliest: string | null, latest: string | null, total: number } | null>(null)
@@ -978,6 +1009,36 @@ function App() {
                                             {loading ? 'Refreshing...' : 'Refresh Data'}
                                         </button>
                                         <div className="tab-divider"></div>
+                                        <button
+                                            className={`tab track-btn-context ${isCurrentFundTracked ? 'active-tracked' : ''}`}
+                                            onClick={() => selectedCik && toggleTrack(selectedCik, isCurrentFundTracked)}
+                                            disabled={isTrackingSyncing}
+                                            style={{
+                                                background: isCurrentFundTracked ? 'rgba(16, 185, 129, 0.1)' : 'rgba(56, 189, 248, 0.05)',
+                                                color: isCurrentFundTracked ? '#10b981' : '#38bdf8',
+                                                border: `1px solid ${isCurrentFundTracked ? 'rgba(16, 185, 129, 0.3)' : 'rgba(56, 189, 248, 0.2)'}`,
+                                                borderRadius: '8px',
+                                                padding: '4px 12px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                fontSize: '12px',
+                                                fontWeight: 700,
+                                                marginRight: '8px',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            {isTrackingSyncing ? (
+                                                <Loader2 className="spin" size={14} />
+                                            ) : isCurrentFundTracked ? (
+                                                <Check size={14} />
+                                            ) : (
+                                                <Plus size={14} />
+                                            )}
+                                            {isCurrentFundTracked ? 'Tracked' : 'Track Fund'}
+                                        </button>
+                                        <div className="tab-divider"></div>
+
                                         <button
                                             className={view === 'summary' ? 'tab active' : 'tab'}
                                             onClick={() => navigate('summary', selectedCik)}

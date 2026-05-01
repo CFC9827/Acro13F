@@ -571,8 +571,8 @@ class DatabaseManager:
             for h in latest_holdings:
                 key = h['ticker'] or h['cusip']
                 if key not in current_ticker_funds:
-                    current_ticker_funds[key] = {"funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
-                current_ticker_funds[key]["funds"].add(fund['name'])
+                    current_ticker_funds[key] = {"funds": [], "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
+                current_ticker_funds[key]["funds"].append({"name": fund['name'], "cik": fund['cik']})
                 current_ticker_funds[key]["total_value"] += h['value']
 
             top_3_raw = sorted(latest_holdings, key=lambda x: x['value'], reverse=True)[:3]
@@ -615,8 +615,8 @@ class DatabaseManager:
 
                 for h in prev_holdings_list:
                     key = h['ticker'] or h['cusip']
-                    if key not in prior_ticker_funds: prior_ticker_funds[key] = set()
-                    prior_ticker_funds[key].add(fund['name'])
+                    if key not in prior_ticker_funds: prior_ticker_funds[key] = []
+                    prior_ticker_funds[key].append({"name": fund['name'], "cik": fund['cik']})
 
                 new_keys, exited_keys = latest_keys - prev_keys, prev_keys - latest_keys
                 summary["kpis"]["new_positions"] += len(new_keys)
@@ -638,11 +638,11 @@ class DatabaseManager:
                         if fund_highlight["top_add"] is None or w_delta > fund_highlight["top_add"]["weight_change"]:
                             fund_highlight["top_add"] = {"ticker": h['ticker'], "issuer_name": h['issuer_name'], "weight_change": w_delta, "curr_weight": curr_w}
 
-                    if key in new_keys:
-                        all_new_positions.append({"ticker": h['ticker'], "issuer_name": h['issuer_name'], "fund_name": fund['name'], "value": h['value'], "weight": curr_w})
+                    if (key in new_keys):
+                        all_new_positions.append({"ticker": h['ticker'], "issuer_name": h['issuer_name'], "fund_name": fund['name'], "cik": fund['cik'], "value": h['value'], "weight": curr_w})
 
                     summary["big_movers"].append({
-                        "fund_name": fund['name'], "ticker": f"{h['ticker']} {h['put_call']}" if h.get('put_call') else h['ticker'],
+                        "fund_name": fund['name'], "cik": fund['cik'], "ticker": f"{h['ticker']} {h['put_call']}" if h.get('put_call') else h['ticker'],
                         "issuer_name": h['issuer_name'], "val_change": h['value'] - (prev_h['value'] if prev_h else 0),
                         "shares_change": h['shares'] - (prev_h['shares'] if prev_h else 0),
                         "pct_of_fund": w_delta, "curr_weight": curr_w, "shares": h['shares'], "value": h['value']
@@ -654,18 +654,18 @@ class DatabaseManager:
                     v_change = h['value'] - (prev_h['value'] if prev_h else 0)
                     if v_change > 0:
                         summary["ticker_fund_activity"][t_key]["buying"] += 1
-                        summary["ticker_fund_activity"][t_key]["buying_funds"].append(fund['name'])
+                        summary["ticker_fund_activity"][t_key]["buying_funds"].append({"name": fund['name'], "cik": fund['cik']})
                     elif v_change < 0:
                         summary["ticker_fund_activity"][t_key]["selling"] += 1
-                        summary["ticker_fund_activity"][t_key]["selling_funds"].append(fund['name'])
+                        summary["ticker_fund_activity"][t_key]["selling_funds"].append({"name": fund['name'], "cik": fund['cik']})
 
                     if abs(w_delta) >= 3.0:
-                        summary["portfolio_shifts"].append({"fund_name": fund['name'], "ticker": h['ticker'], "issuer_name": h['issuer_name'], "weight_delta": w_delta, "curr_weight": curr_w, "prev_weight": prev_w})
+                        summary["portfolio_shifts"].append({"fund_name": fund['name'], "cik": fund['cik'], "ticker": h['ticker'], "issuer_name": h['issuer_name'], "weight_delta": w_delta, "curr_weight": curr_w, "prev_weight": prev_w})
 
                 for h in prev_holdings_list:
                     key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                     if key in exited_keys:
-                        all_exited_positions.append({"ticker": h['ticker'], "issuer_name": h.get('issuer_name', 'Unknown'), "fund_name": fund['name'], "value": h['value'], "weight": (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0})
+                        all_exited_positions.append({"ticker": h['ticker'], "issuer_name": h.get('issuer_name', 'Unknown'), "fund_name": fund['name'], "cik": fund['cik'], "value": h['value'], "weight": (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0})
 
         summary["big_movers"] = sorted(summary["big_movers"], key=lambda x: abs(x['val_change']), reverse=True)[:20]
         summary["portfolio_shifts"].sort(key=lambda x: abs(x['weight_delta']), reverse=True)
@@ -675,7 +675,7 @@ class DatabaseManager:
         
         f_changes = []
         for t, d in current_ticker_funds.items():
-            cc, pc = len(d["funds"]), len(prior_ticker_funds.get(t, set()))
+            cc, pc = len(d["funds"]), len(prior_ticker_funds.get(t, []))
             f_changes.append({"ticker": d["ticker"], "issuer_name": d["issuer"], "curr_count": cc, "prev_count": pc, "change": cc - pc})
         summary["crowding_signals"]["gaining_funds"] = sorted([x for x in f_changes if x["change"] > 0], key=lambda x: x["change"], reverse=True)[:5]
         summary["crowding_signals"]["losing_funds"] = sorted([x for x in f_changes if x["change"] < 0], key=lambda x: x["change"])[:5]
@@ -687,7 +687,7 @@ class DatabaseManager:
         consensus_list = []
         for ticker_key, data in current_ticker_funds.items():
             cc = len(data["funds"])
-            pc = len(prior_ticker_funds.get(ticker_key, set()))
+            pc = len(prior_ticker_funds.get(ticker_key, []))
             consensus_list.append({
                 "ticker": data["ticker"],
                 "issuer_name": data["issuer"],

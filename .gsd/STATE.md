@@ -1,20 +1,22 @@
 # STATE.md — Project State
 
-> Last updated: 2026-04-30
+> Last updated: 2026-05-01
 
-## Current Position
+## Current Phase: Phase 8 (refinements)
 
 **Milestone:** v3.0 — Online 13F Platform
 **Phase:** Maintenance & Stability
-**Status**: 🟢 UI Polished & Infrastructure Stable — Finalized PostgreSQL migration; resolved performance chart layout issues and benchmark duplication.
+**Status**: 
+- [x] Premium UI overhaul (Glassmorphism, dark mode polish)
+- [x] Frictionless Navigation: Clickable fund names across Global Dashboard
+- [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
 
 ## Last Session Summary
 
-### UI Refinement & Data Integrity
+### UI Refinement & Navigation
+- **Frictionless Navigation:** Implemented clickable fund links across all Global Dashboard sections (Holders, Big Movers, New Positions, Crowding tooltips).
+- **Track Fund Toggle:** Added high-fidelity tracking button in the fund analysis header with background sync.
 - **Performance Chart:** Increased vertical space to 600px to accommodate large fund legends.
-- **Benchmark De-duplication:** Removed redundant S&P 500 line from the comparison view.
-- **X-Axis Optimization:** Improved tick spacing to prevent label overlap on long-term charts.
-- **PostgreSQL Migration:** Successfully migrated all 13F data to the cloud database.
 
 ## Next Steps
 

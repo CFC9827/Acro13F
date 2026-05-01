@@ -35,6 +35,7 @@ interface FundHighlight {
 
 interface Mover {
     fund_name: string;
+    cik?: string;
     ticker?: string;
     issuer_name: string;
     val_change: number;
@@ -45,6 +46,7 @@ interface Mover {
 
 interface Shift {
     fund_name: string;
+    cik?: string;
     ticker?: string;
     issuer_name: string;
     weight_delta: number;
@@ -64,7 +66,7 @@ interface CrowdingItem {
     ticker?: string;
     issuer_name: string;
     fund_count?: number;
-    funds?: string[];
+    funds?: { name: string; cik: string }[];
     curr_count?: number;
     prev_count?: number;
     change?: number;
@@ -80,6 +82,7 @@ interface NewPosition {
     ticker?: string;
     issuer_name: string;
     fund_name: string;
+    cik?: string;
     value: number;
     weight: number;
 }
@@ -90,8 +93,8 @@ interface TickerFundActivity {
         selling: number;
         ticker?: string;
         issuer?: string;
-        buying_funds?: string[];
-        selling_funds?: string[];
+        buying_funds?: { name: string; cik: string }[];
+        selling_funds?: { name: string; cik: string }[];
     };
 }
 
@@ -99,6 +102,7 @@ interface ExitedPosition {
     ticker?: string;
     issuer_name: string;
     fund_name: string;
+    cik?: string;
     value: number;
     weight: number;
 }
@@ -120,7 +124,7 @@ interface ConsensusItem {
     prev_fund_count?: number;
     change?: number;
     total_value: number;
-    funds: string[];
+    funds: { name: string; cik: string }[];
 }
 
 interface SectorItem {
@@ -1532,7 +1536,13 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     <div className="mover-info">
                                                         <span className="mover-ticker">{mover.ticker || mover.issuer_name}</span>
                                                         {!showTooltip && (
-                                                            <span className="mover-fund">{mover.fund_name}</span>
+                                                            <span 
+                                                                className="mover-fund"
+                                                                onClick={() => mover.cik && onSelectFund(mover.cik)}
+                                                                style={{ cursor: mover.cik ? 'pointer' : 'default', textDecoration: mover.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                            >
+                                                                {mover.fund_name}
+                                                            </span>
                                                         )}
                                                     </div>
                                                     <div
@@ -1554,7 +1564,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     <strong>Buying:</strong>
                                                                     {(activity?.buying_funds || []).length > 0 ? (
                                                                         (activity?.buying_funds || []).map((fund, idx) => (
-                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                            <span 
+                                                                                key={idx} 
+                                                                                className="fund-line clickable"
+                                                                                onClick={() => onSelectFund(fund.cik)}
+                                                                            >{fund.name}</span>
                                                                         ))
                                                                     ) : (
                                                                         <span className="fund-line">None</span>
@@ -1564,7 +1578,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     <strong>Selling:</strong>
                                                                     {(activity?.selling_funds || []).length > 0 ? (
                                                                         (activity?.selling_funds || []).map((fund, idx) => (
-                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                            <span 
+                                                                                key={idx} 
+                                                                                className="fund-line clickable"
+                                                                                onClick={() => onSelectFund(fund.cik)}
+                                                                            >{fund.name}</span>
                                                                         ))
                                                                     ) : (
                                                                         <span className="fund-line">None</span>
@@ -1613,7 +1631,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                         style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15 }}
                                                                     >
                                                                         {item.funds.map((fund, idx) => (
-                                                                            <span key={idx} className="fund-line">{fund}</span>
+                                                                            <span 
+                                                                                key={idx} 
+                                                                                className="fund-line clickable"
+                                                                                onClick={() => onSelectFund(fund.cik)}
+                                                                            >{fund.name}</span>
                                                                         ))}
                                                                     </span>
                                                                 )}
@@ -1685,7 +1707,13 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div key={i} className="new-position-item">
                                                 <div className="new-position-info">
                                                     <span className="new-position-ticker">{pos.ticker || pos.issuer_name}</span>
-                                                    <span className="new-position-fund">{pos.fund_name}</span>
+                                                    <span 
+                                                        className="new-position-fund"
+                                                        onClick={() => pos.cik && onSelectFund(pos.cik)}
+                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', textDecoration: pos.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                    >
+                                                        {pos.fund_name}
+                                                    </span>
                                                 </div>
                                                 <div className="new-position-stats">
                                                     <span className="new-position-value">{formatCurrency(pos.value)}</span>
@@ -1725,7 +1753,13 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div key={i} className="exited-position-item">
                                                 <div className="exited-position-info">
                                                     <span className="exited-position-ticker">{pos.ticker || pos.issuer_name}</span>
-                                                    <span className="exited-position-fund">{pos.fund_name}</span>
+                                                    <span 
+                                                        className="exited-position-fund"
+                                                        onClick={() => pos.cik && onSelectFund(pos.cik)}
+                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', textDecoration: pos.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                    >
+                                                        {pos.fund_name}
+                                                    </span>
                                                 </div>
                                                 <div className="exited-position-stats">
                                                     <span className="exited-position-value">{formatCurrency(pos.value)}</span>
@@ -2072,7 +2106,22 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     <tbody>
                                         {holders.map((h, i) => (
                                             <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                                <td style={{ padding: '16px 0', color: '#f8fafc', fontWeight: 600 }}>{h.fund_name}</td>
+                                                <td style={{ padding: '16px 0' }}>
+                                                    <div 
+                                                        onClick={() => { setSelectedTicker(null); onSelectFund(h.cik); }}
+                                                        style={{ 
+                                                            color: '#f8fafc', 
+                                                            fontWeight: 600, 
+                                                            cursor: 'pointer',
+                                                            transition: 'color 0.2s ease',
+                                                            display: 'inline-block'
+                                                        }}
+                                                        onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#38bdf8'}
+                                                        onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#f8fafc'}
+                                                    >
+                                                        {h.fund_name}
+                                                    </div>
+                                                </td>
                                                 <td style={{ padding: '16px 0', color: '#94a3b8' }}>{h.shares?.toLocaleString()}</td>
                                                 <td style={{ padding: '16px 0', color: '#f8fafc' }}>{formatCurrency(h.value)}</td>
                                                 <td style={{ padding: '16px 0', textAlign: 'right' }}>
