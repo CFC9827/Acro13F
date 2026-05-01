@@ -1666,15 +1666,22 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                 {crowdingTooltip && crowdingTooltip.ticker === itemTicker && item.funds && item.funds.length > 0 && (
                                                                     <span
                                                                         className="tooltip-content visible"
-                                                                        style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15 }}
+                                                                        style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
                                                                     >
-                                                                        {item.funds.map((fund, idx) => (
-                                                                            <span 
-                                                                                key={idx} 
-                                                                                className="fund-line clickable"
-                                                                                onClick={() => onSelectFund(fund.cik)}
-                                                                            >{fund.name}</span>
-                                                                        ))}
+                                                                        <div className="fund-list-simple">
+                                                                            {item.funds.map((fund: any, idx: number) => (
+                                                                                <div 
+                                                                                    key={idx} 
+                                                                                    className="fund-item-simple clickable"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        onSelectFund(fund.cik);
+                                                                                    }}
+                                                                                >
+                                                                                    {typeof fund === 'string' ? fund : (fund.name || fund.issuer_name || 'Unknown Fund')}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
                                                                     </span>
                                                                 )}
                                                             </span>
