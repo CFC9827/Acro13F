@@ -650,11 +650,18 @@ class DatabaseManager:
 
                     t_key = h['ticker'] or h['cusip']
                     if t_key not in summary["ticker_fund_activity"]:
-                        summary["ticker_fund_activity"][t_key] = {"buying": 0, "selling": 0, "ticker": h['ticker'], "issuer": h['issuer_name'], "buying_funds": [], "selling_funds": []}
+                        summary["ticker_fund_activity"][t_key] = {
+                            "buying": 0, "selling": 0, 
+                            "ticker": h['ticker'], "issuer": h['issuer_name'], 
+                            "buying_funds": [], "selling_funds": [],
+                            "new_buyers": [], "exited_sellers": []
+                        }
                     v_change = h['value'] - (prev_h['value'] if prev_h else 0)
                     if v_change > 0:
                         summary["ticker_fund_activity"][t_key]["buying"] += 1
                         summary["ticker_fund_activity"][t_key]["buying_funds"].append({"name": fund['name'], "cik": fund['cik']})
+                        if key in new_keys:
+                            summary["ticker_fund_activity"][t_key]["new_buyers"].append({"name": fund['name'], "cik": fund['cik']})
                     elif v_change < 0:
                         summary["ticker_fund_activity"][t_key]["selling"] += 1
                         summary["ticker_fund_activity"][t_key]["selling_funds"].append({"name": fund['name'], "cik": fund['cik']})
@@ -666,6 +673,15 @@ class DatabaseManager:
                     key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
                     if key in exited_keys:
                         all_exited_positions.append({"ticker": h['ticker'], "issuer_name": h.get('issuer_name', 'Unknown'), "fund_name": fund['name'], "cik": fund['cik'], "value": h['value'], "weight": (h['value'] * 100.0 / prev_total_value) if prev_total_value else 0})
+                        t_key = h['ticker'] or h['cusip']
+                        if t_key not in summary["ticker_fund_activity"]:
+                             summary["ticker_fund_activity"][t_key] = {
+                                "buying": 0, "selling": 0, 
+                                "ticker": h['ticker'], "issuer": h.get('issuer_name', 'Unknown'), 
+                                "buying_funds": [], "selling_funds": [],
+                                "new_buyers": [], "exited_sellers": []
+                            }
+                        summary["ticker_fund_activity"][t_key]["exited_sellers"].append({"name": fund['name'], "cik": fund['cik']})
 
         summary["big_movers"] = sorted(summary["big_movers"], key=lambda x: abs(x['val_change']), reverse=True)[:20]
         summary["portfolio_shifts"].sort(key=lambda x: abs(x['weight_delta']), reverse=True)

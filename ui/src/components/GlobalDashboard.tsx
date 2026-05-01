@@ -1715,32 +1715,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     {(() => {
                                                                         const tKey = normalizeTicker(item.ticker || item.issuer_name);
                                                                         const activity = tickerActivity[tKey];
-                                                                        const buyers = activity?.buying_funds || [];
-                                                                        const sellers = activity?.selling_funds || [];
+                                                                        const newBuyers = activity?.new_buyers || [];
                                                                         return (
                                                                             <div className="fund-list-simple">
-                                                                                {buyers.length > 0 && (
-                                                                                    <div className="tooltip-row buying" style={{ marginBottom: '8px' }}>
-                                                                                        <strong>Buyers:</strong>
-                                                                                        {buyers.map((f: any, idx: number) => (
-                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
-                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
-                                                                                            </div>
-                                                                                        ))}
+                                                                                {newBuyers.map((f: any, idx: number) => (
+                                                                                    <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                        {typeof f === 'string' ? f : (f.name || 'Unknown')}
                                                                                     </div>
-                                                                                )}
-                                                                                {sellers.length > 0 && (
-                                                                                    <div className="tooltip-row selling">
-                                                                                        <strong>Sellers:</strong>
-                                                                                        {sellers.map((f: any, idx: number) => (
-                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
-                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
-                                                                                            </div>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                )}
-                                                                                {buyers.length === 0 && sellers.length === 0 && (
-                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No activity data found</div>
+                                                                                ))}
+                                                                                {newBuyers.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No new positions this period</div>
                                                                                 )}
                                                                             </div>
                                                                         );
@@ -1775,32 +1759,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     {(() => {
                                                                         const tKey = normalizeTicker(item.ticker || item.issuer_name);
                                                                         const activity = tickerActivity[tKey];
-                                                                        const buyers = activity?.buying_funds || [];
-                                                                        const sellers = activity?.selling_funds || [];
+                                                                        const exitedSellers = activity?.exited_sellers || [];
                                                                         return (
                                                                             <div className="fund-list-simple">
-                                                                                {buyers.length > 0 && (
-                                                                                    <div className="tooltip-row buying" style={{ marginBottom: '8px' }}>
-                                                                                        <strong>Buyers:</strong>
-                                                                                        {buyers.map((f: any, idx: number) => (
-                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
-                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
-                                                                                            </div>
-                                                                                        ))}
+                                                                                {exitedSellers.map((f: any, idx: number) => (
+                                                                                    <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                        {typeof f === 'string' ? f : (f.name || 'Unknown')}
                                                                                     </div>
-                                                                                )}
-                                                                                {sellers.length > 0 && (
-                                                                                    <div className="tooltip-row selling">
-                                                                                        <strong>Sellers:</strong>
-                                                                                        {sellers.map((f: any, idx: number) => (
-                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
-                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
-                                                                                            </div>
-                                                                                        ))}
-                                                                                    </div>
-                                                                                )}
-                                                                                {buyers.length === 0 && sellers.length === 0 && (
-                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No activity data found</div>
+                                                                                ))}
+                                                                                {exitedSellers.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No complete exits this period</div>
                                                                                 )}
                                                                             </div>
                                                                         );
