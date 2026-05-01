@@ -375,9 +375,9 @@ export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) 
                                 </div>
                             )}
                         </div>
-                        <button className="activity-export-btn" onClick={openExportModal} title="Export to CSV">
+                        <button className="download-csv-btn" onClick={openExportModal} title="Download CSV">
                             <Download size={16} />
-                            Export CSV
+                            <span>Export</span>
                         </button>
                     </div>
                 </div>
