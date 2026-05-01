@@ -637,6 +637,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
     const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
     const [isFundSummariesMinimized, setIsFundSummariesMinimized] = useState(false);
+    const normalizeTicker = (t?: string) => {
+        if (!t) return '';
+        // Extract base ticker (handle "AMZN PUT", "TSLA CALL", etc)
+        return t.split(' ')[0].toUpperCase().trim();
+    };
+
     const [activeTab, setActiveTab] = useState<'overview' | 'consensus'>('overview');
     const [stockSearchQuery, setStockSearchQuery] = useState('');
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -869,8 +875,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     }, [fundHighlights, fundHistories]);
 
     const getMoverDisplay = (mover: Mover) => {
-        const ticker = mover.ticker || mover.issuer_name;
-        const activity = tickerActivity[ticker];
+        const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
+        const activity = tickerActivity[tKey];
         switch (moversMode) {
             case 'shares':
                 return `${mover.shares_change !== undefined && mover.shares_change >= 0 ? '+' : ''}${(mover.shares_change || 0).toLocaleString()}`;
@@ -1526,8 +1532,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             const isPositive = displayValue >= 0;
 
                                             // For # mode, get fund activity info
-                                            const ticker = mover.ticker || mover.issuer_name;
-                                            const activity = tickerActivity[ticker];
+                                            const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
+                                            const activity = tickerActivity[tKey];
                                             const allFunds = activity ? [...(activity.buying_funds || []), ...(activity.selling_funds || [])] : [];
                                             const totalFundCount = allFunds.length;
                                             const showTooltip = moversMode === 'funds' && totalFundCount > 1;
@@ -1564,7 +1570,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                 style={{ left: moverTooltip.x - 260, top: moverTooltip.y + 15 }}
                                                             >
                                                                 {(() => {
-                                                                    const tAct = tickerActivity[ticker];
+                                                                    const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
+                                                                    const tAct = tickerActivity[tKey];
                                                                     return (
                                                                         <>
                                                                             <span className="tooltip-row buying">
