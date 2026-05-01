@@ -24,6 +24,7 @@
 
 ## Key Files for Context Restoration
 
+- [SESSION_HANDOFF.md](file:///c:/Users/abram/Projects/Abrams13F/.planning/SESSION_HANDOFF.md) — Summary of Dashboard fixes and Consensus implementation
 - `.planning/phases/07-online-platform/07-CONTEXT.md` — all decisions from discussion
 - `.gsd/ROADMAP.md` — v3.0 phases overview
 - `.gsd/JOURNAL.md` — session history
