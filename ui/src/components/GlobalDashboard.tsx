@@ -1517,10 +1517,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                 return Math.abs(b.shares_change || 0) - Math.abs(a.shares_change || 0);
                                             }
                                             if (moversMode === 'funds') {
-                                                const tickerA = a.ticker || '';
-                                                const tickerB = b.ticker || '';
-                                                const actA = tickerActivity[tickerA];
-                                                const actB = tickerActivity[tickerB];
+                                                const tKeyA = normalizeTicker(a.ticker || a.issuer_name);
+                                                const tKeyB = normalizeTicker(b.ticker || b.issuer_name);
+                                                const actA = tickerActivity[tKeyA];
+                                                const actB = tickerActivity[tKeyB];
                                                 const countA = actA ? actA.buying + actA.selling : 0;
                                                 const countB = actB ? actB.buying + actB.selling : 0;
                                                 return countB - countA;
@@ -1556,7 +1556,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     </div>
                                                     <div
                                                         className={`mover-delta ${showTooltip ? 'has-tooltip' : ''} ${moversMode !== 'funds' ? (isPositive ? 'positive' : 'negative') : ''}`}
-                                                        onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, ticker, i) : undefined}
+                                                        onMouseEnter={showTooltip ? (e) => handleMoverTooltipEnter(e, tKey, i) : undefined}
                                                         onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
                                                     >
                                                         {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
