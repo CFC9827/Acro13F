@@ -617,7 +617,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
     );
 };
 
-type MoversMode = 'dollar' | 'percent' | 'funds';
+type MoversMode = 'value' | 'shares' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initialSummary, onSelectFund, allFunds }) => {
     const [summary, setSummary] = useState<DashboardSummary>(initialSummary);
@@ -626,7 +626,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [loading, setLoading] = useState(false);
-    const [moversMode, setMoversMode] = useState<MoversMode>('dollar');
+    const [moversMode, setMoversMode] = useState<MoversMode>('value');
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
@@ -872,11 +872,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         const ticker = mover.ticker || mover.issuer_name;
         const activity = tickerActivity[ticker];
         switch (moversMode) {
-            case 'percent':
-                return `${mover.pct_of_fund !== undefined && mover.pct_of_fund >= 0 ? '+' : ''}${(mover.pct_of_fund || 0).toFixed(1)}%`;
+            case 'shares':
+                return `${mover.shares_change !== undefined && mover.shares_change >= 0 ? '+' : ''}${(mover.shares_change || 0).toLocaleString()}`;
             case 'funds':
                 if (activity) {
-                    return `${activity.buying}B / ${activity.selling}S`;
+                    const total = activity.buying + activity.selling;
+                    return `${total} ${total === 1 ? 'Fund' : 'Funds'}`;
                 }
                 return '-';
             default:
@@ -886,12 +887,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const getMoverDescription = () => {
         switch (moversMode) {
-            case 'percent':
-                return 'Weight change (%)';
+            case 'shares':
+                return 'Share count change';
             case 'funds':
-                return 'Buying / Selling';
+                return 'Institutional involvement';
             default:
-                return '$ change (QoQ)';
+                return 'Dollar value change';
         }
     };
 
@@ -1482,30 +1483,33 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         <h3 className="section-title-small">Big Movers</h3>
                                         <p className="section-desc-small">{getMoverDescription()}</p>
                                     </div>
-                                    <div className="toggle-group">
+                                    <div className="toggle-group" style={{ gap: '4px' }}>
                                         <button
-                                            className={`toggle-btn ${moversMode === 'dollar' ? 'active' : ''}`}
-                                            onClick={() => setMoversMode('dollar')}
+                                            className={`toggle-btn ${moversMode === 'value' ? 'active' : ''}`}
+                                            onClick={() => setMoversMode('value')}
                                             title="Dollar change"
-                                        >$</button>
+                                            style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px' }}
+                                        >VALUE</button>
                                         <button
-                                            className={`toggle-btn ${moversMode === 'percent' ? 'active' : ''}`}
-                                            onClick={() => setMoversMode('percent')}
-                                            title="Percent of fund"
-                                        >%</button>
+                                            className={`toggle-btn ${moversMode === 'shares' ? 'active' : ''}`}
+                                            onClick={() => setMoversMode('shares')}
+                                            title="Share count change"
+                                            style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px' }}
+                                        >SHARES</button>
                                         <button
                                             className={`toggle-btn ${moversMode === 'funds' ? 'active' : ''}`}
                                             onClick={() => setMoversMode('funds')}
-                                            title="Fund count"
-                                        >#</button>
+                                            title="Total funds involved"
+                                            style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px' }}
+                                        >FUNDS</button>
                                     </div>
                                 </div>
 
                                 <div className="movers-list scrollable">
                                     {[...bigMovers]
                                         .sort((a, b) => {
-                                            if (moversMode === 'percent') {
-                                                return Math.abs(b.pct_of_fund || 0) - Math.abs(a.pct_of_fund || 0);
+                                            if (moversMode === 'shares') {
+                                                return Math.abs(b.shares_change || 0) - Math.abs(a.shares_change || 0);
                                             }
                                             if (moversMode === 'funds') {
                                                 const tickerA = a.ticker || '';
@@ -1519,7 +1523,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             return Math.abs(b.val_change) - Math.abs(a.val_change);
                                         })
                                         .map((mover, i) => {
-                                            const displayValue = moversMode === 'percent' ? (mover.pct_of_fund || 0) : mover.val_change;
+                                            const displayValue = moversMode === 'shares' ? (mover.shares_change || 0) : mover.val_change;
                                             const isPositive = displayValue >= 0;
 
                                             // For # mode, get fund activity info
