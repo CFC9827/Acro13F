@@ -456,7 +456,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                 </div>
             )}
 
-            <div className="comparison-chart-container" style={{ height: '400px', marginTop: '8px' }}>
+            <div className="comparison-chart-container" style={{ height: '600px', marginTop: '8px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={filteredAndIndexedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
@@ -466,6 +466,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                             type="number"
                             domain={['dataMin', 'dataMax']}
                             stroke="#64748b"
+                            minTickGap={30}
                             tickFormatter={(val) => {
                                 const d = new Date(val);
                                 const q = Math.floor((d.getMonth() + 3) / 3);
@@ -547,7 +548,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                         />
                         <Legend
                             content={({ payload }) => (
-                                <div className="custom-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                                <div className="custom-legend" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', marginTop: '16px' }}>
                                     {payload?.map((entry: any, index: number) => {
                                         if (entry.value === 'S&P 500') return null;
                                         const isActive = selectedFunds.includes(entry.value);

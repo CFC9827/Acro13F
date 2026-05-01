@@ -1278,7 +1278,7 @@ class DatabaseManager:
 
         return {
             "chart_data": chart_data,
-            "funds": [f['name'] for f in all_funds if f['cik'] in performance_data] + ["S&P 500"]
+            "funds": [f['name'] for f in all_funds if f['cik'] in performance_data]
         }
 
 
