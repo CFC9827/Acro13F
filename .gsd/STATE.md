@@ -6,7 +6,7 @@
 
 **Milestone:** v3.0 — Online 13F Platform
 **Phase:** Maintenance & Stability
-**Status**: 🟢 Global Dashboard Stabilized — Fixed data-binding and state-synchronization for Stock Consensus; implemented "Who Holds This?" modal.
+**Status**: 🟢 Infrastructure Migrated — Successfully moved to PostgreSQL; stabilized Consensus data and fixed institutional holder duplication.
 
 ## Last Session Summary
 
@@ -18,9 +18,9 @@
 
 ## Next Steps
 
-1. **PostgreSQL Migration:** Move from SQLite to PostgreSQL to handle the expanding fund universe (Phase 7 tail-end).
+1. **Amendment Monitor:** Build logic to track 13F/A amendments for between-quarter updates.
 2. **Containerization:** Create Dockerfile for backend and frontend serving (Phase 9 initialization).
-3. **Amendment Monitor:** Build logic to track 13F/A amendments for between-quarter updates.
+3. **Advanced Charting:** Integrate historical price data into the Consensus view.
 
 ## Key Files for Context Restoration
 
