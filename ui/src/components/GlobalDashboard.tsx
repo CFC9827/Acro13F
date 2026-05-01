@@ -1510,8 +1510,23 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     </div>
                                 </div>
 
-                                <div className="movers-list scrollable">
-                                    {[...bigMovers]
+                            <div className="movers-list scrollable">
+                                {(() => {
+                                    let displayMovers = [...bigMovers];
+                                    
+                                    // In funds mode, group by ticker to avoid duplicates
+                                    if (moversMode === 'funds') {
+                                        const grouped: { [key: string]: any } = {};
+                                        displayMovers.forEach(m => {
+                                            const tKey = normalizeTicker(m.ticker || m.issuer_name);
+                                            if (!grouped[tKey] || Math.abs(m.val_change) > Math.abs(grouped[tKey].val_change)) {
+                                                grouped[tKey] = m;
+                                            }
+                                        });
+                                        displayMovers = Object.values(grouped);
+                                    }
+
+                                    return displayMovers
                                         .sort((a, b) => {
                                             if (moversMode === 'shares') {
                                                 return Math.abs(b.shares_change || 0) - Math.abs(a.shares_change || 0);
@@ -1521,24 +1536,21 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                 const tKeyB = normalizeTicker(b.ticker || b.issuer_name);
                                                 const actA = tickerActivity[tKeyA];
                                                 const actB = tickerActivity[tKeyB];
-                                                const countA = actA ? actA.buying + actA.selling : 0;
-                                                const countB = actB ? actB.buying + actB.selling : 0;
+                                                const countA = actA ? (actA.buying_funds?.length || 0) + (actA.selling_funds?.length || 0) : 0;
+                                                const countB = actB ? (actB.buying_funds?.length || 0) + (actB.selling_funds?.length || 0) : 0;
                                                 return countB - countA;
                                             }
                                             return Math.abs(b.val_change) - Math.abs(a.val_change);
                                         })
+                                        .slice(0, 20)
                                         .map((mover, i) => {
                                             const displayValue = moversMode === 'shares' ? (mover.shares_change || 0) : mover.val_change;
                                             const isPositive = displayValue >= 0;
 
-                                            // For # mode, get fund activity info
                                             const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
                                             const activity = tickerActivity[tKey];
-                                            const allFunds = activity ? [...(activity.buying_funds || []), ...(activity.selling_funds || [])] : [];
-                                            const totalFundCount = allFunds.length;
+                                            const totalFundCount = activity ? (activity.buying_funds?.length || 0) + (activity.selling_funds?.length || 0) : 0;
                                             const showTooltip = moversMode === 'funds' && totalFundCount > 1;
-                                            const buyingFunds = (activity?.buying_funds || []).join(', ') || 'None';
-                                            const sellingFunds = (activity?.selling_funds || []).join(', ') || 'None';
 
                                             return (
                                                 <div key={i} className="mover-item">
@@ -1560,7 +1572,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                         onMouseLeave={showTooltip ? handleMoverTooltipLeave : undefined}
                                                     >
                                                         {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-                                                        {getMoverDisplay(mover)}
+                                                        {moversMode === 'funds' ? `${activity?.buying_funds?.length || 0}B / ${activity?.selling_funds?.length || 0}S` : getMoverDisplay(mover)}
                                                         {moversMode === 'percent' && mover.curr_weight !== undefined && (
                                                             <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
                                                         )}
@@ -1573,15 +1585,19 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     <strong>Buying:</strong>
                                                                     {(activity?.buying_funds || []).length > 0 ? (
                                                                         <div className="fund-list-simple">
-                                                                            {(activity?.buying_funds || []).map((fund, idx) => (
+                                                                            {(activity?.buying_funds || []).map((fund: any, idx) => (
                                                                                 <div 
                                                                                     key={idx} 
                                                                                     className="fund-item-simple clickable"
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        onSelectFund(fund.cik);
+                                                                                        if (fund && typeof fund === 'object' && fund.cik) {
+                                                                                            onSelectFund(fund.cik);
+                                                                                        }
                                                                                     }}
-                                                                                >{fund.name}</div>
+                                                                                >
+                                                                                    {typeof fund === 'string' ? fund : (fund.name || fund.issuer_name || 'Unknown Fund')}
+                                                                                </div>
                                                                             ))}
                                                                         </div>
                                                                     ) : (
@@ -1592,15 +1608,19 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                     <strong>Selling:</strong>
                                                                     {(activity?.selling_funds || []).length > 0 ? (
                                                                         <div className="fund-list-simple">
-                                                                            {(activity?.selling_funds || []).map((fund, idx) => (
+                                                                            {(activity?.selling_funds || []).map((fund: any, idx) => (
                                                                                 <div 
                                                                                     key={idx} 
                                                                                     className="fund-item-simple clickable"
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
-                                                                                        onSelectFund(fund.cik);
+                                                                                        if (fund && typeof fund === 'object' && fund.cik) {
+                                                                                            onSelectFund(fund.cik);
+                                                                                        }
                                                                                     }}
-                                                                                >{fund.name}</div>
+                                                                                >
+                                                                                    {typeof fund === 'string' ? fund : (fund.name || fund.issuer_name || 'Unknown Fund')}
+                                                                                </div>
                                                                             ))}
                                                                         </div>
                                                                     ) : (
@@ -1609,9 +1629,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                                 </div>
                                                             </span>
                                                         )}
-
                                                     </div>
-
                                                 </div>
                                             );
                                         })}
