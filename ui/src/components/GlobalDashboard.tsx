@@ -1701,7 +1701,53 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                 {gainingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
-                                                        <span className="crowding-change positive">+{item.change}</span>
+                                                        <span 
+                                                            className="crowding-change positive has-tooltip"
+                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name)}
+                                                            onMouseLeave={handleCrowdingTooltipLeave}
+                                                        >
+                                                            +{item.change}
+                                                            {crowdingTooltip && crowdingTooltip.ticker === (item.ticker || item.issuer_name) && (
+                                                                <span
+                                                                    className="tooltip-content visible"
+                                                                    style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
+                                                                >
+                                                                    {(() => {
+                                                                        const tKey = normalizeTicker(item.ticker || item.issuer_name);
+                                                                        const activity = tickerActivity[tKey];
+                                                                        const buyers = activity?.buying_funds || [];
+                                                                        const sellers = activity?.selling_funds || [];
+                                                                        return (
+                                                                            <div className="fund-list-simple">
+                                                                                {buyers.length > 0 && (
+                                                                                    <div className="tooltip-row buying" style={{ marginBottom: '8px' }}>
+                                                                                        <strong>Buyers:</strong>
+                                                                                        {buyers.map((f: any, idx: number) => (
+                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                                {sellers.length > 0 && (
+                                                                                    <div className="tooltip-row selling">
+                                                                                        <strong>Sellers:</strong>
+                                                                                        {sellers.map((f: any, idx: number) => (
+                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                                {buyers.length === 0 && sellers.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No activity data found</div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1715,7 +1761,53 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                 {losingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
                                                         <span className="crowding-ticker">{item.ticker || item.issuer_name}</span>
-                                                        <span className="crowding-change negative">{item.change}</span>
+                                                        <span 
+                                                            className="crowding-change negative has-tooltip"
+                                                            onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name)}
+                                                            onMouseLeave={handleCrowdingTooltipLeave}
+                                                        >
+                                                            {item.change}
+                                                            {crowdingTooltip && crowdingTooltip.ticker === (item.ticker || item.issuer_name) && (
+                                                                <span
+                                                                    className="tooltip-content visible"
+                                                                    style={{ left: crowdingTooltip.x - 200, top: crowdingTooltip.y + 15, zIndex: 1000 }}
+                                                                >
+                                                                    {(() => {
+                                                                        const tKey = normalizeTicker(item.ticker || item.issuer_name);
+                                                                        const activity = tickerActivity[tKey];
+                                                                        const buyers = activity?.buying_funds || [];
+                                                                        const sellers = activity?.selling_funds || [];
+                                                                        return (
+                                                                            <div className="fund-list-simple">
+                                                                                {buyers.length > 0 && (
+                                                                                    <div className="tooltip-row buying" style={{ marginBottom: '8px' }}>
+                                                                                        <strong>Buyers:</strong>
+                                                                                        {buyers.map((f: any, idx: number) => (
+                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                                {sellers.length > 0 && (
+                                                                                    <div className="tooltip-row selling">
+                                                                                        <strong>Sellers:</strong>
+                                                                                        {sellers.map((f: any, idx: number) => (
+                                                                                            <div key={idx} className="fund-item-simple clickable" onClick={(e) => { e.stopPropagation(); onSelectFund(f.cik); }}>
+                                                                                                {typeof f === 'string' ? f : (f.name || 'Unknown')}
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                )}
+                                                                                {buyers.length === 0 && sellers.length === 0 && (
+                                                                                    <div className="fund-item-simple" style={{ color: '#94a3b8', fontStyle: 'italic' }}>No activity data found</div>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </span>
+                                                            )}
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
