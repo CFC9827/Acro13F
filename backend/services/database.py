@@ -1008,24 +1008,40 @@ class DatabaseManager:
 
         query = f"""
             WITH LatestPeriods AS (
-                SELECT cik, MAX(period_of_report) as max_period
+                SELECT cik, MAX(period_of_report) as max_p
                 FROM filings
                 GROUP BY cik
+            ),
+            LatestFilings AS (
+                SELECT f.cik, MAX(f.accession_number) as latest_acc
+                FROM filings f
+                JOIN LatestPeriods lp ON f.cik = lp.cik AND f.period_of_report = lp.max_p
+                GROUP BY f.cik
+            ),
+            AggregatedHoldings AS (
+                SELECT 
+                    lf.cik,
+                    lf.latest_acc as accession_number,
+                    SUM(h.shares) as total_shares,
+                    SUM(h.value) as total_value,
+                    MAX(h.put_call) as put_call
+                FROM holdings h
+                JOIN LatestFilings lf ON h.accession_number = lf.latest_acc
+                LEFT JOIN funds f ON lf.cik = f.cik
+                {filter_clause}
+                GROUP BY lf.cik, lf.latest_acc
             )
             SELECT 
-                COALESCE(f.name, 'Unknown Fund (' || fi.cik || ')') as fund_name,
-                fi.cik,
-                h.shares,
-                h.value,
-                h.put_call,
-                (CAST(h.value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
-            FROM holdings h
-            JOIN filings fi ON h.accession_number = fi.accession_number
-            JOIN LatestPeriods lp ON fi.cik = lp.cik AND fi.period_of_report = lp.max_period
-            LEFT JOIN funds f ON fi.cik = f.cik
-            LEFT JOIN fund_quarterly_stats qs ON fi.accession_number = qs.accession_number
-            {filter_clause}
-            ORDER BY h.value DESC
+                COALESCE(f.name, 'Unknown Fund (' || ah.cik || ')') as fund_name,
+                ah.cik,
+                ah.total_shares as shares,
+                ah.total_value as value,
+                ah.put_call,
+                (CAST(ah.total_value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
+            FROM AggregatedHoldings ah
+            LEFT JOIN funds f ON ah.cik = f.cik
+            LEFT JOIN fund_quarterly_stats qs ON ah.accession_number = qs.accession_number
+            ORDER BY ah.total_value DESC
         """
         return self._execute(query, tuple(params), fetch='all')
 
