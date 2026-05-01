@@ -44,6 +44,7 @@
 - [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
 - [x] Performance CSV Export: Standardized export for fund performance tab
 - [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
+- [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
 
 ---
 

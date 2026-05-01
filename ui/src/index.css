@@ -2315,6 +2315,12 @@ body {
   font-size: 0.7rem;
   color: #64748b;
   font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.mover-fund:hover,
+.shift-fund:hover {
+  color: #38bdf8;
 }
 
 .mover-fund.muted {
@@ -2461,7 +2467,7 @@ body {
 
 .fund-item-simple.clickable:hover {
   color: #38bdf8;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .mover-delta.has-tooltip:hover .tooltip-content,
@@ -2625,9 +2631,14 @@ body {
 }
 
 .new-position-fund {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #64748b;
   font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.new-position-fund:hover {
+  color: #38bdf8;
 }
 
 .new-position-weight {
@@ -2679,9 +2690,14 @@ body {
 }
 
 .exited-position-fund {
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   color: #64748b;
   font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.exited-position-fund:hover {
+  color: #38bdf8;
 }
 
 .exited-position-stats {

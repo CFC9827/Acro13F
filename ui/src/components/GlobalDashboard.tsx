@@ -1562,7 +1562,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                             <span 
                                                                 className="mover-fund"
                                                                 onClick={() => mover.cik && onSelectFund(mover.cik)}
-                                                                style={{ cursor: mover.cik ? 'pointer' : 'default', textDecoration: mover.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                                style={{ cursor: mover.cik ? 'pointer' : 'default', opacity: 0.8 }}
                                                             >
                                                                 {mover.fund_name}
                                                             </span>
@@ -1831,7 +1831,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     <span 
                                                         className="new-position-fund"
                                                         onClick={() => pos.cik && onSelectFund(pos.cik)}
-                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', textDecoration: pos.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', opacity: 0.8 }}
                                                     >
                                                         {pos.fund_name}
                                                     </span>
@@ -1877,7 +1877,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     <span 
                                                         className="exited-position-fund"
                                                         onClick={() => pos.cik && onSelectFund(pos.cik)}
-                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', textDecoration: pos.cik ? 'underline' : 'none', textUnderlineOffset: '2px', opacity: 0.8 }}
+                                                        style={{ cursor: pos.cik ? 'pointer' : 'default', opacity: 0.8 }}
                                                     >
                                                         {pos.fund_name}
                                                     </span>
