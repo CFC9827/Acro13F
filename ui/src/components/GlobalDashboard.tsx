@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical, Search, MousePointer2, Loader2, X } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
+import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
 
 interface Holding {
     ticker?: string;
@@ -653,6 +654,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const fetchStockHolders = async (ticker: string) => {
         setSelectedTicker(ticker);
+        setHolders([]); // Clear previous holders to avoid "one-selection behind" visual flicker
         setLoadingHolders(true);
         try {
             const url = `/api/explorer/stock/${encodeURIComponent(ticker)}/holders${selectedGroupId ? `?group_id=${selectedGroupId}` : ''}`;
@@ -931,19 +933,26 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         fetchGroups();
     }, []);
 
+    // Use a ref to track the last fetched groupId to prevent redundant fetches
+    const lastFetchedGroupId = useRef<number | null | undefined>(undefined);
+
     useEffect(() => {
-        if (selectedGroupId !== null) {
-            fetchFilteredSummary(selectedGroupId);
-        } else {
-            // Always prefer initialSummary from App.tsx when on "All Funds"
-            // but fetch if it seems empty or missing consensus
-            if (initialSummary && initialSummary.latest_period && initialSummary.consensus_stocks) {
-                setSummary(initialSummary);
+        // Only fetch if the group ID has actually changed OR if it's the first load
+        if (selectedGroupId !== lastFetchedGroupId.current || (selectedGroupId === null && !summary.latest_period)) {
+            lastFetchedGroupId.current = selectedGroupId;
+            
+            if (selectedGroupId !== null) {
+                fetchFilteredSummary(selectedGroupId);
             } else {
-                fetchFilteredSummary(null);
+                // If we are resetting to "All Funds", prefer initialSummary if it exists
+                if (initialSummary && initialSummary.latest_period && initialSummary.consensus_stocks) {
+                    setSummary(initialSummary);
+                } else {
+                    fetchFilteredSummary(null);
+                }
             }
         }
-    }, [selectedGroupId, initialSummary]);
+    }, [selectedGroupId, initialSummary, summary.latest_period]);
 
     // Fetch sector allocation data
     useEffect(() => {
@@ -1641,7 +1650,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                             {/* Crowding Signals */}
                             {crowding && (mostHeld.length > 0 || gainingFunds.length > 0) && (
-                                <section className="dashboard-section compact">
+                                <section 
+                                    className="dashboard-section compact interactive-section"
+                                    onClick={() => setActiveTab('consensus')}
+                                >
                                     <div className="section-header">
                                         <Users className="section-icon-small" />
                                         <div>
@@ -1658,7 +1670,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     const itemTicker = item.ticker || item.issuer_name;
                                                     return (
                                                         <div key={i} className="crowding-item">
-                                                            <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(itemTicker)); }}>{itemTicker}</span>
+                                                            <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(itemTicker)); }}>{itemTicker}</span>
                                                             <span
                                                                 className="crowding-count has-tooltip"
                                                                 onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker, 'widely_held')}
@@ -1702,7 +1714,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {gainingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change positive has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'gaining')}
@@ -1753,7 +1765,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {losingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change negative has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'losing')}
@@ -1802,7 +1814,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                             {/* New Positions Spotlight */}
                             {newPositions.length > 0 && (
-                                <section className="dashboard-section compact">
+                                <section 
+                                    className="dashboard-section compact interactive-section"
+                                    onClick={() => setActiveTab('consensus')}
+                                >
                                     <div className="section-header">
                                         <PlusCircle className="section-icon-small" style={{ color: '#10b981' }} />
                                         <div>
@@ -1827,10 +1842,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayNewPositions.map((pos, i) => (
                                             <div key={i} className="new-position-item">
                                                 <div className="new-position-info">
-                                                    <span className="new-position-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="new-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="new-position-fund"
-                                                        onClick={() => pos.cik && onSelectFund(pos.cik)}
+                                                        onClick={(e) => { e.stopPropagation(); pos.cik && onSelectFund(pos.cik); }}
                                                         style={{ cursor: pos.cik ? 'pointer' : 'default', opacity: 0.8 }}
                                                     >
                                                         {pos.fund_name}
@@ -1848,7 +1863,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                             {/* Exited Positions Spotlight */}
                             {exitedPositions.length > 0 && (
-                                <section className="dashboard-section compact">
+                                <section 
+                                    className="dashboard-section compact interactive-section"
+                                    onClick={() => setActiveTab('consensus')}
+                                >
                                     <div className="section-header">
                                         <MinusCircle className="section-icon-small" style={{ color: '#ef4444' }} />
                                         <div>
@@ -1873,10 +1891,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayExitedPositions.map((pos, i) => (
                                             <div key={i} className="exited-position-item">
                                                 <div className="exited-position-info">
-                                                    <span className="exited-position-ticker" onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="exited-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="exited-position-fund"
-                                                        onClick={() => pos.cik && onSelectFund(pos.cik)}
+                                                        onClick={(e) => { e.stopPropagation(); pos.cik && onSelectFund(pos.cik); }}
                                                         style={{ cursor: pos.cik ? 'pointer' : 'default', opacity: 0.8 }}
                                                     >
                                                         {pos.fund_name}
@@ -1893,7 +1911,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             )}
 
                             {/* Swoop Opportunities */}
-                            <section className="dashboard-section compact" style={{ overflow: 'hidden' }}>
+                             <section 
+                                 className="dashboard-section compact interactive-section"
+                                 onClick={() => setActiveTab('consensus')}
+                                 style={{ overflow: 'hidden' }}
+                             >
                                 <div className="section-header">
                                     <AlertCircle className="section-icon-small" style={{ color: '#eab308' }} />
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1928,7 +1950,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         swoopOpportunities.map((op, i) => (
                                             <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
                                                 <div className="mover-info">
-                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }} onClick={() => { setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(op.ticker || op.issuer_name)); }}>{op.ticker || op.issuer_name}</div>
+                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }} onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(op.ticker || op.issuer_name)); }}>{op.ticker || op.issuer_name}</div>
                                                     <div className="mover-fund" style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
                                                         {op.fund_name}
                                                     </div>
@@ -2177,91 +2199,17 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             </>
         )}
 
-            {/* Who Holds This? Modal */}
-            {selectedTicker && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(12px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-                    padding: '20px'
-                }} onClick={() => setSelectedTicker(null)}>
-                    <div style={{
-                        background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '24px', width: '100%', maxWidth: '800px', maxHeight: '80vh',
-                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
-                    }} onClick={e => e.stopPropagation()}>
-                        <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                                    <h2 style={{ margin: 0, fontSize: '20px', color: '#f8fafc', fontWeight: 800 }}>{selectedTicker}</h2>
-                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800 }}>STOCK CONSENSUS</div>
-                                </div>
-                                <p style={{ margin: 0, color: '#64748b', fontSize: '13px' }}>Current fund allocations within your selected overview.</p>
-                            </div>
-                            <button onClick={() => setSelectedTicker(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#64748b', padding: '8px', borderRadius: '50%', cursor: 'pointer' }}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div style={{ overflowY: 'auto', padding: '0 24px 24px' }}>
-                            {loadingHolders ? (
-                                <div style={{ padding: '60px', textAlign: 'center' }}>
-                                    <Loader2 size={32} className="spin" style={{ color: '#38bdf8', marginBottom: '16px' }} />
-                                    <p style={{ color: '#64748b' }}>Fetching institutional holders...</p>
-                                </div>
-                            ) : holders.length === 0 ? (
-                                <div style={{ padding: '60px', textAlign: 'center' }}>
-                                    <AlertCircle size={32} style={{ color: '#64748b', marginBottom: '16px' }} />
-                                    <p style={{ color: '#64748b' }}>No holders found in the current group.</p>
-                                </div>
-                            ) : (
-                                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
-                                    <thead>
-                                        <tr style={{ textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Fund Name</th>
-                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Shares</th>
-                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>Market Value</th>
-                                            <th style={{ padding: '12px 0', fontSize: '11px', color: '#64748b', textTransform: 'uppercase', textAlign: 'right' }}>Weight</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {holders.map((h, i) => (
-                                            <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                                <td style={{ padding: '16px 0' }}>
-                                                    <div 
-                                                        onClick={() => { setSelectedTicker(null); onSelectFund(h.cik); }}
-                                                        style={{ 
-                                                            color: '#f8fafc', 
-                                                            fontWeight: 600, 
-                                                            cursor: 'pointer',
-                                                            transition: 'color 0.2s ease',
-                                                            display: 'inline-block'
-                                                        }}
-                                                        onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#38bdf8'}
-                                                        onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#f8fafc'}
-                                                    >
-                                                        {h.fund_name}
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: '16px 0', color: '#94a3b8' }}>{h.shares?.toLocaleString()}</td>
-                                                <td style={{ padding: '16px 0', color: '#f8fafc' }}>{formatCurrency(h.value)}</td>
-                                                <td style={{ padding: '16px 0', textAlign: 'right' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                        <span style={{ color: '#38bdf8', fontWeight: 700 }}>{h.weight?.toFixed(2)}%</span>
-                                                        <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', marginTop: '4px' }}>
-                                                            <div style={{ height: '100%', width: `${Math.min(h.weight * 5, 100)}%`, background: '#38bdf8', borderRadius: '2px' }} />
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Institutional Holders Modal */}
+            <InstitutionalHoldersModal
+                ticker={selectedTicker}
+                holders={holders}
+                loading={loadingHolders}
+                onClose={() => setSelectedTicker(null)}
+                onAnalyze={(cik) => {
+                    onFollow(cik);
+                    setSelectedTicker(null);
+                }}
+            />
         </div>
     );
 };

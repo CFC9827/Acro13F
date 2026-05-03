@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Database, TrendingUp, Info, ArrowRight, Check, Plus, Loader2, X, ChevronDown, ChevronRight, Activity, Globe, LayoutGrid, Briefcase, DollarSign, Users, Sparkles, PieChart, Shield, Target, Zap, Clock, BarChart3, Fingerprint, MousePointer2, List, Trash2, SlidersHorizontal, AlertCircle, Star } from 'lucide-react';
 import { formatCurrency } from './PortfolioChart';
 import { ResponsiveContainer, AreaChart, Area, YAxis } from 'recharts';
+import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
 
 interface InstitutionalExplorerProps {
     onFollow: (cik: string) => void;
@@ -276,64 +277,17 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
 
     return (
         <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#020617' }}>
-            {/* Holders Modal */}
-            {selectedTicker && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(2, 6, 23, 0.8)', backdropFilter: 'blur(12px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-                    padding: '40px'
-                }} onClick={() => setSelectedTicker(null)}>
-                    <div style={{
-                        background: '#0f172a', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '32px', width: '100%', maxWidth: '900px', maxHeight: '80vh',
-                        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-                        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
-                    }} onClick={e => e.stopPropagation()}>
-                        <div style={{ padding: '32px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                                    <h2 style={{ margin: 0, fontSize: '24px', color: '#f8fafc', fontWeight: 900 }}>{selectedTicker}</h2>
-                                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '4px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 800 }}>INSTITUTIONAL HOLDERS</div>
-                                </div>
-                                <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>Showing all whale funds holding this position in their latest filing.</p>
-                            </div>
-                            <button onClick={() => setSelectedTicker(null)} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#64748b', padding: '10px', borderRadius: '12px', cursor: 'pointer' }}><X size={20} /></button>
-                        </div>
-                        
-                        <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                <thead style={{ position: 'sticky', top: 0, background: '#0f172a', zIndex: 10 }}>
-                                    <tr>
-                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Fund Name</th>
-                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Shares</th>
-                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Value</th>
-                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Weight</th>
-                                        <th style={{ padding: '16px 32px', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'right' }}>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {loadingHolders ? (
-                                        <tr><td colSpan={5} style={{ padding: '100px', textAlign: 'center' }}><Loader2 size={32} className="animate-spin" style={{ color: '#38bdf8' }} /></td></tr>
-                                    ) : holders.length === 0 ? (
-                                        <tr><td colSpan={5} style={{ padding: '100px', textAlign: 'center', color: '#475569' }}>No institutional holders found in database.</td></tr>
-                                    ) : holders.map((h, i) => (
-                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                                            <td style={{ padding: '20px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 700 }}>{h.fund_name}</div><div style={{ fontSize: '11px', color: '#475569' }}>CIK: {h.cik}</div></td>
-                                            <td style={{ padding: '20px 32px', color: '#94a3b8', fontSize: '14px' }}>{h.shares?.toLocaleString()}</td>
-                                            <td style={{ padding: '20px 32px', color: '#f8fafc', fontWeight: 700 }}>{formatCurrency(h.value)}</td>
-                                            <td style={{ padding: '20px 32px' }}><div style={{ color: '#38bdf8', fontWeight: 800 }}>{h.weight?.toFixed(2)}%</div></td>
-                                            <td style={{ padding: '20px 32px', textAlign: 'right' }}>
-                                                <button onClick={() => { onFollow(h.cik); setSelectedTicker(null); }} style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '6px 16px', borderRadius: '8px', fontSize: '11px', fontWeight: 800, cursor: 'pointer' }}>ANALYZE</button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Institutional Holders Modal */}
+            <InstitutionalHoldersModal
+                ticker={selectedTicker}
+                holders={holders}
+                loading={loadingHolders}
+                onClose={() => setSelectedTicker(null)}
+                onAnalyze={(cik) => {
+                    onFollow(cik);
+                    setSelectedTicker(null);
+                }}
+            />
 
             {/* Premium Header */}
             <div className="dashboard-header" style={{ padding: '32px 48px', borderBottom: '1px solid rgba(255,255,255,0.03)', background: 'linear-gradient(to bottom, rgba(15, 23, 24, 0.4), transparent)' }}>

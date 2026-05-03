@@ -1276,6 +1276,7 @@ function App() {
                                     <HoldingsTable
                                         history={history}
                                         fundName={(activeFundName || funds.find(f => f.cik.replace(/^0+/, '') === selectedCik?.replace(/^0+/, ''))?.name) || 'Hedge Fund Portfolio'}
+                                        onFollow={(cik) => navigate('summary', cik)}
                                     />
                                 )}
                             </div>

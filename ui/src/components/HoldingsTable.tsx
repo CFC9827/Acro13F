@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List } from 'lucide-react';
 import {
     AreaChart,
@@ -13,10 +13,12 @@ import {
 import { formatCurrency, HistoricalHolding } from './PortfolioChart';
 import { calculateIRR } from '../utils/performanceUtils';
 import { CsvExportModal } from './CsvExportModal';
+import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
 
 interface HoldingsTableProps {
     history: HistoricalHolding[];
     fundName: string;
+    onFollow?: (cik: string) => void;
 }
 
 type SortField = 'name' | 'shares' | 'value' | 'percent' | 'pnl' | 'cap_allocation' | 'roi' | 'irr' | 'percent_delta' | 'price_delta';
@@ -1199,6 +1201,27 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const [showQuarterDropdown, setShowQuarterDropdown] = useState(false);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
+    const [selectedExplorerTicker, setSelectedExplorerTicker] = useState<string | null>(null);
+    const [holders, setHolders] = useState<any[]>([]);
+    const [loadingHolders, setLoadingHolders] = useState(false);
+
+    const fetchHolders = async (ticker: string) => {
+        setLoadingHolders(true);
+        try {
+            const res = await fetch(`/api/explorer/stock/${ticker}/holders`);
+            const data = await res.json();
+            setHolders(data);
+        } catch (err) {
+            console.error("Failed to fetch holders", err);
+        } finally {
+            setLoadingHolders(false);
+        }
+    };
+
+    const handleExploreTicker = (ticker: string) => {
+        setSelectedExplorerTicker(ticker);
+        fetchHolders(ticker);
+    };
     const [itemsToShow, setItemsToShow] = useState(40);
     const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -2286,7 +2309,50 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                     {isExpanded && (
                                         <tr className="expanded-row-content bg-slate-900/50">
                                             <td colSpan={7} className="p-0">
-                                                <div className="p-6 border-b border-slate-700/50">
+                                                <div className="p-8 border-b border-slate-700/50">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                                                        <div>
+                                                            <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '20px', fontWeight: 800 }}>{h.issuer_name}</h3>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                                                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: '15px' }}>{h.ticker}</span>
+                                                                <span style={{ color: '#475569', fontSize: '12px', fontMono: 'true' }}>{h.cusip}</span>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleExploreTicker(h.ticker || h.cusip)}
+                                                            style={{ 
+                                                                background: 'rgba(56, 189, 248, 0.08)', 
+                                                                border: '1px solid rgba(56, 189, 248, 0.15)', 
+                                                                color: '#38bdf8', 
+                                                                padding: '10px 24px', 
+                                                                borderRadius: '12px', 
+                                                                fontSize: '13px', 
+                                                                fontWeight: 800, 
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '10px',
+                                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                boxShadow: '0 4px 12px rgba(56, 189, 248, 0.1)'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                (e.currentTarget as HTMLElement).style.background = 'rgba(56, 189, 248, 0.15)';
+                                                                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(56, 189, 248, 0.3)';
+                                                                (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)';
+                                                                (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 20px rgba(56, 189, 248, 0.15)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                (e.currentTarget as HTMLElement).style.background = 'rgba(56, 189, 248, 0.08)';
+                                                                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(56, 189, 248, 0.15)';
+                                                                (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
+                                                                (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(56, 189, 248, 0.1)';
+                                                            }}
+                                                        >
+                                                            <Users size={18} />
+                                                            WHO ELSE HOLDS THIS?
+                                                        </button>
+                                                    </div>
+
                                                     {/* Stock History Chart - TOP */}
                                                     <StockHistoryChart
                                                         history={fullHist}
@@ -2859,6 +2925,16 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
             />
             {/* Anchored Copyright Notice */}
 
+            <InstitutionalHoldersModal
+                ticker={selectedExplorerTicker}
+                holders={holders}
+                loading={loadingHolders}
+                onClose={() => setSelectedExplorerTicker(null)}
+                onAnalyze={(cik) => {
+                    onFollow?.(cik);
+                    setSelectedExplorerTicker(null);
+                }}
+            />
         </div>
     );
 };

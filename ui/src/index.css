@@ -1921,6 +1921,32 @@ body {
   margin-top: 20px;
 }
 
+.dashboard-section.interactive-section {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.dashboard-section.interactive-section:hover {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: #38bdf8;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.4);
+}
+
+.dashboard-section.interactive-section:hover .section-title-small {
+  color: #38bdf8;
+}
+
+.dashboard-section.interactive-section:hover .section-icon-small {
+  color: #38bdf8;
+  transform: scale(1.1);
+}
+
+.dashboard-section.interactive-section .section-icon-small {
+  transition: all 0.2s ease;
+}
+
 .section-header {
   display: flex;
   align-items: center;

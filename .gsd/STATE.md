@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-01 17:10
+> Last updated: 2026-05-03 10:25
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -14,6 +14,9 @@
 - [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
 - [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
 - [x] Consensus View Integration: Clickable tickers across Dashboard routing to Stock Consensus view
+- [x] Institutional Holder Explorer: Enriched backend with sector/turnover data and added premium Modal discovery
+- [x] Interactive Dashboard Sections: Entire spotlight sections (Crowding, New, Exited, Swoop) now clickable and navigable
+- [x] Cross-Fund Discovery: Added "Who else holds this?" triggers directly to fund holding lists
 
 ## Last Session Summary
 

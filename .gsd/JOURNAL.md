@@ -91,3 +91,20 @@
 - Defaulted all Whale Index syncs to `is_tracked=0` to ensure the personal dashboard remains clean unless a fund is explicitly "followed".
 - Used native dropdowns with explicit dark-mode styling to fix browser-default white backgrounds that made text illegible.
 
+---
+
+## 2026-05-03 — Institutional Insight & Interactive Dashboard
+
+**Session Goal:** Finalize the "Who Holds This?" exploration feature and elevate dashboard interactivity.
+
+**Accomplished:**
+- **Institutional Holder Explorer:** Enriched the backend `get_stock_holders` API with institutional "DNA" (Primary Sector and Portfolio Turnover) to provide deeper context for whaling signals.
+- **Premium Discovery Modal:** Developed a centralized `InstitutionalHoldersModal` with glassmorphism and micro-animations, enabling users to explore cross-fund ownership from any ticker or holding list.
+- **Cross-Fund Integration:** Added "Who else holds this?" discovery triggers directly to individual fund holding rows, bridging the gap between specific fund analysis and broad institutional consensus.
+- **Interactive Spotlight Sections:** Transformed Global Dashboard sections (Crowding, New, Exited, Swoop) into navigable links. The entire spotlight area now responds to hover with premium lift effects and routes directly to the Stock Consensus view.
+- **Event Propagation Tuning:** Implemented intelligent event bubbling to ensure nested ticker and fund links maintain their specific navigation logic while the surrounding section acts as a broad-scope link.
+
+**Key Decisions:**
+- Centralized the "Who Holds This?" logic into a reusable modal rather than separate pages to maintain user flow during deep research.
+- Added institutional turnover metrics to the holders table to help users differentiate between high-frequency "rented" positions and long-term institutional "core" holdings.
+- Chose section-level interactivity for the dashboard to match contemporary "Discovery Hub" aesthetics, reducing the need for small, fiddly "View All" buttons.

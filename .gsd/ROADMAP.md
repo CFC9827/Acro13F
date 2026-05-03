@@ -46,6 +46,9 @@
 - [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
 - [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
 - [x] Consensus View Integration: Clickable tickers across Dashboard routing to Stock Consensus view
+- [x] Institutional Holder Explorer: Premium modal for cross-fund stock ownership discovery
+- [x] Interactive Spotlight Sections: Multi-layer interactivity for Global Dashboard sections
+- [x] Deep Insights Backend: Integrated fund sector and turnover data into explorer APIs
 
 ---
 

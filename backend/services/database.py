@@ -1057,7 +1057,7 @@ class DatabaseManager:
         params = [ticker]
         
         if group_id:
-            filter_clause += " AND fi.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
+            filter_clause += " AND lf.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
             params.append(group_id)
         else:
             filter_clause += " AND f.is_tracked = 1"
@@ -1093,6 +1093,8 @@ class DatabaseManager:
                 ah.total_shares as shares,
                 ah.total_value as value,
                 ah.put_call,
+                qs.primary_sector,
+                qs.portfolio_turnover,
                 (CAST(ah.total_value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
             FROM AggregatedHoldings ah
             LEFT JOIN funds f ON ah.cik = f.cik
