@@ -49,6 +49,7 @@
 - [x] Institutional Holder Explorer: Premium modal for cross-fund stock ownership discovery
 - [x] Interactive Spotlight Sections: Multi-layer interactivity for Global Dashboard sections
 - [x] Deep Insights Backend: Integrated fund sector and turnover data into explorer APIs
+- [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
 
 ---
 

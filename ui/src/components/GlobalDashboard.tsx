@@ -648,9 +648,20 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const [activeTab, setActiveTab] = useState<'overview' | 'consensus'>('overview');
     const [stockSearchQuery, setStockSearchQuery] = useState('');
+    const [searchTickerOnly, setSearchTickerOnly] = useState(false);
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
     const [holders, setHolders] = useState<any[]>([]);
     const [loadingHolders, setLoadingHolders] = useState(false);
+
+    // Clear search and selection when returning to the overview tab
+    useEffect(() => {
+        if (activeTab === 'overview') {
+            setStockSearchQuery('');
+            setSearchTickerOnly(false);
+            setSelectedTicker(null);
+            setHolders([]);
+        }
+    }, [activeTab]);
 
     const fetchStockHolders = async (ticker: string) => {
         setSelectedTicker(ticker);
@@ -1670,7 +1681,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     const itemTicker = item.ticker || item.issuer_name;
                                                     return (
                                                         <div key={i} className="crowding-item">
-                                                            <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(itemTicker)); }}>{itemTicker}</span>
+                                                            <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(itemTicker)); setSearchTickerOnly(true); }}>{itemTicker}</span>
                                                             <span
                                                                 className="crowding-count has-tooltip"
                                                                 onMouseEnter={(e) => handleCrowdingTooltipEnter(e, itemTicker, 'widely_held')}
@@ -1714,7 +1725,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {gainingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); setSearchTickerOnly(true); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change positive has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'gaining')}
@@ -1765,7 +1776,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div className="crowding-list">
                                                 {losingFunds.slice(0, 3).map((item, i) => (
                                                     <div key={i} className="crowding-item">
-                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); }}>{item.ticker || item.issuer_name}</span>
+                                                        <span className="crowding-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(item.ticker || item.issuer_name)); setSearchTickerOnly(true); }}>{item.ticker || item.issuer_name}</span>
                                                         <span 
                                                             className="crowding-change negative has-tooltip"
                                                             onMouseEnter={(e) => handleCrowdingTooltipEnter(e, item.ticker || item.issuer_name, 'losing')}
@@ -1842,7 +1853,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayNewPositions.map((pos, i) => (
                                             <div key={i} className="new-position-item">
                                                 <div className="new-position-info">
-                                                    <span className="new-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="new-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); setSearchTickerOnly(true); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="new-position-fund"
                                                         onClick={(e) => { e.stopPropagation(); pos.cik && onSelectFund(pos.cik); }}
@@ -1891,7 +1902,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         {displayExitedPositions.map((pos, i) => (
                                             <div key={i} className="exited-position-item">
                                                 <div className="exited-position-info">
-                                                    <span className="exited-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); }}>{pos.ticker || pos.issuer_name}</span>
+                                                    <span className="exited-position-ticker" onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(pos.ticker || pos.issuer_name)); setSearchTickerOnly(true); }}>{pos.ticker || pos.issuer_name}</span>
                                                     <span 
                                                         className="exited-position-fund"
                                                         onClick={(e) => { e.stopPropagation(); pos.cik && onSelectFund(pos.cik); }}
@@ -1950,7 +1961,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         swoopOpportunities.map((op, i) => (
                                             <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
                                                 <div className="mover-info">
-                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }} onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(op.ticker || op.issuer_name)); }}>{op.ticker || op.issuer_name}</div>
+                                                    <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }} onClick={(e) => { e.stopPropagation(); setActiveTab('consensus'); setStockSearchQuery(normalizeTicker(op.ticker || op.issuer_name)); setSearchTickerOnly(true); }}>{op.ticker || op.issuer_name}</div>
                                                     <div className="mover-fund" style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
                                                         {op.fund_name}
                                                     </div>
@@ -2092,7 +2103,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 type="text"
                                 placeholder="Search tickers or companies..."
                                 value={stockSearchQuery}
-                                onChange={(e) => setStockSearchQuery(e.target.value)}
+                                onChange={(e) => { setStockSearchQuery(e.target.value); setSearchTickerOnly(false); }}
                                 style={{
                                     width: '100%',
                                     padding: '12px 12px 12px 42px',
@@ -2124,10 +2135,22 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             <tbody>
                                 {(() => {
                                     const filtered = (summary.consensus_stocks || [])
-                                        .filter(s => 
-                                            (s.ticker || '').toLowerCase().includes(stockSearchQuery.toLowerCase()) || 
-                                            (s.issuer_name || '').toLowerCase().includes(stockSearchQuery.toLowerCase())
-                                        );
+                                        .filter(s => {
+                                            const query = stockSearchQuery.toLowerCase();
+                                            if (!query) return true;
+                                            
+                                            const ticker = (s.ticker || '').toLowerCase();
+                                            const name = (s.issuer_name || '').toLowerCase();
+                                            
+                                            if (searchTickerOnly) {
+                                                return ticker === query;
+                                            }
+                                            
+                                            const tickerMatch = ticker.includes(query);
+                                            const nameMatch = name.startsWith(query) || name.includes(' ' + query);
+                                            
+                                            return tickerMatch || nameMatch;
+                                        });
                                     
                                     if (filtered.length === 0) {
                                         return (

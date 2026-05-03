@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-03 10:25
+> Last updated: 2026-05-03 10:30
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -17,6 +17,8 @@
 - [x] Institutional Holder Explorer: Enriched backend with sector/turnover data and added premium Modal discovery
 - [x] Interactive Dashboard Sections: Entire spotlight sections (Crowding, New, Exited, Swoop) now clickable and navigable
 - [x] Cross-Fund Discovery: Added "Who else holds this?" triggers directly to fund holding lists
+- [x] Navigation Cleanup: Automatic reset of Stock Consensus search and selection when returning to Global Dashboard
+- [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only, while manual search uses improved word-boundary logic
 
 ## Last Session Summary
 

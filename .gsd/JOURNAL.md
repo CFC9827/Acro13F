@@ -103,6 +103,8 @@
 - **Cross-Fund Integration:** Added "Who else holds this?" discovery triggers directly to individual fund holding rows, bridging the gap between specific fund analysis and broad institutional consensus.
 - **Interactive Spotlight Sections:** Transformed Global Dashboard sections (Crowding, New, Exited, Swoop) into navigable links. The entire spotlight area now responds to hover with premium lift effects and routes directly to the Stock Consensus view.
 - **Event Propagation Tuning:** Implemented intelligent event bubbling to ensure nested ticker and fund links maintain their specific navigation logic while the surrounding section acts as a broad-scope link.
+- **Navigation Cleanup:** Implemented a state-reset effect in `GlobalDashboard` that automatically clears the Stock Consensus search box and selected ticker when the user returns to the Global Overview dashboard, ensuring a clean state for every research session.
+- **Strict Ticker Search Mode:** Introduced a dual-mode search engine for the Stock Consensus view. Clicking a ticker from the dashboard now activates "Strict Mode" (exact ticker match only), while manual typing enables "Flexible Mode" with improved word-boundary filtering (e.g., "SE" no longer matches "CHASE").
 
 **Key Decisions:**
 - Centralized the "Who Holds This?" logic into a reusable modal rather than separate pages to maintain user flow during deep research.
