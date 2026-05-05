@@ -178,6 +178,14 @@ const formatCurrency = (value: number): string => {
     return `$${value.toFixed(0)}`;
 };
 
+const formatNumber = (value: number): string => {
+    const absValue = Math.abs(value);
+    if (absValue >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+    if (absValue >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (absValue >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+    return value.toLocaleString();
+};
+
 const formatQ = (dateStr: string) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
