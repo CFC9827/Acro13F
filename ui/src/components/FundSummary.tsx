@@ -12,6 +12,7 @@ interface FundSummaryProps {
     onOpenHoldings?: () => void;
     onOpenActivity?: () => void;
     onOpenComposition?: () => void;
+    onOpenPerformance?: () => void;
 }
 
 interface TooltipState {
@@ -36,7 +37,7 @@ const formatQ = (dateStr: string) => {
     return `${q}Q '${d.getFullYear().toString().slice(2)}`;
 };
 
-export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik, onOpenHoldings, onOpenActivity, onOpenComposition }) => {
+export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik, onOpenHoldings, onOpenActivity, onOpenComposition, onOpenPerformance }) => {
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
     const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
@@ -370,7 +371,14 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 </div>
 
                 {/* QOQ TWR TILE */}
-                <div className="kpi-tile">
+                <div
+                    className="kpi-tile"
+                    role={onOpenPerformance ? 'button' : undefined}
+                    tabIndex={onOpenPerformance ? 0 : undefined}
+                    onClick={onOpenPerformance}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenPerformance)}
+                    style={{ cursor: onOpenPerformance ? 'pointer' : 'default' }}
+                >
                     <div className="kpi-icon" style={{ color: totalReturnQoQ >= 0 ? '#10b981' : '#ef4444', background: totalReturnQoQ >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
                         <TrendingUp size={18} />
                     </div>

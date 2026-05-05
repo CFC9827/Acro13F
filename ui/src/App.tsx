@@ -1249,6 +1249,7 @@ function App() {
                                         onOpenHoldings={() => navigate('table', selectedCik)}
                                         onOpenActivity={() => navigate('activity', selectedCik)}
                                         onOpenComposition={() => navigate('chart', selectedCik)}
+                                        onOpenPerformance={() => navigate('performance', selectedCik)}
                                     />
                                 ) : (view === 'performance' || view === 'mimic') ? (
                                     <div className="performance-view-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
