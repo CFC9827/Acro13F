@@ -619,10 +619,12 @@ class DatabaseManager:
                     if key not in current_ticker_funds:
                         current_ticker_funds[key] = {
                             "funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], 
-                            "total_value": 0, "weights": [], "max_weight": 0, "top_holder": None
+                            "total_value": 0, "weights": [], "max_weight": 0, "top_holder": None,
+                            "net_shares_change": 0
                         }
                     current_ticker_funds[key]["funds"].add((fund['name'], fund['cik']))
                     current_ticker_funds[key]["total_value"] += h['value']
+                    current_ticker_funds[key]["net_shares_change"] += h.get('shares', 0)
                     
                     w = (h['value'] * 100.0 / total_value) if total_value else 0
                     current_ticker_funds[key]["weights"].append(w)
@@ -636,6 +638,8 @@ class DatabaseManager:
                     key = t_raw.strip().upper()
                     if key not in prior_ticker_funds: prior_ticker_funds[key] = set()
                     prior_ticker_funds[key].add(fund['cik'])
+                    if key in current_ticker_funds:
+                        current_ticker_funds[key]["net_shares_change"] -= h.get('shares', 0)
 
                 new_keys, exited_keys = latest_keys - prev_keys, prev_keys - latest_keys
                 summary["kpis"]["new_positions"] += len(new_base_keys)
@@ -767,6 +771,7 @@ class DatabaseManager:
                 "avg_weight": avg_w,
                 "max_weight": data["max_weight"],
                 "top_holder": data["top_holder"],
+                "net_shares_change": data["net_shares_change"],
                 "conviction_score": round(score, 1),
                 "funds": list(data["funds"])
             })

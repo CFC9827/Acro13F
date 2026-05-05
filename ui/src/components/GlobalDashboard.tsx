@@ -130,6 +130,8 @@ interface ConsensusItem {
     total_value: number;
     funds: { name: string; cik: string }[];
     avg_weight?: number;
+    max_weight?: number;
+    net_shares_change?: number;
     conviction_score?: number;
     top_holder?: string;
 }
@@ -2133,8 +2135,9 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker & Trend</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funds</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Change</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Max Allocation</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Holder</th>
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Value</th>
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
@@ -2163,7 +2166,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     if (filtered.length === 0) {
                                         return (
                                             <tr>
-                                                <td colSpan={7} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                                <td colSpan={8} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
                                                         <Search size={40} style={{ color: '#38bdf8' }} />
                                                         <p style={{ fontSize: '16px', fontWeight: 500, color: '#f8fafc' }}>
@@ -2216,32 +2219,29 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             <div style={{ fontSize: '11px', color: '#64748b' }}>filers</div>
                                         </td>
                                         <td style={{ padding: '16px 24px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '120px' }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <span style={{ 
-                                                        fontSize: '10px', 
-                                                        fontWeight: 800, 
-                                                        color: (stock.conviction_score || 0) > 70 ? '#34d399' : (stock.conviction_score || 0) > 40 ? '#fbbf24' : '#94a3b8',
-                                                        textTransform: 'uppercase'
-                                                    }}>
-                                                        {(stock.conviction_score || 0) > 70 ? 'High Conviction' : (stock.conviction_score || 0) > 40 ? 'Moderate' : 'Low'}
-                                                    </span>
-                                                    <span style={{ fontSize: '11px', color: '#f8fafc', fontWeight: 600 }}>{Math.round(stock.conviction_score || 0)}</span>
-                                                </div>
-                                                <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                                                    <div style={{ 
-                                                        height: '100%', 
-                                                        width: `${stock.conviction_score || 0}%`, 
-                                                        background: (stock.conviction_score || 0) > 70 ? 'linear-gradient(90deg, #10b981, #34d399)' : (stock.conviction_score || 0) > 40 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : '#64748b',
-                                                        borderRadius: '2px'
-                                                    }} />
-                                                </div>
+                                            <div style={{ 
+                                                color: (stock.net_shares_change || 0) > 0 ? '#34d399' : (stock.net_shares_change || 0) < 0 ? '#f87171' : '#94a3b8', 
+                                                fontWeight: 700, 
+                                                fontSize: '15px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}>
+                                                {(stock.net_shares_change || 0) > 0 ? '+' : ''}
+                                                {formatNumber(stock.net_shares_change || 0)}
                                             </div>
+                                            <div style={{ fontSize: '11px', color: '#64748b' }}>shares</div>
                                         </td>
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
                                                 <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: '16px' }}>{stock.avg_weight?.toFixed(1)}%</span>
                                                 <span style={{ color: '#64748b', fontSize: '11px' }}>avg</span>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                                <span style={{ color: '#38bdf8', fontWeight: 900, fontSize: '16px' }}>{stock.max_weight?.toFixed(1)}%</span>
+                                                <span style={{ color: '#0284c7', fontSize: '11px', fontWeight: 700 }}>max</span>
                                             </div>
                                         </td>
                                         <td style={{ padding: '16px 24px' }}>
