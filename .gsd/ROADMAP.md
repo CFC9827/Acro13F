@@ -56,6 +56,8 @@
 - [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
 - [x] Consensus Data Accuracy: Fixed calculation bug for 'Conviction' metric causing discrepancies with 'Avg Allocation'
 - [x] Consensus Sorting Logic: Fixed crash when sorting by ticker and correctly mapped numerical/alphabetical logic for Conviction and Highest Weight
+- [x] Individual Fund Summary Interactivity: Standardized row-level clicks for Holdings/Movers and card-level for Activity sections
+- [x] UI Decluttering: Systematically removed 'VIEW ACTIVITY' labels for a cleaner, premium aesthetic
 
 ---
 

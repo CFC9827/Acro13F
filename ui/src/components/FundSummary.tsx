@@ -268,43 +268,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
             <div className="kpi-tiles-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                 {/* POSITIONS TILE */}
                 <div
-                    className="kpi-tile has-tooltip"
+                    className="kpi-tile"
                     role={onOpenHoldings ? 'button' : undefined}
                     tabIndex={onOpenHoldings ? 0 : undefined}
                     onClick={onOpenHoldings}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenHoldings)}
-                    onMouseEnter={(e) => handleMouseEnter(e, 'Recent Activity', (
-                        <div>
-                            {newPositions.length > 0 && (
-                                <div style={{ marginBottom: '12px' }}>
-                                    <div className="tooltip-title" style={{ color: '#10b981', borderBottom: '1px solid rgba(16,185,129,0.2)', marginBottom: '8px', paddingBottom: '4px' }}>New Positions</div>
-                                    {newPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                            <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
-                                            <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
-                                            <span className="pos-weight">+{p.weight.toFixed(1)}%</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {exitedPositions.length > 0 && (
-                                <div>
-                                    <div className="tooltip-title" style={{ color: '#ef4444', borderBottom: '1px solid rgba(239,68,68,0.2)', marginBottom: '8px', paddingBottom: '4px' }}>Exited</div>
-                                    {exitedPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                            <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
-                                            <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
-                                            <span className="pos-weight negative">-{p.weight.toFixed(1)}%</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                            {newPositions.length === 0 && exitedPositions.length === 0 && (
-                                <div style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>No changes this quarter</div>
-                            )}
-                        </div>
-                    ))}
-                    onMouseLeave={handleMouseLeave}
                     style={{ cursor: onOpenHoldings ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon"><Briefcase size={18} /></div>
@@ -315,11 +283,12 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                 <span style={{
                                     fontSize: '0.85rem',
                                     fontWeight: 600,
-                                    color: (currentHoldings.length - (currentHoldings.length - newPositions.length + exitedPositions.length)) > 0 ? '#10b981' : '#ef4444',
-                                    display: 'flex', alignItems: 'center'
+                                    color: (newPositions.length - exitedPositions.length) > 0 ? '#10b981' : (newPositions.length - exitedPositions.length) < 0 ? '#ef4444' : '#64748b',
+                                    display: 'flex', alignItems: 'center', gap: '2px'
                                 }}>
-                                    {(currentHoldings.length - (currentHoldings.length - newPositions.length + exitedPositions.length)) > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                                    {Math.abs(currentHoldings.length - (currentHoldings.length - newPositions.length + exitedPositions.length))}
+                                    {(newPositions.length - exitedPositions.length) > 0 && <ArrowUp size={12} />}
+                                    {(newPositions.length - exitedPositions.length) < 0 && <ArrowDown size={12} />}
+                                    {Math.abs(newPositions.length - exitedPositions.length)}
                                 </span>
                             )}
                         </div>
@@ -343,10 +312,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             <span style={{
                                 fontSize: '0.85rem',
                                 fontWeight: 600,
-                                color: aumChange >= 0 ? '#10b981' : '#ef4444',
+                                color: aumChangePercent > 0.01 ? '#10b981' : aumChangePercent < -0.01 ? '#ef4444' : '#64748b',
                                 display: 'flex', alignItems: 'center', gap: '2px'
                             }}>
-                                {aumChange >= 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                                {aumChangePercent > 0.01 && <ArrowUp size={12} />}
+                                {aumChangePercent < -0.01 && <ArrowDown size={12} />}
                                 {Math.abs(aumChangePercent).toFixed(1)}%
                             </span>
                         </div>
@@ -356,30 +326,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
                 {/* NEW POSITIONS TILE */}
                 <div
-                    className="kpi-tile has-tooltip"
+                    className="kpi-tile"
                     role={onOpenActivity ? 'button' : undefined}
                     tabIndex={onOpenActivity ? 0 : undefined}
                     onClick={onOpenActivity}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
-                    onMouseEnter={(e) => handleMouseEnter(e, 'New Positions', (
-                        <div>
-                            {newPositions.slice(0, 8).map(p => (
-                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
-                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
-                                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
-                                        <span className="pos-weight">{p.weight.toFixed(1)}%</span>
-                                    </div>
-                                </div>
-                            ))}
-                            {newPositions.length > 8 && (
-                                <span className="tooltip-more">+{newPositions.length - 8} more</span>
-                            )}
-                            {newPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
-                        </div>
-                    ))}
-                    onMouseLeave={handleMouseLeave}
                     style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon positive"><PlusCircle size={18} /></div>
@@ -398,30 +349,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
                 {/* EXITED POSITIONS TILE */}
                 <div
-                    className="kpi-tile has-tooltip"
+                    className="kpi-tile"
                     role={onOpenActivity ? 'button' : undefined}
                     tabIndex={onOpenActivity ? 0 : undefined}
                     onClick={onOpenActivity}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
-                    onMouseEnter={(e) => handleMouseEnter(e, 'Exited Positions', (
-                        <div>
-                            {exitedPositions.slice(0, 8).map(p => (
-                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
-                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
-                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
-                                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
-                                        <span className="pos-weight negative">{p.weight.toFixed(1)}%</span>
-                                    </div>
-                                </div>
-                            ))}
-                            {exitedPositions.length > 8 && (
-                                <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
-                            )}
-                            {exitedPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
-                        </div>
-                    ))}
-                    onMouseLeave={handleMouseLeave}
                     style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon negative"><MinusCircle size={18} /></div>
@@ -479,7 +411,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                 {topHoldings.map((h, i) => (
                                     <div 
                                         key={i} 
-                                        className="mini-holding interactive-section" 
+                                        className="mini-holding" 
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (onOpenHoldings) onOpenHoldings();

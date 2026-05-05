@@ -2312,7 +2312,8 @@ body {
 }
 
 .mover-item:hover,
-.shift-item:hover {
+.shift-item:hover,
+.mini-holding:hover {
   background: rgba(56, 189, 248, 0.08);
 }
 
@@ -2766,17 +2767,21 @@ body {
   z-index: 20 !important;
 }
 
-/* Force disable all internal hovers and interactions ONLY for card-level interactivity */
+/* Force disable all internal hovers ONLY for card-level interactivity, keep pointer-events for scrolling */
 .interactive-section[role="button"] .mover-item,
 .interactive-section[role="button"] .new-position-item,
 .interactive-section[role="button"] .exited-position-item,
 .interactive-section[role="button"] .crowding-item,
-.interactive-section[role="button"] .shift-item,
+.interactive-section[role="button"] .shift-item {
+  pointer-events: none !important;
+  cursor: inherit !important;
+}
+
+/* Ensure lists are scrollable even when the card is interactive */
 .interactive-section[role="button"] .movers-list,
 .interactive-section[role="button"] .new-positions-list,
 .interactive-section[role="button"] .exited-positions-list {
-  pointer-events: none !important;
-  cursor: inherit !important;
+  pointer-events: auto !important;
 }
 
 .interactive-section .mover-item:hover,
