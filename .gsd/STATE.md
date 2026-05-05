@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-05 01:25
+> Last updated: 2026-05-05 13:28
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -23,8 +23,8 @@
 - [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
 - [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
 - [x] UI Terminology Alignment: Renamed 'Top Holder' to 'Highest Weight' and 'Max Allocation' to 'Conviction'
-- [/] Pending Verification: Investigating persistent 0 net change and truncated holders list reported by user
-
+- [x] Data Verification Fix: Resolved stale cache issues causing truncated holders lists and "0 net change" bugs
+- [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
 ## Last Session Summary
 
 ### UI Refinement & Navigation

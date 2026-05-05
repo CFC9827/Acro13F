@@ -52,6 +52,8 @@
 - [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
 - [x] Dashboard Stability: Resolved critical JSX syntax errors and refactored modal rendering architecture
 - [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
+- [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
+- [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
 
 ---
 

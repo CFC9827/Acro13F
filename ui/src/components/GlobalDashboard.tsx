@@ -127,6 +127,8 @@ interface ConsensusItem {
     fund_count: number;
     prev_fund_count?: number;
     change?: number;
+    funds_added?: number;
+    funds_out?: number;
     total_value: number;
     funds: { name: string; cik: string }[];
     avg_weight?: number;
@@ -2157,8 +2159,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker & Trend</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funds</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Added</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Out</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Change</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
@@ -2190,7 +2194,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     if (filtered.length === 0) {
                                         return (
                                             <tr>
-                                                <td colSpan={8} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                                <td colSpan={10} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
                                                         <Search size={40} style={{ color: '#38bdf8' }} />
                                                         <p style={{ fontSize: '16px', fontWeight: 500, color: '#f8fafc' }}>
@@ -2211,26 +2215,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#38bdf8', fontSize: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
                                                         {stock.ticker?.slice(0, 4) || 'N/A'}
                                                     </div>
-                                                    {(stock.change || 0) !== 0 && (
-                                                        <div style={{ 
-                                                            position: 'absolute', 
-                                                            bottom: '-4px', 
-                                                            right: '-4px', 
-                                                            background: (stock.change ?? 0) > 0 ? '#065f46' : '#7f1d1d',
-                                                            color: (stock.change ?? 0) > 0 ? '#34d399' : '#f87171',
-                                                            padding: '2px 4px',
-                                                            borderRadius: '4px',
-                                                            fontSize: '10px',
-                                                            fontWeight: 800,
-                                                            border: '1px solid rgba(255,255,255,0.1)',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '2px'
-                                                        }}>
-                                                            { (stock.change ?? 0) > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />}
-                                                            {Math.abs(stock.change ?? 0)}
-                                                        </div>
-                                                    )}
                                                 </div>
                                                 <div>
                                                     <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.ticker || 'N/A'}</div>
@@ -2241,6 +2225,16 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.fund_count}</div>
                                             <div style={{ fontSize: '11px', color: '#64748b' }}>filers</div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ color: (stock.funds_added || 0) > 0 ? '#34d399' : '#64748b', fontWeight: 700, fontSize: '15px' }}>
+                                                {(stock.funds_added || 0) > 0 ? '+' : ''}{stock.funds_added || 0}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ color: (stock.funds_out || 0) > 0 ? '#f87171' : '#64748b', fontWeight: 700, fontSize: '15px' }}>
+                                                {(stock.funds_out || 0) > 0 ? '-' : ''}{stock.funds_out || 0}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ 

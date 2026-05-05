@@ -110,3 +110,23 @@
 - Centralized the "Who Holds This?" logic into a reusable modal rather than separate pages to maintain user flow during deep research.
 - Added institutional turnover metrics to the holders table to help users differentiate between high-frequency "rented" positions and long-term institutional "core" holdings.
 - Chose section-level interactivity for the dashboard to match contemporary "Discovery Hub" aesthetics, reducing the need for small, fiddly "View All" buttons.
+
+---
+
+## 2026-05-05 — Dashboard Sync & Data Integrity
+
+**Session Goal:** Finalize Stock Consensus dashboard by resolving data rendering discrepancies and UI terminology.
+
+**Accomplished:**
+- **Data Integrity Fixes:** Corrected a bug in database.py where the net_shares_change was being reset to 0 in the aggregation loop.
+- **Frontend State Synchronization:** Added a useEffect hook to GlobalDashboard.tsx to ensure the local summary state updates when the parent App.tsx refreshes its data.
+- **UI Terminology Alignment:** Renamed 'Top Holder' to '**Highest Weight**' and 'Max Allocation' to '**Conviction**' in the consensus table to better reflect institutional analysis standards.
+- **Improved Holder Discovery:** Broadened the holder search filter to ensure all group-member funds are visible in the 'All Funds' modal view.
+- **Manual Refresh Trigger:** Added an explicit data fetch when switching to the 'All Funds' group view to clear potentially stale cached state.
+
+**Key Decisions:**
+- Prioritized 'Weight-Based' terminology (Conviction) over nominal share counts to match the user's focus on high-conviction institutional signals.
+- Implemented state-syncing in GlobalDashboard rather than just relying on props to allow for more granular local filtering without losing parent-level updates.
+
+**Open Issues/Pending:**
+- The user reports that 'Net Change' and 'Holders' count still appear incorrect/truncated in their environment. This warrants a deep-dive into the local build process and client-side data propagation in the next session.

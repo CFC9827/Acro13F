@@ -775,8 +775,15 @@ class DatabaseManager:
         # Build full consensus list for the new tab
         consensus_list = []
         for ticker_key, data in current_ticker_funds.items():
-            cc = len(data["funds"])
-            pc = len(prior_ticker_funds.get(ticker_key, []))
+            current_ciks = set(cik for name, cik in data["funds"])
+            prior_ciks = prior_ticker_funds.get(ticker_key, set())
+            
+            cc = len(current_ciks)
+            pc = len(prior_ciks)
+            
+            funds_added = len(current_ciks - prior_ciks)
+            funds_out = len(prior_ciks - current_ciks)
+            
             avg_w = sum(data["weights"]) / cc if cc > 0 else 0
             # Conviction score: 40% breadth (min 10 funds), 60% depth (min 15% avg weight)
             score = (min(cc / 10.0, 1.0) * 40.0) + (min(avg_w / 15.0, 1.0) * 60.0)
@@ -787,6 +794,8 @@ class DatabaseManager:
                 "fund_count": cc,
                 "prev_fund_count": pc,
                 "change": cc - pc,
+                "funds_added": funds_added,
+                "funds_out": funds_out,
                 "total_value": data["total_value"],
                 "avg_weight": avg_w,
                 "max_weight": data["max_weight"],
