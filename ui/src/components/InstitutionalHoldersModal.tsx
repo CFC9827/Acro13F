@@ -8,6 +8,8 @@ interface Holder {
     shares: number;
     value: number;
     weight: number;
+    prior_shares?: number;
+    prior_weight?: number;
     primary_sector?: string;
     portfolio_turnover?: number;
 }
@@ -114,15 +116,20 @@ export function InstitutionalHoldersModal({
                             <thead style={{ position: 'sticky', top: 0, background: 'rgba(15, 23, 42, 0.95)', backdropFilter: 'blur(8px)', zIndex: 10 }}>
                                 <tr>
                                     <th style={{ padding: '18px 40px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>Institution</th>
-                                    <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>DNA & Focus</th>
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Shares</th>
+                                    <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Net Change</th>
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Market Value</th>
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Portfolio Weight</th>
+                                    <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Δ Weight</th>
                                     <th style={{ padding: '18px 40px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {holders.map((h, i) => (
+                                {holders.map((h, i) => {
+                                    const sharesDelta = h.prior_shares != null ? h.shares - Number(h.prior_shares) : h.shares;
+                                    const weightDelta = h.prior_weight != null && h.weight != null ? h.weight - Number(h.prior_weight) : (h.weight || 0);
+                                    
+                                    return (
                                     <tr key={h.cik} className="holder-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }}>
                                         <td style={{ padding: '24px 40px' }}>
                                             <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>{h.fund_name}</div>
@@ -130,34 +137,46 @@ export function InstitutionalHoldersModal({
                                                 <span style={{ fontSize: '10px', color: '#475569', fontWeight: 700, fontFamily: 'monospace' }}>CIK: {h.cik}</span>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '24px 24px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                                {h.primary_sector && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>
-                                                        <PieChart size={12} className="text-blue-400" />
-                                                        {h.primary_sector}
-                                                    </div>
-                                                )}
-                                                {h.portfolio_turnover !== undefined && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '10px', fontWeight: 700 }}>
-                                                        <Activity size={12} className="text-pink-500" />
-                                                        {h.portfolio_turnover.toFixed(1)}% TURNOVER
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '24px 24px', textAlign: 'right', color: '#94a3b8', fontSize: '13px', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
+                                        <td style={{ padding: '24px 24px', textAlign: 'right', color: '#f8fafc', fontSize: '13px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                                             {h.shares.toLocaleString()}
+                                        </td>
+                                        <td style={{ padding: '24px 24px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                            <div style={{ 
+                                                color: sharesDelta > 0 ? '#34d399' : sharesDelta < 0 ? '#f87171' : '#64748b',
+                                                fontWeight: 700, 
+                                                fontSize: '13px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'flex-end',
+                                                gap: '4px'
+                                            }}>
+                                                {sharesDelta > 0 ? '+' : ''}
+                                                {sharesDelta.toLocaleString()}
+                                            </div>
                                         </td>
                                         <td style={{ padding: '24px 24px', textAlign: 'right' }}>
                                             <div style={{ color: '#f8fafc', fontWeight: 800, fontSize: '15px' }}>{formatCurrency(h.value)}</div>
                                         </td>
                                         <td style={{ padding: '24px 24px', textAlign: 'right' }}>
                                             <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                <div style={{ color: '#38bdf8', fontWeight: 900, fontSize: '15px' }}>{h.weight.toFixed(2)}%</div>
+                                                <div style={{ color: '#38bdf8', fontWeight: 900, fontSize: '15px' }}>{h.weight?.toFixed(2) || '0.00'}%</div>
                                                 <div style={{ width: '40px', height: '3px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '10px', marginTop: '4px', overflow: 'hidden' }}>
-                                                    <div style={{ width: `${Math.min(h.weight * 5, 100)}%`, height: '100%', background: '#38bdf8' }} />
+                                                    <div style={{ width: `${Math.min((h.weight || 0) * 5, 100)}%`, height: '100%', background: '#38bdf8' }} />
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '24px 24px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                                            <div style={{ 
+                                                color: weightDelta > 0 ? '#34d399' : weightDelta < 0 ? '#f87171' : '#64748b',
+                                                fontWeight: 700, 
+                                                fontSize: '13px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'flex-end',
+                                                gap: '4px'
+                                            }}>
+                                                {weightDelta > 0 ? '+' : ''}
+                                                {weightDelta.toFixed(2)}%
                                             </div>
                                         </td>
                                         <td style={{ padding: '24px 40px', textAlign: 'right' }}>
@@ -184,7 +203,8 @@ export function InstitutionalHoldersModal({
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}
@@ -197,7 +217,7 @@ export function InstitutionalHoldersModal({
                             <span style={{ color: '#94a3b8', fontWeight: 700 }}>{holders.length}</span> WHALE FUNDS IDENTIFIED
                         </div>
                         <div style={{ fontSize: '12px', color: '#64748b' }}>
-                            AGGREGATE CONVICTION: <span style={{ color: '#38bdf8', fontWeight: 800 }}>{(holders.reduce((acc, h) => acc + h.weight, 0) / (holders.length || 1)).toFixed(2)}% AVG</span>
+                            AGGREGATE CONVICTION: <span style={{ color: '#38bdf8', fontWeight: 800 }}>{(holders.reduce((acc, h) => acc + (h.weight || 0), 0) / (holders.length || 1)).toFixed(2)}% AVG</span>
                         </div>
                     </div>
                     <div style={{ fontSize: '11px', color: '#334155', fontWeight: 700, letterSpacing: '0.05em' }}>

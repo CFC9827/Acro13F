@@ -1123,16 +1123,19 @@ class DatabaseManager:
             filter_clause += " AND (f.is_tracked = 1 OR f.cik IN (SELECT cik FROM fund_group_members))"
 
         query = f"""
-            WITH LatestPeriods AS (
-                SELECT cik, MAX(period_of_report) as max_p
+            WITH RecentFilings AS (
+                SELECT 
+                    cik, 
+                    accession_number,
+                    period_of_report,
+                    ROW_NUMBER() OVER(PARTITION BY cik ORDER BY period_of_report DESC, filing_date DESC) as rn
                 FROM filings
-                GROUP BY cik
             ),
             LatestFilings AS (
-                SELECT f.cik, MAX(f.accession_number) as latest_acc
-                FROM filings f
-                JOIN LatestPeriods lp ON f.cik = lp.cik AND f.period_of_report = lp.max_p
-                GROUP BY f.cik
+                SELECT cik, accession_number as latest_acc FROM RecentFilings WHERE rn = 1
+            ),
+            PriorFilings AS (
+                SELECT cik, accession_number as prior_acc FROM RecentFilings WHERE rn = 2
             ),
             AggregatedHoldings AS (
                 SELECT 
@@ -1146,22 +1149,39 @@ class DatabaseManager:
                 LEFT JOIN funds f ON lf.cik = f.cik
                 {filter_clause}
                 GROUP BY lf.cik, lf.latest_acc
+            ),
+            PriorAggregatedHoldings AS (
+                SELECT 
+                    pf.cik,
+                    pf.prior_acc as accession_number,
+                    SUM(h.shares) as prior_shares,
+                    SUM(h.value) as prior_value
+                FROM holdings h
+                JOIN PriorFilings pf ON h.accession_number = pf.prior_acc
+                LEFT JOIN funds f ON pf.cik = f.cik
+                {filter_clause}
+                GROUP BY pf.cik, pf.prior_acc
             )
             SELECT 
                 COALESCE(f.name, 'Unknown Fund (' || ah.cik || ')') as fund_name,
                 ah.cik,
                 ah.total_shares as shares,
                 ah.total_value as value,
+                pah.prior_shares as prior_shares,
                 ah.put_call,
                 qs.primary_sector,
                 qs.portfolio_turnover,
-                (CAST(ah.total_value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight
+                (CAST(ah.total_value AS FLOAT) * 100.0 / NULLIF(qs.total_aum, 0)) as weight,
+                (CAST(pah.prior_value AS FLOAT) * 100.0 / NULLIF(pqs.total_aum, 0)) as prior_weight
             FROM AggregatedHoldings ah
+            LEFT JOIN PriorAggregatedHoldings pah ON ah.cik = pah.cik
             LEFT JOIN funds f ON ah.cik = f.cik
             LEFT JOIN fund_quarterly_stats qs ON ah.accession_number = qs.accession_number
+            LEFT JOIN fund_quarterly_stats pqs ON pah.accession_number = pqs.accession_number
             ORDER BY ah.total_value DESC
         """
-        return self._execute(query, tuple(params), fetch='all')
+        # Pass params twice because filter_clause is used in two CTEs
+        return self._execute(query, tuple(params * 2), fetch='all')
 
     def search_all(self, query: str) -> Dict:
         """Global search for funds and tickers."""
