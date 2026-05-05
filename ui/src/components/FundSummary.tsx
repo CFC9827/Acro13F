@@ -269,32 +269,34 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 {/* POSITIONS TILE */}
                 <div
                     className="kpi-tile has-tooltip"
-                    role={onOpenActivity ? 'button' : undefined}
-                    tabIndex={onOpenActivity ? 0 : undefined}
-                    onClick={onOpenActivity}
-                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
-                    onMouseEnter={(e) => handleMouseEnter(e, 'Position Changes', (
+                    role={onOpenHoldings ? 'button' : undefined}
+                    tabIndex={onOpenHoldings ? 0 : undefined}
+                    onClick={onOpenHoldings}
+                    onKeyDown={(e) => handleNavigationKeyDown(e, onOpenHoldings)}
+                    onMouseEnter={(e) => handleMouseEnter(e, 'Recent Activity', (
                         <div>
                             {newPositions.length > 0 && (
-                                <div style={{ marginBottom: '8px' }}>
-                                    <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginBottom: '4px' }}>NEW ({newPositions.length})</div>
+                                <div style={{ marginBottom: '12px' }}>
+                                    <div className="tooltip-title" style={{ color: '#10b981', borderBottom: '1px solid rgba(16,185,129,0.2)', marginBottom: '8px', paddingBottom: '4px' }}>New Positions</div>
                                     {newPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker || p.issuer_name || p.cusip} style={{ fontSize: '11px', color: '#e2e8f0' }}>+ {p.ticker || p.issuer_name || p.cusip}</div>
+                                        <div key={p.ticker} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                            <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
+                                            <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
+                                            <span className="pos-weight">+{p.weight.toFixed(1)}%</span>
+                                        </div>
                                     ))}
-                                    {newPositions.length > 5 && (
-                                        <span className="tooltip-more">+{newPositions.length - 5} more</span>
-                                    )}
                                 </div>
                             )}
                             {exitedPositions.length > 0 && (
                                 <div>
-                                    <div style={{ fontSize: '11px', color: '#ef4444', fontWeight: 700, marginBottom: '4px' }}>EXITED ({exitedPositions.length})</div>
+                                    <div className="tooltip-title" style={{ color: '#ef4444', borderBottom: '1px solid rgba(239,68,68,0.2)', marginBottom: '8px', paddingBottom: '4px' }}>Exited</div>
                                     {exitedPositions.slice(0, 5).map(p => (
-                                        <div key={p.ticker || p.cusip} style={{ fontSize: '11px', color: '#94a3b8' }}>- {p.ticker || p.issuer_name || p.cusip}</div>
+                                        <div key={p.ticker} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                            <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
+                                            <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
+                                            <span className="pos-weight negative">-{p.weight.toFixed(1)}%</span>
+                                        </div>
                                     ))}
-                                    {exitedPositions.length > 5 && (
-                                        <span className="tooltip-more">+{exitedPositions.length - 5} more</span>
-                                    )}
                                 </div>
                             )}
                             {newPositions.length === 0 && exitedPositions.length === 0 && (
@@ -303,7 +305,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         </div>
                     ))}
                     onMouseLeave={handleMouseLeave}
-                    style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
+                    style={{ cursor: onOpenHoldings ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon"><Briefcase size={18} /></div>
                     <div className="kpi-content">
@@ -472,33 +474,29 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             </div>
                         </div>
 
-                        <div
-                            className="fund-summary-card"
-                            role={onOpenHoldings ? 'button' : undefined}
-                            tabIndex={onOpenHoldings ? 0 : undefined}
-                            onClick={onOpenHoldings}
-                            onKeyDown={(e) => {
-                                if (!onOpenHoldings) return;
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    onOpenHoldings();
-                                }
-                            }}
-                            style={{ cursor: onOpenHoldings ? 'pointer' : 'default' }}
-                        >
+                        <div className="fund-summary-card">
                             <div className="top-holdings-list" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 {topHoldings.map((h, i) => (
-                                    <div key={i} className="mini-holding" style={{
-                                        position: 'relative',
-                                        padding: '12px 16px',
-                                        backgroundColor: 'rgba(30, 41, 59, 0.4)',
-                                        border: '1px solid rgba(255,255,255,0.05)',
-                                        borderRadius: '6px',
-                                        overflow: 'hidden',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between'
-                                    }}>
+                                    <div 
+                                        key={i} 
+                                        className="mini-holding interactive-section" 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onOpenHoldings) onOpenHoldings();
+                                        }}
+                                        style={{
+                                            position: 'relative',
+                                            padding: '12px 16px',
+                                            backgroundColor: 'rgba(30, 41, 59, 0.4)',
+                                            border: '1px solid rgba(255,255,255,0.05)',
+                                            borderRadius: '6px',
+                                            overflow: 'hidden',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
                                         {/* Background Bar */}
                                         <div style={{
                                             position: 'absolute',
@@ -549,7 +547,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             <div className="toggle-group" style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.5)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                 <button 
                                     className={`control-btn-mini ${moversMode === 'value' ? 'active' : ''}`}
-                                    onClick={() => setMoversMode('value')}
+                                    onClick={(e) => { e.stopPropagation(); setMoversMode('value'); }}
                                     style={{ 
                                         padding: '4px 8px', 
                                         fontSize: '10px', 
@@ -565,7 +563,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                 </button>
                                 <button 
                                     className={`control-btn-mini ${moversMode === 'shares' ? 'active' : ''}`}
-                                    onClick={() => setMoversMode('shares')}
+                                    onClick={(e) => { e.stopPropagation(); setMoversMode('shares'); }}
                                     style={{ 
                                         padding: '4px 8px', 
                                         fontSize: '10px', 
@@ -591,7 +589,15 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                 .slice(0, 10).map((mover, i) => {
                                 const isPositive = moversMode === 'value' ? mover.val_change >= 0 : mover.shares_change >= 0;
                                 return (
-                                    <div key={i} className="mover-item">
+                                    <div 
+                                        key={i} 
+                                        className="mover-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (onOpenActivity) onOpenActivity();
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         <div className="mover-info">
                                             <span className="mover-ticker">{mover.ticker || mover.issuer_name}</span>
                                             <span className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b' }}>{mover.issuer_name.slice(0, 15)}...</span>
@@ -615,9 +621,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             })}
                         </div>
                     </section>
-
-                    {/* New Positions */}
-                    <section className="dashboard-section compact">
+                    <section 
+                        className="dashboard-section compact interactive-section"
+                        role="button"
+                        onClick={onOpenActivity}
+                    >
                         <div className="section-header">
                             <PlusCircle className="section-icon-small" style={{ color: '#10b981' }} />
                             <div>
@@ -628,7 +636,10 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         <div className="new-positions-list scrollable">
                             {newPositions.length > 0 ? (
                                 newPositions.slice(0, 8).map((pos, i) => (
-                                    <div key={i} className="new-position-item">
+                                    <div 
+                                        key={i} 
+                                        className="new-position-item"
+                                    >
                                         <div className="new-position-info">
                                             <span className="new-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                             <span className="new-position-fund">{pos.issuer_name.slice(0, 15)}...</span>
@@ -648,7 +659,11 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     </section>
 
                     {/* Exited Positions */}
-                    <section className="dashboard-section compact">
+                    <section 
+                        className="dashboard-section compact interactive-section"
+                        role="button"
+                        onClick={onOpenActivity}
+                    >
                         <div className="section-header">
                             <MinusCircle className="section-icon-small" style={{ color: '#ef4444' }} />
                             <div>
@@ -659,14 +674,17 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         <div className="exited-positions-list scrollable">
                             {exitedPositions.length > 0 ? (
                                 exitedPositions.slice(0, 8).map((pos, i) => (
-                                    <div key={i} className="exited-position-item">
+                                    <div 
+                                        key={i} 
+                                        className="exited-position-item"
+                                    >
                                         <div className="exited-position-info">
                                             <span className="exited-position-ticker">{pos.ticker || pos.issuer_name}</span>
                                             <span className="exited-position-fund">{pos.issuer_name.slice(0, 15)}...</span>
                                         </div>
-                                        <div className="exited-position-stats">
+                                        <div className={`exited-position-stats`}>
                                             <span className="exited-position-value" style={{ color: '#ef4444', fontWeight: 600 }}>{formatCurrency(pos.value)}</span>
-                                            <span className="exited-position-weight" style={{ color: '#ef4444', fontWeight: 600 }}>{pos.weight.toFixed(1)}%</span>
+                                            <span className="exited-position-weight" style={{ color: '#ef4444', fontWeight: 600 }}>-{pos.weight.toFixed(1)}%</span>
                                         </div>
                                     </div>
                                 ))
@@ -678,55 +696,6 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                         </div>
                     </section>
 
-                    {/* Swoop Opportunities (Always Rendered for Debugging) */}
-                    <section className="dashboard-section compact" style={{ overflow: 'hidden' }}>
-                        <div className="section-header">
-                            <AlertCircle className="section-icon-small" style={{ color: '#eab308' }} />
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <h3 className="section-title-small">Swoop Opps</h3>
-                                <Info
-                                    size={14}
-                                    style={{ color: '#64748b', cursor: 'help' }}
-                                    onMouseEnter={(e) => handleMouseEnter(e, 'Swoop Opportunities', (
-                                        <div style={{ maxWidth: '280px', fontSize: '11px', color: '#cbd5e1', lineHeight: 1.5 }}>
-                                            <p>High-conviction positions (&gt;3% portfolio weight) where the implied share price has dropped &gt;10% quarter-over-quarter.</p>
-                                            <p style={{ marginTop: '8px', color: '#94a3b8' }}>These represent potential buying opportunities where funds are holding through price weakness. Stock splits are filtered out using a price/share change heuristic.</p>
-                                        </div>
-                                    ))}
-                                    onMouseLeave={handleMouseLeave}
-                                />
-                            </div>
-                        </div>
-                        <p className="section-desc-small" style={{ marginLeft: '28px', marginTop: '-4px' }}>Conviction (&gt;3%) share price dips</p>
-                        <div className="swoop-list scrollable" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                            {swoopOpportunities.length > 0 ? (
-                                swoopOpportunities.slice(0, 5).map((op, i) => (
-                                    <div key={i} className="mover-item" style={{ borderLeft: '3px solid #eab308', paddingLeft: '12px', display: 'flex', justifyContent: 'space-between', paddingRight: '4px' }}>
-                                        <div className="mover-info">
-                                            <div className="mover-ticker" style={{ fontWeight: 700, color: '#f1f5f9' }}>{op.ticker || op.issuer_name}</div>
-                                            <div className="mover-fund" style={{ fontSize: '0.65rem', color: '#64748b', marginTop: '2px' }}>
-                                                {formatCurrency(op.prevPrice)} {'->'} {formatCurrency(op.currentPrice)}
-                                            </div>
-                                        </div>
-                                        <div className="mover-delta" style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                                                <span style={{ fontSize: '9px', color: '#64748b', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Price</span>
-                                                <span style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>{op.dropPct.toFixed(1)}%</span>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'baseline', marginTop: '1px' }}>
-                                                <span style={{ fontSize: '9px', color: '#64748b', marginRight: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Weight</span>
-                                                <span style={{ fontSize: '11px', color: '#64748b' }}>{op.weight.toFixed(1)}%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div style={{ padding: '12px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', textAlign: 'center' }}>
-                                    No high conviction dips found this quarter.
-                                </div>
-                            )}
-                        </div>
-                    </section>
 
                     {/* Sector Allocation */}
                     {sectorAllocation.length > 0 && (

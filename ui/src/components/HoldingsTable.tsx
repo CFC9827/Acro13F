@@ -1983,7 +1983,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                             <th onClick={() => handleSort('percent_delta')} className="sortable-th text-right">
                                 <div className="th-content justify-end">
                                     <div className="whitespace-normal leading-tight" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                        <span>╬ö % Port</span>
+                                        <span>Δ % Port</span>
                                     </div>
                                     {renderSortIcon('percent_delta')}
                                 </div>
@@ -1991,7 +1991,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                             <th onClick={() => handleSort('price_delta')} className="sortable-th text-right">
                                 <div className="th-content justify-end">
                                     <div className="whitespace-normal leading-tight" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                        <span>Price ╬ö %</span>
+                                        <span>Price Δ %</span>
                                     </div>
                                     {renderSortIcon('price_delta')}
                                 </div>
@@ -2210,8 +2210,8 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                 <div>
                                                     <div className="ticker" style={(h as any).isSoldOff ? { color: '#f87171' } : isNewPosition ? { color: '#34d399' } : {}}>
                                                         {h.issuer_name}
-                                                        {(h as any).put_call?.toUpperCase() === 'PUT' && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderRadius: '4px', fontWeight: 600 }}>≡ƒö╗ PUT</span>}
-                                                        {(h as any).put_call?.toUpperCase() === 'CALL' && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(34, 197, 94, 0.2)', color: '#22c55e', borderRadius: '4px', fontWeight: 600 }}>≡ƒö║ CALL</span>}
+                                                        {(h as any).put_call?.toUpperCase() === 'PUT' && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', borderRadius: '4px', fontWeight: 600 }}>🔴 PUT</span>}
+                                                        {(h as any).put_call?.toUpperCase() === 'CALL' && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(34, 197, 94, 0.2)', color: '#22c55e', borderRadius: '4px', fontWeight: 600 }}>🟢 CALL</span>}
                                                         {(h as any).isSoldOff && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(248, 113, 113, 0.2)', color: '#f87171', borderRadius: '4px', fontWeight: 600 }}>EXIT</span>}
                                                         {isNewPosition && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(52, 211, 153, 0.2)', color: '#34d399', borderRadius: '4px', fontWeight: 600 }}>NEW</span>}
                                                     </div>
