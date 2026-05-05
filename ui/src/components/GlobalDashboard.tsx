@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical, Search, MousePointer2, Loader2, X } from 'lucide-react';
+import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical, Search, MousePointer2, Loader2, X, Target, Zap, Plus, Award } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
 
@@ -42,6 +42,7 @@ interface Mover {
     val_change: number;
     pct_of_fund?: number;
     curr_weight?: number;
+    shares_change?: number;
     value: number;
 }
 
@@ -128,6 +129,9 @@ interface ConsensusItem {
     change?: number;
     total_value: number;
     funds: { name: string; cik: string }[];
+    avg_weight?: number;
+    conviction_score?: number;
+    top_holder?: string;
 }
 
 interface SectorItem {
@@ -1046,6 +1050,167 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 )}
             </div>
 
+            {/* Group Selector Bar - Always visible if groups exist or being managed */}
+            <div className="group-selector-bar" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '20px',
+                padding: '6px',
+                background: 'rgba(255,255,255,0.02)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255,255,255,0.05)',
+            }}>
+                <button
+                    className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
+                    onClick={() => setSelectedGroupId(null)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: selectedGroupId === null ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+                        color: selectedGroupId === null ? '#38bdf8' : '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0
+                    }}
+                >
+                    <LayoutGrid size={14} />
+                    <span>All Funds</span>
+                </button>
+
+                {groups.map(g => {
+                    const isEmpty = g.member_ciks.length === 0;
+                    const isBeingDragged = draggedGroupId === g.id;
+
+                    return (
+                        <div
+                            key={g.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, g.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOver(e, g.id)}
+                            onDrop={handleDrop}
+                            className={`group-pill-container ${isBeingDragged ? 'dragging' : ''}`}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                position: 'relative',
+                                flexShrink: 0
+                            }}
+                        >
+                            <button
+                                className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
+                                onClick={() => {
+                                    if (isEmpty) {
+                                        setIsGroupModalOpen(true);
+                                    } else {
+                                        setSelectedGroupId(g.id);
+                                    }
+                                }}
+                                title={isEmpty ? 'Add funds to this group first' : `View ${g.name} (Drag to reorder)`}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
+                                    background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
+                                        isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                    color: isEmpty ? '#ef4444' :
+                                        selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <GripVertical size={12} style={{ opacity: 0.5 }} className="drag-handle" />
+                                <Folder size={14} />
+                                <span>{g.name}</span>
+                                {!isEmpty && <span style={{ opacity: 0.5, fontSize: '10px' }}>{g.member_ciks.length}</span>}
+                            </button>
+                        </div>
+                    );
+                })}
+
+                <button
+                    className="group-pill manage-btn"
+                    onClick={() => setIsGroupModalOpen(true)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px dashed rgba(255,255,255,0.1)',
+                        background: 'transparent',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        flexShrink: 0,
+                        whiteSpace: 'nowrap',
+                        marginLeft: 'auto'
+                    }}
+                >
+                    <FolderPlus size={14} />
+                    <span>Manage Groups</span>
+                </button>
+            </div>
+
+            {/* Tab Switcher - Always visible */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: 'rgba(15, 23, 42, 0.4)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
+                <button
+                    onClick={() => setActiveTab('overview')}
+                    style={{
+                        padding: '8px 24px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        background: activeTab === 'overview' ? '#38bdf8' : 'transparent',
+                        color: activeTab === 'overview' ? '#0f172a' : '#64748b',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}
+                >
+                    <LayoutGrid size={16} />
+                    Overview
+                </button>
+                <button
+                    onClick={() => setActiveTab('consensus')}
+                    style={{
+                        padding: '8px 24px',
+                        borderRadius: '10px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        background: activeTab === 'consensus' ? '#38bdf8' : 'transparent',
+                        color: activeTab === 'consensus' ? '#0f172a' : '#64748b',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}
+                >
+                    <TrendingUp size={16} />
+                    Stock Consensus
+                </button>
+            </div>
+
             {(!fundHighlights || fundHighlights.length === 0) ? (
                 <div className="dashboard-empty-state" style={{
                     display: 'flex',
@@ -1075,166 +1240,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             ) : (
                 <>
 
-                    {/* Group Selector Bar */}
-                    <div className="group-selector-bar" style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '20px',
-                        padding: '6px',
-                        background: 'rgba(255,255,255,0.02)',
-                        borderRadius: '12px',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                    }}>
-                        <button
-                            className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
-                            onClick={() => setSelectedGroupId(null)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                background: selectedGroupId === null ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
-                                color: selectedGroupId === null ? '#38bdf8' : '#94a3b8',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0
-                            }}
-                        >
-                            <LayoutGrid size={14} />
-                            <span>All Funds</span>
-                        </button>
-
-                        {groups.map(g => {
-                            const isEmpty = g.member_ciks.length === 0;
-                            const isBeingDragged = draggedGroupId === g.id;
-
-                            return (
-                                <div
-                                    key={g.id}
-                                    draggable
-                                    onDragStart={(e) => handleDragStart(e, g.id)}
-                                    onDragEnd={handleDragEnd}
-                                    onDragOver={(e) => handleDragOver(e, g.id)}
-                                    onDrop={handleDrop}
-                                    className={`group-pill-container ${isBeingDragged ? 'dragging' : ''}`}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        position: 'relative',
-                                        flexShrink: 0
-                                    }}
-                                >
-                                    <button
-                                        className={`group-pill ${selectedGroupId === g.id ? 'active' : ''} ${isEmpty ? 'empty' : ''}`}
-                                        onClick={() => {
-                                            if (isEmpty) {
-                                                setIsGroupModalOpen(true);
-                                            } else {
-                                                setSelectedGroupId(g.id);
-                                            }
-                                        }}
-                                        title={isEmpty ? 'Add funds to this group first' : `View ${g.name} (Drag to reorder)`}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            padding: '6px 12px',
-                                            borderRadius: '8px',
-                                            border: isEmpty ? '1px dashed rgba(239, 68, 68, 0.5)' : 'none',
-                                            background: selectedGroupId === g.id ? 'rgba(56, 189, 248, 0.15)' :
-                                                isEmpty ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                                            color: isEmpty ? '#ef4444' :
-                                                selectedGroupId === g.id ? '#38bdf8' : '#94a3b8',
-                                            cursor: 'pointer',
-                                            fontSize: '12px',
-                                            fontWeight: 600,
-                                            whiteSpace: 'nowrap',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                    >
-                                        <GripVertical size={12} style={{ opacity: 0.5 }} className="drag-handle" />
-                                        <Folder size={14} />
-                                        <span>{g.name}</span>
-                                        {!isEmpty && <span style={{ opacity: 0.5, fontSize: '10px' }}>{g.member_ciks.length}</span>}
-                                    </button>
-                                </div>
-                            );
-                        })}
-
-                        <button
-                            className="group-pill manage-btn"
-                            onClick={() => setIsGroupModalOpen(true)}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                border: '1px dashed rgba(255,255,255,0.1)',
-                                background: 'transparent',
-                                color: '#94a3b8',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.05em',
-                                flexShrink: 0,
-                                whiteSpace: 'nowrap',
-                                marginLeft: 'auto'
-                            }}
-                        >
-                            <FolderPlus size={14} />
-                            <span>Manage Groups</span>
-                        </button>
-                    </div>
-
-                    {/* Tab Switcher */}
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: 'rgba(15, 23, 42, 0.4)', padding: '4px', borderRadius: '12px', width: 'fit-content' }}>
-                        <button
-                            onClick={() => setActiveTab('overview')}
-                            style={{
-                                padding: '8px 24px',
-                                borderRadius: '10px',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                background: activeTab === 'overview' ? '#38bdf8' : 'transparent',
-                                color: activeTab === 'overview' ? '#0f172a' : '#64748b',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}
-                        >
-                            <LayoutGrid size={16} />
-                            Overview
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('consensus')}
-                            style={{
-                                padding: '8px 24px',
-                                borderRadius: '10px',
-                                fontSize: '13px',
-                                fontWeight: 700,
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                background: activeTab === 'consensus' ? '#38bdf8' : 'transparent',
-                                color: activeTab === 'consensus' ? '#0f172a' : '#64748b',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}
-                        >
-                            <TrendingUp size={16} />
-                            Stock Consensus
-                        </button>
-                    </div>
 
                     {activeTab === 'overview' ? (
                         <>
@@ -1408,7 +1413,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     </button>
                                 </div>
 
-                                {!isFundSummariesMinimized && (
+                                {!isFundSummariesMinimized ? (
                                     <div className="fund-highlights-grid">
                                         {fundHighlights.map((fund) => (
                                             <div
@@ -1494,7 +1499,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             </div>
                                         ))}
                                     </div>
-                                )}
+                                ) : null}
                             </section>
 
                             <PerformanceComparisonChart groupId={selectedGroupId} />
@@ -1595,9 +1600,6 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     >
                                                         {moversMode !== 'funds' && (isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
                                                         {moversMode === 'funds' ? `${activity?.buying_funds?.length || 0}B / ${activity?.selling_funds?.length || 0}S` : getMoverDisplay(mover)}
-                                                        {moversMode === 'percent' && mover.curr_weight !== undefined && (
-                                                            <span className="weight-current">@ {mover.curr_weight.toFixed(1)}%</span>
-                                                        )}
                                                         {showTooltip && moverTooltip && moverTooltip.index === i && (
                                                             <span
                                                                 className="tooltip-content visible"
@@ -2025,71 +2027,9 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </div>
                     </div>
                     {/* Group Management Modal */}
-                    {isGroupModalOpen && (
-                        <div className="modal-overlay" onClick={() => setIsGroupModalOpen(false)}>
-                            <div className="modal-content group-modal" onClick={e => e.stopPropagation()}>
-                                <div className="modal-header">
-                                    <div>
-                                        <h2>Manage Fund Groups</h2>
-                                        <p>Group funds into folders for aggregated analysis</p>
-                                    </div>
-                                    <button className="close-btn" onClick={() => setIsGroupModalOpen(false)}>&times;</button>
-                                </div>
-
-                                <div className="modal-body">
-                                    <div className="create-group-section">
-                                        <input
-                                            type="text"
-                                            placeholder="New group name..."
-                                            value={newGroupName}
-                                            onChange={e => setNewGroupName(e.target.value)}
-                                            onKeyPress={e => e.key === 'Enter' && handleCreateGroup()}
-                                        />
-                                        <button className="add-group-btn" onClick={handleCreateGroup}>
-                                            <PlusCircle size={18} />
-                                            <span>Create Group</span>
-                                        </button>
-                                    </div>
-
-                                    <div className="groups-list">
-                                        {groups.map(group => (
-                                            <div key={group.id} className="group-item-config">
-                                                <div className="group-header-row">
-                                                    <div className="group-title-info">
-                                                        <Folder size={18} color="#38bdf8" />
-                                                        <h3>{group.name}</h3>
-                                                        <span className="member-count">{group.member_ciks.length} funds</span>
-                                                    </div>
-                                                    <button className="delete-group-icon" onClick={() => handleDeleteGroup(group.id)}>
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-
-                                                <div className="group-member-grid">
-                                                    {allFunds.map(fund => {
-                                                        const isMember = group.member_ciks.includes(fund.cik);
-                                                        return (
-                                                            <div
-                                                                key={fund.cik}
-                                                                className={`fund-chip ${isMember ? 'active' : ''}`}
-                                                                onClick={() => toggleGroupMember(group.id, fund.cik, isMember)}
-                                                            >
-                                                                <span className="chip-name">{fund.name}</span>
-                                                                {isMember ? <MinusCircle size={12} /> : <PlusCircle size={12} />}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="consensus-view" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                        </>
+                    ) : (
+                        <div className="consensus-view" style={{ animation: 'fadeIn 0.3s ease-out' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <div>
                             <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#f8fafc', margin: 0 }}>Stock Consensus</h2>
@@ -2121,14 +2061,81 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </div>
                     </div>
 
+                    {/* Insight Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                        {/* Crowd Favorite */}
+                        <div style={{ background: 'rgba(56, 189, 248, 0.05)', border: '1px solid rgba(56, 189, 248, 0.1)', borderRadius: '16px', padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div style={{ background: 'rgba(56, 189, 248, 0.1)', padding: '8px', borderRadius: '10px' }}>
+                                    <Users size={20} style={{ color: '#38bdf8' }} />
+                                </div>
+                                <Sparkles size={16} style={{ color: '#38bdf8', opacity: 0.5 }} />
+                            </div>
+                            <h4 style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 4px 0' }}>Crowd Favorite</h4>
+                            <div style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc' }}>
+                                {summary.consensus_stocks?.[0]?.ticker || 'N/A'}
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#38bdf8', marginTop: '4px' }}>
+                                Held by {summary.consensus_stocks?.[0]?.fund_count || 0} funds
+                            </p>
+                        </div>
+
+                        {/* Conviction Leader */}
+                        <div style={{ background: 'rgba(167, 139, 250, 0.05)', border: '1px solid rgba(167, 139, 250, 0.1)', borderRadius: '16px', padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div style={{ background: 'rgba(167, 139, 250, 0.1)', padding: '8px', borderRadius: '10px' }}>
+                                    <Target size={20} style={{ color: '#a78bfa' }} />
+                                </div>
+                                <Zap size={16} style={{ color: '#a78bfa', opacity: 0.5 }} />
+                            </div>
+                            <h4 style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 4px 0' }}>Highest Conviction</h4>
+                            <div style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc' }}>
+                                {(() => {
+                                    const highestConviction = [...(summary.consensus_stocks || [])].sort((a, b) => (b.conviction_score || 0) - (a.conviction_score || 0))[0];
+                                    return highestConviction?.ticker || 'N/A';
+                                })()}
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#a78bfa', marginTop: '4px' }}>
+                                Score: {(() => {
+                                    const highestConviction = [...(summary.consensus_stocks || [])].sort((a, b) => (b.conviction_score || 0) - (a.conviction_score || 0))[0];
+                                    return highestConviction?.conviction_score || 0;
+                                })()} / 100
+                            </p>
+                        </div>
+
+                        {/* Top New Idea */}
+                        <div style={{ background: 'rgba(52, 211, 153, 0.05)', border: '1px solid rgba(52, 211, 153, 0.1)', borderRadius: '16px', padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                <div style={{ background: 'rgba(52, 211, 153, 0.1)', padding: '8px', borderRadius: '10px' }}>
+                                    <TrendingUp size={20} style={{ color: '#34d399' }} />
+                                </div>
+                                <Plus size={16} style={{ color: '#34d399', opacity: 0.5 }} />
+                            </div>
+                            <h4 style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 4px 0' }}>Rising Momentum</h4>
+                            <div style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc' }}>
+                                {(() => {
+                                    const rising = [...(summary.consensus_stocks || [])].sort((a, b) => (b.change || 0) - (a.change || 0))[0];
+                                    return rising?.ticker || 'N/A';
+                                })()}
+                            </div>
+                            <p style={{ fontSize: '12px', color: '#34d399', marginTop: '4px' }}>
+                                +{(() => {
+                                    const rising = [...(summary.consensus_stocks || [])].sort((a, b) => (b.change || 0) - (a.change || 0))[0];
+                                    return rising?.change || 0;
+                                })()} new buyers
+                            </p>
+                        </div>
+                    </div>
+
                     <div style={{ background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', overflow: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Company</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fund Count</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Agg. Value</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker & Trend</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Holder</th>
+                                    <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Value</th>
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
                                 </tr>
                             </thead>
@@ -2155,7 +2162,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     if (filtered.length === 0) {
                                         return (
                                             <tr>
-                                                <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                                <td colSpan={6} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
                                                         <Search size={40} style={{ color: '#38bdf8' }} />
                                                         <p style={{ fontSize: '16px', fontWeight: 500, color: '#f8fafc' }}>
@@ -2169,27 +2176,80 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     }
 
                                     return filtered.map((stock, idx) => (
-                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'background 0.2s' }} className="consensus-row">
+                                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', transition: 'all 0.2s' }} className="consensus-row">
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#38bdf8', fontSize: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
-                                                    {stock.ticker?.slice(0, 4) || 'N/A'}
+                                                <div style={{ position: 'relative' }}>
+                                                    <div style={{ width: '40px', height: '40px', background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#38bdf8', fontSize: '12px', border: '1px solid rgba(56, 189, 248, 0.2)' }}>
+                                                        {stock.ticker?.slice(0, 4) || 'N/A'}
+                                                    </div>
+                                                    {(stock.change || 0) !== 0 && (
+                                                        <div style={{ 
+                                                            position: 'absolute', 
+                                                            bottom: '-4px', 
+                                                            right: '-4px', 
+                                                            background: (stock.change ?? 0) > 0 ? '#065f46' : '#7f1d1d',
+                                                            color: (stock.change ?? 0) > 0 ? '#34d399' : '#f87171',
+                                                            padding: '2px 4px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '10px',
+                                                            fontWeight: 800,
+                                                            border: '1px solid rgba(255,255,255,0.1)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '2px'
+                                                        }}>
+                                                            { (stock.change ?? 0) > 0 ? <ArrowUp size={8} /> : <ArrowDown size={8} />}
+                                                            {Math.abs(stock.change ?? 0)}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <span style={{ color: '#f8fafc', fontWeight: 700 }}>{stock.ticker || 'N/A'}</span>
+                                                <div>
+                                                    <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.ticker || 'N/A'}</div>
+                                                    <div style={{ color: '#64748b', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>{stock.issuer_name}</div>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '16px 24px', color: '#94a3b8', fontSize: '14px' }}>{stock.issuer_name}</td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '120px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ 
+                                                        fontSize: '10px', 
+                                                        fontWeight: 800, 
+                                                        color: (stock.conviction_score || 0) > 70 ? '#34d399' : (stock.conviction_score || 0) > 40 ? '#fbbf24' : '#94a3b8',
+                                                        textTransform: 'uppercase'
+                                                    }}>
+                                                        {(stock.conviction_score || 0) > 70 ? 'High Conviction' : (stock.conviction_score || 0) > 40 ? 'Moderate' : 'Low'}
+                                                    </span>
+                                                    <span style={{ fontSize: '11px', color: '#f8fafc', fontWeight: 600 }}>{Math.round(stock.conviction_score || 0)}</span>
+                                                </div>
+                                                <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                                    <div style={{ 
+                                                        height: '100%', 
+                                                        width: `${stock.conviction_score || 0}%`, 
+                                                        background: (stock.conviction_score || 0) > 70 ? 'linear-gradient(90deg, #10b981, #34d399)' : (stock.conviction_score || 0) > 40 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' : '#64748b',
+                                                        borderRadius: '2px'
+                                                    }} />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                                <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: '16px' }}>{stock.avg_weight?.toFixed(1)}%</span>
+                                                <span style={{ color: '#64748b', fontSize: '11px' }}>avg</span>
+                                            </div>
+                                        </td>
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ color: '#f8fafc', fontWeight: 700, fontSize: '16px' }}>{stock.fund_count}</span>
-                                                <div style={{ display: 'flex', gap: '2px' }}>
-                                                    {Array.from({ length: Math.min(3, stock.fund_count) }).map((_, i) => (
-                                                        <Users key={i} size={12} style={{ color: '#38bdf8', opacity: 0.6 }} />
-                                                    ))}
+                                                <div style={{ background: 'rgba(167, 139, 250, 0.1)', padding: '4px', borderRadius: '6px' }}>
+                                                    <Award size={12} style={{ color: '#a78bfa' }} />
                                                 </div>
+                                                <span style={{ color: '#f8fafc', fontSize: '13px', fontWeight: 500 }}>{stock.top_holder || 'N/A'}</span>
                                             </div>
                                         </td>
-                                        <td style={{ padding: '16px 24px', color: '#f8fafc', fontWeight: 600 }}>{formatCurrency(stock.total_value)}</td>
+                                        <td style={{ padding: '16px 24px', textAlign: 'right', color: '#f8fafc', fontWeight: 600 }}>
+                                            {formatCurrency(stock.total_value)}
+                                        </td>
                                         <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                                             <button 
                                                 onClick={() => fetchStockHolders(stock.ticker || '')}
@@ -2200,36 +2260,106 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     padding: '6px 12px', 
                                                     borderRadius: '8px', 
                                                     fontSize: '12px', 
-                                                    fontWeight: 700, 
+                                                    fontWeight: 600, 
                                                     cursor: 'pointer',
+                                                    transition: 'all 0.2s',
                                                     display: 'inline-flex',
                                                     alignItems: 'center',
                                                     gap: '6px'
                                                 }}
+                                                onMouseOver={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.2)';
+                                                    e.currentTarget.style.transform = 'translateY(-1px)';
+                                                }}
+                                                onMouseOut={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
                                             >
-                                                <Search size={14} />
+                                                <Users size={14} />
                                                 Holders
                                             </button>
                                         </td>
                                     </tr>
                                     ));
                                 })()}
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
             </>
         )}
 
-            {/* Institutional Holders Modal */}
+        {isGroupModalOpen && (
+            <div className="modal-overlay" onClick={() => setIsGroupModalOpen(false)}>
+                <div className="modal-content group-modal" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <div>
+                            <h2>Manage Fund Groups</h2>
+                            <p>Group funds into folders for aggregated analysis</p>
+                        </div>
+                        <button className="close-btn" onClick={() => setIsGroupModalOpen(false)}>&times;</button>
+                    </div>
+
+                    <div className="modal-body">
+                        <div className="create-group-section">
+                            <input
+                                type="text"
+                                placeholder="New group name..."
+                                value={newGroupName}
+                                onChange={e => setNewGroupName(e.target.value)}
+                                onKeyPress={e => e.key === 'Enter' && handleCreateGroup()}
+                            />
+                            <button className="add-group-btn" onClick={handleCreateGroup}>
+                                <PlusCircle size={18} />
+                                <span>Create Group</span>
+                            </button>
+                        </div>
+
+                        <div className="groups-list">
+                            {groups.map(group => (
+                                <div key={group.id} className="group-item-config">
+                                    <div className="group-header-row">
+                                        <div className="group-title-info">
+                                            <Folder size={18} color="#38bdf8" />
+                                            <h3>{group.name}</h3>
+                                            <span className="member-count">{group.member_ciks.length} funds</span>
+                                        </div>
+                                        <button className="delete-group-icon" onClick={() => handleDeleteGroup(group.id)}>
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+
+                                    <div className="group-member-grid">
+                                        {allFunds.map(fund => {
+                                            const isMember = group.member_ciks.includes(fund.cik);
+                                            return (
+                                                <div
+                                                    key={fund.cik}
+                                                    className={`fund-chip ${isMember ? 'active' : ''}`}
+                                                    onClick={() => toggleGroupMember(group.id, fund.cik, isMember)}
+                                                >
+                                                    <span className="chip-name">{fund.name}</span>
+                                                    {isMember ? <MinusCircle size={12} /> : <PlusCircle size={12} />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
             <InstitutionalHoldersModal
                 ticker={selectedTicker}
                 holders={holders}
                 loading={loadingHolders}
                 onClose={() => setSelectedTicker(null)}
                 onAnalyze={(cik) => {
-                    onFollow(cik);
+                    onSelectFund(cik);
                     setSelectedTicker(null);
                 }}
             />

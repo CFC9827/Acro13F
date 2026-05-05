@@ -332,7 +332,7 @@ class DatabaseManager:
     def get_funds(self, tracked_only: bool = True) -> List[Dict]:
         query = "SELECT * FROM funds"
         if tracked_only:
-            query += " WHERE is_tracked = 1"
+            query += " WHERE is_tracked = 1 OR cik IN (SELECT cik FROM fund_group_members)"
         query += " ORDER BY sort_order, name"
         return self._execute(query, fetch='all')
 
@@ -617,9 +617,18 @@ class DatabaseManager:
                     if not t_raw: continue
                     key = t_raw.strip().upper()
                     if key not in current_ticker_funds:
-                        current_ticker_funds[key] = {"funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], "total_value": 0}
+                        current_ticker_funds[key] = {
+                            "funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], 
+                            "total_value": 0, "weights": [], "max_weight": 0, "top_holder": None
+                        }
                     current_ticker_funds[key]["funds"].add((fund['name'], fund['cik']))
                     current_ticker_funds[key]["total_value"] += h['value']
+                    
+                    w = (h['value'] * 100.0 / total_value) if total_value else 0
+                    current_ticker_funds[key]["weights"].append(w)
+                    if w > current_ticker_funds[key]["max_weight"]:
+                        current_ticker_funds[key]["max_weight"] = w
+                        current_ticker_funds[key]["top_holder"] = fund['name']
 
                 for h in prev_holdings_list:
                     t_raw = h.get('ticker') or h.get('cusip')
@@ -744,6 +753,10 @@ class DatabaseManager:
         for ticker_key, data in current_ticker_funds.items():
             cc = len(data["funds"])
             pc = len(prior_ticker_funds.get(ticker_key, []))
+            avg_w = sum(data["weights"]) / cc if cc > 0 else 0
+            # Conviction score: 40% breadth (min 10 funds), 60% depth (min 15% avg weight)
+            score = (min(cc / 10.0, 1.0) * 40.0) + (min(avg_w / 15.0, 1.0) * 60.0)
+            
             consensus_list.append({
                 "ticker": data["ticker"],
                 "issuer_name": data["issuer"],
@@ -751,6 +764,10 @@ class DatabaseManager:
                 "prev_fund_count": pc,
                 "change": cc - pc,
                 "total_value": data["total_value"],
+                "avg_weight": avg_w,
+                "max_weight": data["max_weight"],
+                "top_holder": data["top_holder"],
+                "conviction_score": round(score, 1),
                 "funds": list(data["funds"])
             })
         

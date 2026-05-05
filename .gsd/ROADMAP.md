@@ -50,6 +50,8 @@
 - [x] Interactive Spotlight Sections: Multi-layer interactivity for Global Dashboard sections
 - [x] Deep Insights Backend: Integrated fund sector and turnover data into explorer APIs
 - [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
+- [x] Dashboard Stability: Resolved critical JSX syntax errors and refactored modal rendering architecture
+- [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
 
 ---
 

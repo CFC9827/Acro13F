@@ -127,7 +127,7 @@ export function InstitutionalHoldersModal({
                                         <td style={{ padding: '24px 40px' }}>
                                             <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px', marginBottom: '4px' }}>{h.fund_name}</div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <span style={{ fontSize: '10px', color: '#475569', fontWeight: 700, fontMono: 'true' }}>CIK: {h.cik}</span>
+                                                <span style={{ fontSize: '10px', color: '#475569', fontWeight: 700, fontFamily: 'monospace' }}>CIK: {h.cik}</span>
                                             </div>
                                         </td>
                                         <td style={{ padding: '24px 24px' }}>
