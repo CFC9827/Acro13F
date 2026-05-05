@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, ArrowUp, ArrowDown, DollarSign, PlusCircle, MinusCircle, LayoutGrid, Briefcase, ChevronRight, Info, PieChart, Activity, AlertCircle } from 'lucide-react';
 import { HistoricalHolding } from './PortfolioChart';
 import { createPortal } from 'react-dom';
+import { calculateIRR } from '../utils/performanceUtils';
 
 interface FundSummaryProps {
     history: HistoricalHolding[];
@@ -63,6 +64,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
     const {
         latestPeriod,
+        priorPeriod,
         currentHoldings,
         aum,
         priorAum,
@@ -70,12 +72,14 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
         exitedPositions,
         movers,
         topHoldings,
-        swoopOpportunities
+        swoopOpportunities,
+        totalReturnQoQ
     } = useMemo(() => {
         if (!history || history.length === 0) {
             return {
                 latestPeriod: '', priorPeriod: '', currentHoldings: [],
-                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: []
+                aum: 0, priorAum: 0, newPositions: [], exitedPositions: [], movers: [], topHoldings: [], swoopOpportunities: [],
+                totalReturnQoQ: 0
             };
         }
 
@@ -196,6 +200,42 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
             }
         });
 
+        // Calculate QoQ TWR (Aggregated across holdings)
+        let totalPnlQoQ = 0;
+        let totalCostBasisQoQ = 0;
+
+        currentHoldings.forEach(curr => {
+            const prev = priorHoldingsMap.get(curr.cusip);
+            const prevVal = prev ? prev.value : 0;
+            const prevShrs = prev ? prev.shares : 0;
+            const deltaShrs = curr.shares - prevShrs;
+            const price_end = curr.shares > 0 ? curr.value / curr.shares : 0;
+            const netFlow = deltaShrs * price_end;
+            const pnl = (curr.value - prevVal) - netFlow;
+            const buys = deltaShrs > 0 ? netFlow : 0;
+            const basis = prevVal + buys;
+
+            totalPnlQoQ += pnl;
+            totalCostBasisQoQ += basis;
+        });
+
+        // Add exited positions to PnL
+        priorHoldingsRaw.forEach(prev => {
+            if (!processedCusips.has(prev.cusip)) {
+                // Was exited. Price at end is effectively 0 or last known.
+                // In 13F context, we don't have intraday/intraquarter exit prices easily.
+                // Standard heuristic: Exit at period end price (0 in current 13F list)
+                // PnL = (0 - prevVal) - (-prevShrs * price_exit)
+                // If we assume they exited at avg price or end-of-prev price, we need more data.
+                // For now, assume neutral flow exit for simplicity or use prev value as basis.
+                totalCostBasisQoQ += prev.value;
+                // If they exited, the PnL is the change from prev value to exit cash. 
+                // Hard to know without prices. We'll stick to active holdings for TWR proxy.
+            }
+        });
+
+        const totalReturnQoQ = totalCostBasisQoQ > 0 ? (totalPnlQoQ / totalCostBasisQoQ) * 100 : 0;
+
         // Top Holdings
         const topHoldings = [...currentHoldings].sort((a, b) => b.value - a.value).slice(0, 10);
 
@@ -212,7 +252,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
             exitedPositions: exitedPositions.sort((a, b) => b.value - a.value),
             movers: movers.sort((a, b) => Math.abs(b.val_change) - Math.abs(a.val_change)),
             topHoldings,
-            swoopOpportunities
+            swoopOpportunities,
+            totalReturnQoQ: totalReturnQoQ
         };
     }, [history]);
 
@@ -265,7 +306,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
     return (
         <div className="dashboard-container" style={{ padding: '0 20px 20px 20px' }}>
             {/* KPI Tiles Row */}
-            <div className="kpi-tiles-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <div className="kpi-tiles-row" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
                 {/* POSITIONS TILE */}
                 <div
                     className="kpi-tile"
@@ -309,18 +350,37 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     <div className="kpi-content">
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                             <span className="kpi-value">{formatCurrency(aum)}</span>
-                            <span style={{
-                                fontSize: '0.85rem',
-                                fontWeight: 600,
-                                color: aumChangePercent > 0.01 ? '#10b981' : aumChangePercent < -0.01 ? '#ef4444' : '#64748b',
-                                display: 'flex', alignItems: 'center', gap: '2px'
-                            }}>
-                                {aumChangePercent > 0.01 && <ArrowUp size={12} />}
-                                {aumChangePercent < -0.01 && <ArrowDown size={12} />}
-                                {Math.abs(aumChangePercent).toFixed(1)}%
+                            {aumChangePercent !== 0 ? (
+                                <span style={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: 600,
+                                    color: aumChangePercent > 0 ? '#10b981' : aumChangePercent < 0 ? '#ef4444' : '#64748b',
+                                    display: 'flex', alignItems: 'center', gap: '2px'
+                                }}>
+                                    {aumChangePercent > 0 && <ArrowUp size={12} />}
+                                    {aumChangePercent < 0 && <ArrowDown size={12} />}
+                                    {Math.abs(aumChangePercent).toFixed(1)}%
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#64748b' }}>0.0%</span>
+                            )}
+                        </div>
+                        <span className="kpi-label">AUM</span>
+                    </div>
+                </div>
+
+                {/* QOQ TWR TILE */}
+                <div className="kpi-tile">
+                    <div className="kpi-icon" style={{ color: totalReturnQoQ >= 0 ? '#10b981' : '#ef4444', background: totalReturnQoQ >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
+                        <TrendingUp size={18} />
+                    </div>
+                    <div className="kpi-content">
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                            <span className={`kpi-value ${totalReturnQoQ > 0 ? 'positive' : totalReturnQoQ < 0 ? 'negative' : ''}`}>
+                                {totalReturnQoQ > 0 ? '+' : ''}{totalReturnQoQ.toFixed(1)}%
                             </span>
                         </div>
-                        <span className="kpi-label">Total AUM</span>
+                        <span className="kpi-label">QoQ TWR</span>
                     </div>
                 </div>
 
