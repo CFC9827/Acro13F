@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-05 13:28
+> Last updated: 2026-05-05 13:42
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -25,6 +25,8 @@
 - [x] UI Terminology Alignment: Renamed 'Top Holder' to 'Highest Weight' and 'Max Allocation' to 'Conviction'
 - [x] Data Verification Fix: Resolved stale cache issues causing truncated holders lists and "0 net change" bugs
 - [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
+- [x] Consensus Data Accuracy: Fixed calculation bug for 'Conviction' metric causing discrepancies with 'Avg Allocation'
+- [x] Consensus Sorting Logic: Fixed crash when sorting by ticker and correctly mapped numerical/alphabetical logic for Conviction and Highest Weight
 ## Last Session Summary
 
 ### UI Refinement & Navigation

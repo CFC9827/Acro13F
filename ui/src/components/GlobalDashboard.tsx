@@ -674,6 +674,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [holders, setHolders] = useState<any[]>([]);
     const [loadingHolders, setLoadingHolders] = useState(false);
 
+    const [consensusSortColumn, setConsensusSortColumn] = useState<string>('fund_count');
+    const [consensusSortDirection, setConsensusSortDirection] = useState<'asc' | 'desc'>('desc');
+
+    const handleConsensusSort = (column: string) => {
+        if (consensusSortColumn === column) {
+            setConsensusSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setConsensusSortColumn(column);
+            setConsensusSortDirection('desc');
+        }
+    };
+
     // Clear search and selection when returning to the overview tab
     useEffect(() => {
         if (activeTab === 'overview') {
@@ -2108,7 +2120,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             </p>
                         </div>
 
-                        {/* Conviction Leader */}
+                        {/* Highest Avg Allocation */}
                         <div style={{ background: 'rgba(167, 139, 250, 0.05)', border: '1px solid rgba(167, 139, 250, 0.1)', borderRadius: '16px', padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                                 <div style={{ background: 'rgba(167, 139, 250, 0.1)', padding: '8px', borderRadius: '10px' }}>
@@ -2116,18 +2128,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 </div>
                                 <Zap size={16} style={{ color: '#a78bfa', opacity: 0.5 }} />
                             </div>
-                            <h4 style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 4px 0' }}>Highest Conviction</h4>
+                            <h4 style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 4px 0' }}>Highest Avg Allocation</h4>
                             <div style={{ fontSize: '20px', fontWeight: 800, color: '#f8fafc' }}>
                                 {(() => {
-                                    const highestConviction = [...(summary.consensus_stocks || [])].sort((a, b) => (b.conviction_score || 0) - (a.conviction_score || 0))[0];
-                                    return highestConviction?.ticker || 'N/A';
+                                    const highestAllocation = [...(summary.consensus_stocks || [])].sort((a, b) => (b.avg_weight || 0) - (a.avg_weight || 0))[0];
+                                    return highestAllocation?.ticker || 'N/A';
                                 })()}
                             </div>
                             <p style={{ fontSize: '12px', color: '#a78bfa', marginTop: '4px' }}>
-                                Score: {(() => {
-                                    const highestConviction = [...(summary.consensus_stocks || [])].sort((a, b) => (b.conviction_score || 0) - (a.conviction_score || 0))[0];
-                                    return highestConviction?.conviction_score || 0;
-                                })()} / 100
+                                Allocation: {(() => {
+                                    const highestAllocation = [...(summary.consensus_stocks || [])].sort((a, b) => (b.avg_weight || 0) - (a.avg_weight || 0))[0];
+                                    return highestAllocation?.avg_weight ? `${highestAllocation.avg_weight.toFixed(1)}%` : '0%';
+                                })()}
                             </p>
                         </div>
 
@@ -2159,21 +2171,48 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funds</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Added</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Out</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Change</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Highest Weight</th>
-                                    <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Value</th>
+                                    {[
+                                        { key: 'ticker', label: 'Ticker', align: 'left' },
+                                        { key: 'fund_count', label: 'Funds', align: 'left' },
+                                        { key: 'funds_added', label: 'Added', align: 'left' },
+                                        { key: 'funds_out', label: 'Out', align: 'left' },
+                                        { key: 'net_shares_change', label: 'Net Change', align: 'left' },
+                                        { key: 'avg_weight', label: 'Avg. Allocation', align: 'left' },
+                                        { key: 'max_weight', label: 'Conviction', align: 'left' },
+                                        { key: 'top_holder', label: 'Highest Weight', align: 'left' },
+                                        { key: 'total_value', label: 'Value', align: 'right' }
+                                    ].map((col) => (
+                                        <th 
+                                            key={col.key}
+                                            onClick={() => handleConsensusSort(col.key)}
+                                            style={{ 
+                                                textAlign: col.align as any, 
+                                                padding: '16px 24px', 
+                                                fontSize: '12px', 
+                                                color: consensusSortColumn === col.key ? '#f8fafc' : '#64748b', 
+                                                textTransform: 'uppercase', 
+                                                letterSpacing: '0.05em',
+                                                cursor: 'pointer',
+                                                transition: 'color 0.2s',
+                                                userSelect: 'none'
+                                            }}
+                                            onMouseOver={(e) => e.currentTarget.style.color = '#f8fafc'}
+                                            onMouseOut={(e) => e.currentTarget.style.color = consensusSortColumn === col.key ? '#f8fafc' : '#64748b'}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: col.align === 'right' ? 'flex-end' : 'flex-start', gap: '4px' }}>
+                                                {col.label}
+                                                {consensusSortColumn === col.key && (
+                                                    consensusSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                                                )}
+                                            </div>
+                                        </th>
+                                    ))}
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {(() => {
-                                    const filtered = (summary.consensus_stocks || [])
+                                    let filtered = (summary.consensus_stocks || [])
                                         .filter(s => {
                                             const query = stockSearchQuery.toLowerCase();
                                             if (!query) return true;
@@ -2190,6 +2229,27 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                             
                                             return tickerMatch || nameMatch;
                                         });
+
+                                    filtered = filtered.sort((a, b) => {
+                                        const aValue: any = a[consensusSortColumn as keyof ConsensusItem];
+                                        const bValue: any = b[consensusSortColumn as keyof ConsensusItem];
+
+                                        const isStringColumn = ['ticker', 'top_holder', 'issuer_name'].includes(consensusSortColumn);
+
+                                        if (isStringColumn) {
+                                            const aStr = (aValue || '').toString().toLowerCase();
+                                            const bStr = (bValue || '').toString().toLowerCase();
+                                            return consensusSortDirection === 'asc' 
+                                                ? aStr.localeCompare(bStr) 
+                                                : bStr.localeCompare(aStr);
+                                        } else {
+                                            const aNum = aValue || 0;
+                                            const bNum = bValue || 0;
+                                            return consensusSortDirection === 'asc' 
+                                                ? aNum - bNum 
+                                                : bNum - aNum;
+                                        }
+                                    });
                                     
                                     if (filtered.length === 0) {
                                         return (

@@ -54,6 +54,8 @@
 - [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
 - [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
 - [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
+- [x] Consensus Data Accuracy: Fixed calculation bug for 'Conviction' metric causing discrepancies with 'Avg Allocation'
+- [x] Consensus Sorting Logic: Fixed crash when sorting by ticker and correctly mapped numerical/alphabetical logic for Conviction and Highest Weight
 
 ---
 

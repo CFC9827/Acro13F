@@ -612,7 +612,7 @@ class DatabaseManager:
                     if key not in current_ticker_funds:
                         current_ticker_funds[key] = {
                             "funds": set(), "ticker": h['ticker'], "issuer": h['issuer_name'], 
-                            "total_value": 0, "weights": [], "max_weight": 0, "top_holder": None,
+                            "total_value": 0, "fund_weights": {},
                             "net_shares_change": 0
                         }
                     current_ticker_funds[key]["funds"].add((fund['name'], fund['cik']))
@@ -625,10 +625,10 @@ class DatabaseManager:
                         pass
                     
                     w = (h['value'] * 100.0 / total_value) if total_value else 0
-                    current_ticker_funds[key]["weights"].append(w)
-                    if w > current_ticker_funds[key]["max_weight"]:
-                        current_ticker_funds[key]["max_weight"] = w
-                        current_ticker_funds[key]["top_holder"] = fund['name']
+                    fund_tuple = (fund['name'], fund['cik'])
+                    if fund_tuple not in current_ticker_funds[key]["fund_weights"]:
+                        current_ticker_funds[key]["fund_weights"][fund_tuple] = 0
+                    current_ticker_funds[key]["fund_weights"][fund_tuple] += w
 
                 if prev_acc:
                     # Map for current fund comparison (ticker+put_call)
@@ -784,7 +784,16 @@ class DatabaseManager:
             funds_added = len(current_ciks - prior_ciks)
             funds_out = len(prior_ciks - current_ciks)
             
-            avg_w = sum(data["weights"]) / cc if cc > 0 else 0
+            fund_weights = data.get("fund_weights", {})
+            avg_w = sum(fund_weights.values()) / cc if cc > 0 else 0
+            
+            max_w = 0
+            top_holder = None
+            for (f_name, f_cik), w in fund_weights.items():
+                if w > max_w:
+                    max_w = w
+                    top_holder = f_name
+            
             # Conviction score: 40% breadth (min 10 funds), 60% depth (min 15% avg weight)
             score = (min(cc / 10.0, 1.0) * 40.0) + (min(avg_w / 15.0, 1.0) * 60.0)
             
@@ -798,8 +807,8 @@ class DatabaseManager:
                 "funds_out": funds_out,
                 "total_value": data["total_value"],
                 "avg_weight": avg_w,
-                "max_weight": data["max_weight"],
-                "top_holder": data["top_holder"],
+                "max_weight": max_w,
+                "top_holder": top_holder,
                 "net_shares_change": data["net_shares_change"],
                 "conviction_score": round(score, 1),
                 "funds": list(data["funds"])
