@@ -201,41 +201,41 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
             }
         });
 
-        // Calculate QoQ TWR (Aggregated across holdings)
-        let totalPnlQoQ = 0;
-        let totalCostBasisQoQ = 0;
+        // Calculate QoQ TWR (Standard Time-Weighted Return Formula)
+        // Formula: (TotalValue_t - NetFlow_t) / TotalValue_prev - 1
+        let totalValue_t = 0;
+        let totalValue_prev = 0;
+        let netFlow_t = 0;
 
-        currentHoldings.forEach(curr => {
-            const prev = priorHoldingsMap.get(curr.cusip);
-            const prevVal = prev ? prev.value : 0;
-            const prevShrs = prev ? prev.shares : 0;
-            const deltaShrs = curr.shares - prevShrs;
-            const price_end = curr.shares > 0 ? curr.value / curr.shares : 0;
-            const netFlow = deltaShrs * price_end;
-            const pnl = (curr.value - prevVal) - netFlow;
-            const buys = deltaShrs > 0 ? netFlow : 0;
-            const basis = prevVal + buys;
-
-            totalPnlQoQ += pnl;
-            totalCostBasisQoQ += basis;
+        const prevShrsMap = new Map<string, { shares: number, value: number }>();
+        priorHoldingsRaw.forEach(h => {
+            prevShrsMap.set(h.cusip, { shares: h.shares, value: h.value });
+            totalValue_prev += h.value;
         });
 
-        // Add exited positions to PnL
+        currentHoldingsRaw.forEach(curr => {
+            totalValue_t += curr.value;
+            const prev = prevShrsMap.get(curr.cusip);
+            const shares_t = curr.shares;
+            const shares_prev = prev ? prev.shares : 0;
+            const price_t = shares_t > 0 ? curr.value / shares_t : 0;
+
+            // Flow at time t (using price at t)
+            const flow = (shares_t - shares_prev) * price_t;
+            netFlow_t += flow;
+        });
+
+        // Handle exited positions for NetFlow
         priorHoldingsRaw.forEach(prev => {
-            if (!processedCusips.has(prev.cusip)) {
-                // Was exited. Price at end is effectively 0 or last known.
-                // In 13F context, we don't have intraday/intraquarter exit prices easily.
-                // Standard heuristic: Exit at period end price (0 in current 13F list)
-                // PnL = (0 - prevVal) - (-prevShrs * price_exit)
-                // If we assume they exited at avg price or end-of-prev price, we need more data.
-                // For now, assume neutral flow exit for simplicity or use prev value as basis.
-                totalCostBasisQoQ += prev.value;
-                // If they exited, the PnL is the change from prev value to exit cash. 
-                // Hard to know without prices. We'll stick to active holdings for TWR proxy.
+            const stillHeld = currentHoldingsRaw.some(curr => curr.cusip === prev.cusip);
+            if (!stillHeld) {
+                // Flow for exit: (0 - shares_prev) * price_prev (standard 13F heuristic for exit)
+                const price_prev = prev.shares > 0 ? prev.value / prev.shares : 0;
+                netFlow_t += (0 - prev.shares) * price_prev;
             }
         });
 
-        const totalReturnQoQ = totalCostBasisQoQ > 0 ? (totalPnlQoQ / totalCostBasisQoQ) * 100 : 0;
+        const totalReturnQoQ = totalValue_prev > 0 ? ((totalValue_t - netFlow_t) / totalValue_prev - 1) * 100 : 0;
 
         // Top Holdings
         const topHoldings = [...currentHoldings].sort((a, b) => b.value - a.value).slice(0, 10);
