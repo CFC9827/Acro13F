@@ -326,11 +326,30 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
                 {/* NEW POSITIONS TILE */}
                 <div
-                    className="kpi-tile"
+                    className="kpi-tile has-tooltip"
                     role={onOpenActivity ? 'button' : undefined}
                     tabIndex={onOpenActivity ? 0 : undefined}
                     onClick={onOpenActivity}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
+                    onMouseEnter={(e) => handleMouseEnter(e, 'New Positions', (
+                        <div>
+                            {newPositions.slice(0, 8).map(p => (
+                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
+                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
+                                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
+                                        <span className="pos-weight">{p.weight.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {newPositions.length > 8 && (
+                                <span className="tooltip-more">+{newPositions.length - 8} more</span>
+                            )}
+                            {newPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
+                        </div>
+                    ))}
+                    onMouseLeave={handleMouseLeave}
                     style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon positive"><PlusCircle size={18} /></div>
@@ -349,11 +368,30 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
                 {/* EXITED POSITIONS TILE */}
                 <div
-                    className="kpi-tile"
+                    className="kpi-tile has-tooltip"
                     role={onOpenActivity ? 'button' : undefined}
                     tabIndex={onOpenActivity ? 0 : undefined}
                     onClick={onOpenActivity}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenActivity)}
+                    onMouseEnter={(e) => handleMouseEnter(e, 'Exited Positions', (
+                        <div>
+                            {exitedPositions.slice(0, 8).map(p => (
+                                <div key={p.ticker || p.issuer_name || p.cusip} className="tooltip-position-row" style={{ gridTemplateColumns: '50px 1fr auto' }}>
+                                    <span className="pos-ticker">{p.ticker || p.issuer_name}</span>
+                                    <span className="pos-fund" title={p.issuer_name}>{p.issuer_name}</span>
+                                    <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span style={{ fontSize: '11px', color: '#e2e8f0' }}>{formatCurrency(p.value)}</span>
+                                        <span className="pos-weight negative">{p.weight.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            ))}
+                            {exitedPositions.length > 8 && (
+                                <span className="tooltip-more">+{exitedPositions.length - 8} more</span>
+                            )}
+                            {exitedPositions.length === 0 && <span style={{ color: '#64748b' }}>None</span>}
+                        </div>
+                    ))}
+                    onMouseLeave={handleMouseLeave}
                     style={{ cursor: onOpenActivity ? 'pointer' : 'default' }}
                 >
                     <div className="kpi-icon negative"><MinusCircle size={18} /></div>
