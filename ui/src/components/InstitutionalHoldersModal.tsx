@@ -117,7 +117,7 @@ export function InstitutionalHoldersModal({
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>DNA & Focus</th>
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Shares</th>
                                     <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Market Value</th>
-                                    <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Weight</th>
+                                    <th style={{ padding: '18px 24px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Portfolio Weight</th>
                                     <th style={{ padding: '18px 40px', fontSize: '10px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.15em', borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>Action</th>
                                 </tr>
                             </thead>

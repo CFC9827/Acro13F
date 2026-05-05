@@ -638,6 +638,11 @@ type MoversMode = 'value' | 'shares' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initialSummary, onSelectFund, allFunds }) => {
     const [summary, setSummary] = useState<DashboardSummary>(initialSummary);
+
+    // Sync local state when initialSummary prop changes (e.g. after backend fix/refresh)
+    useEffect(() => {
+        setSummary(initialSummary);
+    }, [initialSummary]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
@@ -1073,7 +1078,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             }}>
                 <button
                     className={`group-pill ${selectedGroupId === null ? 'active' : ''}`}
-                    onClick={() => setSelectedGroupId(null)}
+                    onClick={() => {
+                        setSelectedGroupId(null);
+                        // Force refresh dashboard summary
+                        setLoading(true);
+                        fetch('/api/dashboard/summary')
+                            .then(res => res.json())
+                            .then(data => {
+                                setSummary(data);
+                                setLoading(false);
+                            })
+                            .catch(() => setLoading(false));
+                    }}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -2145,8 +2161,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funds</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Change</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Max Allocation</th>
-                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Holder</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Highest Weight</th>
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Value</th>
                                     <th style={{ textAlign: 'right', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
                                 </tr>

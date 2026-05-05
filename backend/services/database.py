@@ -602,16 +602,9 @@ class DatabaseManager:
                     else:
                         th["weight_change"] = th["weight"]
 
-                prev_map = { ((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')): h for h in prev_holdings_list }
-                latest_keys = set(((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')) for h in latest_holdings)
-                prev_keys = set(prev_map.keys())
+                # Consensus tracking already initialized above
 
-                # Base keys for new/exited (ignoring put/call)
-                latest_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in latest_holdings if h.get('ticker') or h.get('cusip'))
-                prev_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in prev_holdings_list if h.get('ticker') or h.get('cusip'))
-                new_base_keys = latest_base_keys - prev_base_keys
-                exited_base_keys = prev_base_keys - latest_base_keys
-
+                # --- CONSENSUS DATA AGGREGATION ---
                 for h in latest_holdings:
                     t_raw = h.get('ticker') or h.get('cusip')
                     if not t_raw: continue
@@ -624,7 +617,12 @@ class DatabaseManager:
                         }
                     current_ticker_funds[key]["funds"].add((fund['name'], fund['cik']))
                     current_ticker_funds[key]["total_value"] += h['value']
-                    current_ticker_funds[key]["net_shares_change"] += h.get('shares', 0)
+                    
+                    try:
+                        shares_val = int(h.get('shares') or 0)
+                        current_ticker_funds[key]["net_shares_change"] += shares_val
+                    except:
+                        pass
                     
                     w = (h['value'] * 100.0 / total_value) if total_value else 0
                     current_ticker_funds[key]["weights"].append(w)
@@ -632,23 +630,45 @@ class DatabaseManager:
                         current_ticker_funds[key]["max_weight"] = w
                         current_ticker_funds[key]["top_holder"] = fund['name']
 
-                for h in prev_holdings_list:
-                    t_raw = h.get('ticker') or h.get('cusip')
-                    if not t_raw: continue
-                    key = t_raw.strip().upper()
-                    if key not in prior_ticker_funds: prior_ticker_funds[key] = set()
-                    prior_ticker_funds[key].add(fund['cik'])
-                    if key in current_ticker_funds:
-                        current_ticker_funds[key]["net_shares_change"] -= h.get('shares', 0)
+                if prev_acc:
+                    # Map for current fund comparison (ticker+put_call)
+                    prev_map = { ((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')): h for h in prev_holdings_list }
+                    latest_keys = set(((h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')) for h in latest_holdings)
+                    prev_keys = set(prev_map.keys())
 
-                new_keys, exited_keys = latest_keys - prev_keys, prev_keys - latest_keys
-                summary["kpis"]["new_positions"] += len(new_base_keys)
-                summary["kpis"]["exited_positions"] += len(exited_base_keys)
-                fund_highlight["new_count"], fund_highlight["exit_count"] = len(new_base_keys), len(exited_base_keys)
+                    # Base keys for new/exited (ignoring put/call)
+                    latest_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in latest_holdings if h.get('ticker') or h.get('cusip'))
+                    prev_base_keys = set((h['ticker'] or h['cusip']).strip().upper() for h in prev_holdings_list if h.get('ticker') or h.get('cusip'))
+                    new_base_keys = latest_base_keys - prev_base_keys
+                    exited_base_keys = prev_base_keys - latest_base_keys
+                    
+                    new_keys, exited_keys = latest_keys - prev_keys, prev_keys - latest_keys
 
-                prev_top_3_raw = sorted(prev_holdings_list, key=lambda x: x['value'], reverse=True)[:3]
-                prev_concentration = (sum(h['value'] for h in prev_top_3_raw) * 100.0 / prev_total_value) if prev_total_value else 0
-                fund_highlight["concentration_change"] = concentration - prev_concentration
+                    # Subtract prior shares for net change
+                    for h in prev_holdings_list:
+                        t_raw = h.get('ticker') or h.get('cusip')
+                        if not t_raw: continue
+                        key = t_raw.strip().upper()
+                        
+                        # Update prior fund tracking
+                        if key not in prior_ticker_funds: prior_ticker_funds[key] = set()
+                        prior_ticker_funds[key].add(fund['cik'])
+                        
+                        # Subtract shares
+                        if key in current_ticker_funds:
+                            try:
+                                shares_val = int(h.get('shares') or 0)
+                                current_ticker_funds[key]["net_shares_change"] -= shares_val
+                            except:
+                                pass
+
+                    summary["kpis"]["new_positions"] += len(new_base_keys)
+                    summary["kpis"]["exited_positions"] += len(exited_base_keys)
+                    fund_highlight["new_count"], fund_highlight["exit_count"] = len(new_base_keys), len(exited_base_keys)
+
+                    prev_top_3_raw = sorted(prev_holdings_list, key=lambda x: x['value'], reverse=True)[:3]
+                    prev_concentration = (sum(h['value'] for h in prev_top_3_raw) * 100.0 / prev_total_value) if prev_total_value else 0
+                    fund_highlight["concentration_change"] = concentration - prev_concentration
 
                 for h in latest_holdings:
                     key = (h['ticker'] or h['cusip']) + ('_' + h['put_call'] if h.get('put_call') else '')
@@ -1079,10 +1099,10 @@ class DatabaseManager:
         params = [ticker]
         
         if group_id:
-            filter_clause += " AND lf.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
+            filter_clause += " AND f.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
             params.append(group_id)
         else:
-            filter_clause += " AND f.is_tracked = 1"
+            filter_clause += " AND (f.is_tracked = 1 OR f.cik IN (SELECT cik FROM fund_group_members))"
 
         query = f"""
             WITH LatestPeriods AS (

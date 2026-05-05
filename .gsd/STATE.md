@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-05 00:50
+> Last updated: 2026-05-05 01:25
 
 ## Current Phase: Phase 8 (refinements)
 
@@ -21,6 +21,9 @@
 - [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
 - [x] Dashboard Stability: Resolved critical JSX syntax errors and refactored modal rendering architecture
 - [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
+- [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
+- [x] UI Terminology Alignment: Renamed 'Top Holder' to 'Highest Weight' and 'Max Allocation' to 'Conviction'
+- [/] Pending Verification: Investigating persistent 0 net change and truncated holders list reported by user
 
 ## Last Session Summary
 
@@ -28,6 +31,9 @@
 - **Frictionless Navigation:** Implemented clickable fund links across all Global Dashboard sections (Holders, Big Movers, New Positions, Crowding tooltips).
 - **Aesthetic Polish:** Removed underlines from fund links and standardized font sizes (0.7rem) for "New", "Exited", and "Swoop" positions to match "Big Movers".
 - **Consensus Integration:** Enabled ticker click-through navigation across the dashboard, routing directly to the Stock Consensus view with automatic filtering and terminology alignment.
+- **Data Integrity Fixes:** Resolved a critical bug where `net_shares_change` was resetting to 0 in the aggregation loop and fixed a state sync issue where the dashboard wouldn't reflect backend updates without a refresh.
+- **Terminology Standard:** Renamed table columns to 'Highest Weight' and 'Conviction' to align with institutional analysis standards.
+- **Modal Discovery:** Enriched the institutional holders modal with sector DNA and clarified labels.
 - **Track Fund Toggle:** Added high-fidelity tracking button in the fund analysis header with background sync.
 - **Performance Chart:** Increased vertical space to 600px to accommodate large fund legends.
 
