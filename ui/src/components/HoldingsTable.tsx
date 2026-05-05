@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List, Users } from 'lucide-react';
 import {
     AreaChart,
     Area,
