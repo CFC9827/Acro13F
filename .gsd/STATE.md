@@ -42,6 +42,7 @@
 1. **Amendment Monitor:** Build logic to track 13F/A amendments for between-quarter updates.
 2. **Containerization:** Create Dockerfile for backend and frontend serving (Phase 9 initialization).
 3. **Advanced Charting:** Integrate historical price data into the Consensus view.
+4. **Consensus Table Refactor:** Split 'Ticker & Trend' into a single 'Ticker' column and add two new columns: 'Funds Added' and 'Funds Out'.
 
 ## Key Files for Context Restoration
 
