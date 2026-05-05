@@ -2132,6 +2132,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                             <thead>
                                 <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ticker & Trend</th>
+                                    <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Funds</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Conviction</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Avg. Allocation</th>
                                     <th style={{ textAlign: 'left', padding: '16px 24px', fontSize: '12px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Top Holder</th>
@@ -2162,7 +2163,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                     if (filtered.length === 0) {
                                         return (
                                             <tr>
-                                                <td colSpan={6} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                                <td colSpan={7} style={{ padding: '60px 24px', textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
                                                         <Search size={40} style={{ color: '#38bdf8' }} />
                                                         <p style={{ fontSize: '16px', fontWeight: 500, color: '#f8fafc' }}>
@@ -2209,6 +2210,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                                     <div style={{ color: '#64748b', fontSize: '11px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }}>{stock.issuer_name}</div>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td style={{ padding: '16px 24px' }}>
+                                            <div style={{ color: '#f8fafc', fontWeight: 700, fontSize: '15px' }}>{stock.fund_count}</div>
+                                            <div style={{ fontSize: '11px', color: '#64748b' }}>filers</div>
                                         </td>
                                         <td style={{ padding: '16px 24px' }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '120px' }}>
