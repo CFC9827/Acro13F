@@ -967,13 +967,13 @@ const StockHistoryChart: React.FC<{
                                 return (
                                     <div style={{ display: 'flex', gap: '16px', fontSize: '11px' }}>
                                         <span style={{ color: '#94a3b8' }}>
-                                            <span style={{ color: '#64748b' }}>╬ö Shares:</span>{' '}
+                                            <span style={{ color: '#64748b' }}>Δ Shares:</span>{' '}
                                             <span style={{ color: details.shareChange >= 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>
                                                 {details.shareChange >= 0 ? '+' : ''}{details.shareChange.toLocaleString()}
                                             </span>
                                         </span>
                                         <span style={{ color: '#94a3b8' }}>
-                                            <span style={{ color: '#64748b' }}>╬ö Value:</span>{' '}
+                                            <span style={{ color: '#64748b' }}>Δ Value:</span>{' '}
                                             <span style={{ color: details.valueChange >= 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>
                                                 {details.valueChange >= 0 ? '+' : '-'}{
                                                     Math.abs(details.valueChange) >= 1000000
@@ -985,7 +985,7 @@ const StockHistoryChart: React.FC<{
                                             </span>
                                         </span>
                                         <span style={{ color: '#94a3b8' }}>
-                                            <span style={{ color: '#64748b' }}>╬ö % Port:</span>{' '}
+                                            <span style={{ color: '#64748b' }}>Δ % Port:</span>{' '}
                                             <span style={{ color: details.portfolioChange >= 0 ? '#34d399' : '#f87171', fontWeight: 600 }}>
                                                 {details.portfolioChange >= 0 ? '+' : ''}{details.portfolioChange.toFixed(2)}%
                                             </span>
@@ -2373,12 +2373,12 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                         <th className="text-left py-2 px-2 w-20">Date</th>
                                                                         <th className="text-left py-2 px-2 w-16">Action</th>
                                                                         <th className="text-right py-2 px-2 w-20">Shares</th>
-                                                                        <th className="text-right py-2 px-2 w-20">╬ö Shares</th>
+                                                                        <th className="text-right py-2 px-2 w-20">Δ Shares</th>
                                                                         <th className="text-right py-2 px-2 w-20">Value</th>
-                                                                        <th className="text-right py-2 px-2 w-20">╬ö Value</th>
+                                                                        <th className="text-right py-2 px-2 w-20">Δ Value</th>
                                                                         <th className="text-right py-2 px-2 w-16">% Port</th>
-                                                                        <th className="text-right py-2 px-2 w-16">╬ö %</th>
-                                                                        <th className="text-right py-2 px-2 w-16">Price ╬ö</th>
+                                                                        <th className="text-right py-2 px-2 w-16">Δ %</th>
+                                                                        <th className="text-right py-2 px-2 w-16">Price Δ</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
@@ -2403,11 +2403,11 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                 return (
                                                                                     <tr key={item.id} className="border-b border-dashed border-slate-700/30">
                                                                                         <td className="py-2 px-2 font-mono text-slate-500 whitespace-nowrap text-xs" colSpan={2}>
-                                                                                            {formatQuarterLabel((item as any).gapStartQuarter)} ΓÇö {formatQuarterLabel((item as any).gapEndQuarter)}
+                                                                                            {formatQuarterLabel((item as any).gapStartQuarter)} - {formatQuarterLabel((item as any).gapEndQuarter)}
                                                                                             {isFuture && <span className="text-[8px] text-yellow-500 font-bold"> FUT</span>}
                                                                                             <span className="ml-2 text-[10px] text-slate-600"> (not held for {(item as any).gapCount} Q's)</span>
                                                                                         </td>
-                                                                                        <td className="py-2 px-2 text-center text-slate-600 text-xs" colSpan={7}>ΓÇö</td>
+                                                                                        <td className="py-2 px-2 text-center text-slate-600 text-xs" colSpan={7}>-</td>
                                                                                     </tr>
                                                                                 );
                                                                             }
@@ -2420,14 +2420,14 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                             {formatQuarterLabel(item.period_of_report)}
                                                                                             {isFuture && <span className="text-[8px] text-yellow-500 font-bold"> FUT</span>}
                                                                                         </td>
-                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">ΓÇö</td>
+                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">-</td>
                                                                                         <td className="py-2 px-2 text-right text-slate-500 text-xs">0</td>
-                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">ΓÇö</td>
+                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">-</td>
                                                                                         <td className="py-2 px-2 text-right text-slate-500 text-xs">$0</td>
-                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">ΓÇö</td>
+                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">-</td>
                                                                                         <td className="py-2 px-2 text-right text-slate-500 text-xs">0.00%</td>
-                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">ΓÇö</td>
-                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">ΓÇö</td>
+                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">-</td>
+                                                                                        <td className="py-2 px-2 text-right text-slate-500 text-xs">-</td>
                                                                                     </tr>
                                                                                 );
                                                                             }
@@ -2568,7 +2568,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                     >
                                                                                         {prevItem ? (
                                                                                             <>{shareChange > 0 ? '+' : ''}{shareChange.toLocaleString()}</>
-                                                                                        ) : 'ΓÇö'}
+                                                                                        ) : '-'}
                                                                                     </td>
 
                                                                                     <td className="py-2 px-2 text-right font-medium text-slate-300 text-xs">
@@ -2581,7 +2581,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                     >
                                                                                         {prevItem ? (
                                                                                             <>{valueChange > 0 ? '+' : valueChange < 0 ? '-' : ''}{formatCurrency(Math.abs(valueChange))}</>
-                                                                                        ) : 'ΓÇö'}
+                                                                                        ) : '-'}
                                                                                     </td>
 
                                                                                     <td className="py-2 px-2 text-right font-medium text-slate-300 text-xs">
@@ -2594,18 +2594,18 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                     >
                                                                                         {prevItem ? (
                                                                                             <>{pctChange > 0 ? '+' : ''}{pctChange.toFixed(2)}%</>
-                                                                                        ) : 'ΓÇö'}
+                                                                                        ) : '-'}
                                                                                     </td>
                                                                                     <td className="py-2 px-2 text-right font-mono font-bold text-xs">
                                                                                         {(() => {
-                                                                                            if (!prevItem) return <span className="text-slate-600">ΓÇö</span>;
+                                                                                            if (!prevItem) return <span className="text-slate-600">-</span>;
 
                                                                                             // If we have exited (0 shares), we cannot calculate a meaningful price change
-                                                                                            if (item.shares === 0) return <span className="text-slate-600">ΓÇö</span>;
+                                                                                            if (item.shares === 0) return <span className="text-slate-600">-</span>;
 
                                                                                             const p2 = item.shares > 0 ? item.value / item.shares : 0;
                                                                                             const p1 = prevItem.shares > 0 ? prevItem.value / prevItem.shares : 0;
-                                                                                            if (p1 === 0) return <span className="text-slate-600">ΓÇö</span>;
+                                                                                            if (p1 === 0) return <span className="text-slate-600">-</span>;
 
                                                                                             // Split Detection Logic
                                                                                             const shareRatio = item.shares > 0 ? item.shares / prevItem.shares : 1;
@@ -2753,7 +2753,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                         /* Single Episode: Compact Row */
                                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                                                             <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 500 }}>
-                                                                                                {formatQuarterLabel(ep.startQ)} ΓÇö {formatQuarterLabel(ep.endQ)}
+                                                                                                {formatQuarterLabel(ep.startQ)} - {formatQuarterLabel(ep.endQ)}
                                                                                             </span>
                                                                                             <span style={{ color: ep.perf >= 0 ? '#34d399' : '#f87171', fontWeight: 700, fontSize: '14px' }}>
                                                                                                 {ep.perf >= 0 ? '+' : ''}{ep.perf.toFixed(1)}%
@@ -2769,7 +2769,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
                                                                                                 </span>
                                                                                             </div>
                                                                                             <div style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 500 }}>
-                                                                                                {formatQuarterLabel(ep.startQ)} ΓÇö {formatQuarterLabel(ep.endQ)}
+                                                                                                {formatQuarterLabel(ep.startQ)} - {formatQuarterLabel(ep.endQ)}
                                                                                             </div>
                                                                                         </>
                                                                                     )}
