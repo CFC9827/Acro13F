@@ -1,6 +1,6 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-10 09:38
+> Last updated: 2026-05-10 19:46
 
 ## Current Phase: Phase 6: Update Sidebar And Folder Logic
 **Status**: 🟢 In Progress
@@ -32,6 +32,12 @@
 - Resolved "Blank Screen" crash by adding defensive array guards to all `.map()` calls
 - Fixed application boot sequence: `authLoading` -> `SplashScreen` -> `Login` or `Dashboard`
 - Standardized error boundaries to prevent malformed API responses from breaking the UI
+
+### Phase 5 & 7: Search & Explorer User-Scoping ✅
+- Refactored `search_all` and `search_explorer` to be user-scoped and return tracking status
+- Implemented CIK normalization in `InstitutionalExplorer` to fix tracking toggle bugs
+- Added visual feedback (updating states) to tracking buttons in the UI
+- Ensured JIT user creation in auth layer to maintain database integrity
 
 ## Next Steps
 

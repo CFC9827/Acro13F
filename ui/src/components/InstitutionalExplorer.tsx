@@ -145,15 +145,32 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
 
     const toggleTrack = async (cik: string, currentStatus: boolean) => {
         setSyncingCik(cik);
+        console.log(`Toggling track for ${cik}. Current: ${currentStatus}`);
         try {
             const res = await fetchWithAuth(`/api/funds/${cik}/track?track=${!currentStatus}`, {
                 method: 'POST'
             }, session);
+            
+            // Normalize CIK for comparison (strip leading zeros)
+            const cleanCik = String(cik).replace(/^0+/, '');
+            
             if (res.ok) {
-                setFundResults(prev => prev.map(f => f.cik === cik ? { ...f, is_tracked: !currentStatus ? 1 : 0 } : f));
+                console.log(`Track success for ${cik}`);
+                const newState = !currentStatus ? 1 : 0;
+                setFundResults(prev => prev.map(f => {
+                    const fundCleanCik = String(f.cik).replace(/^0+/, '');
+                    if (fundCleanCik === cleanCik) {
+                        return { ...f, is_tracked: newState };
+                    }
+                    return f;
+                }));
+                
                 if (onTrackToggle) {
-                    onTrackToggle(cik, !currentStatus);
+                    await onTrackToggle(cik, !currentStatus);
                 }
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                console.error("Track request failed", errData);
             }
         } catch (err) {
             console.error("Failed to toggle track", err);
@@ -435,7 +452,41 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
                                         <td style={{ padding: '24px 32px', width: '140px' }}><div style={{ height: '40px', width: '100px' }}><ResponsiveContainer width="100%" height="100%"><AreaChart data={fund.sparkline}><defs><linearGradient id={`grad-${fund.cik}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3}/><stop offset="95%" stopColor="#38bdf8" stopOpacity={0}/></linearGradient></defs><Area type="monotone" dataKey="value" stroke="#38bdf8" strokeWidth={2} fill={`url(#grad-${fund.cik})`} isAnimationActive={false} /></AreaChart></ResponsiveContainer></div></td>
                                         <td style={{ padding: '24px 32px' }}><div style={{ color: '#f8fafc', fontWeight: 800, fontSize: '15px' }}>{formatCurrency(fund.total_aum)}</div><div style={{ color: '#64748b', fontSize: '11px', fontWeight: 600, marginTop: '4px' }}>{fund.position_count} HOLDINGS</div></td>
                                         <td style={{ padding: '24px 32px' }}><div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 800, color: '#94a3b8' }}><span>{fund.primary_sector?.toUpperCase() || 'UNKNOWN'}</span><span>{fund.primary_sector_weight?.toFixed(1) || 0}%</span></div><div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', overflow: 'hidden', width: '120px' }}><div style={{ height: '100%', background: '#38bdf8', width: `${fund.primary_sector_weight}%`, boxShadow: '0 0 10px rgba(56,189,248,0.3)' }} /></div></div></td>
-                                        <td style={{ padding: '24px 32px' }}><button onClick={(e) => { e.stopPropagation(); toggleTrack(fund.cik, !!fund.is_tracked); }} disabled={syncingCik === fund.cik} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, background: fund.is_tracked ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)', color: fund.is_tracked ? '#4ade80' : '#94a3b8', border: `1px solid ${fund.is_tracked ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.05)'}`, cursor: syncingCik === fund.cik ? 'wait' : 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{syncingCik === fund.cik ? <Loader2 size={12} className="animate-spin" /> : fund.is_tracked ? <Check size={12} /> : <Plus size={12} />}{fund.is_tracked ? 'Tracked' : 'Track Fund'}</button></td>
+                                        <td style={{ padding: '24px 32px' }}>
+                                            <button 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    toggleTrack(fund.cik, !!fund.is_tracked); 
+                                                }} 
+                                                disabled={syncingCik === fund.cik} 
+                                                style={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    gap: '8px', 
+                                                    padding: '6px 12px', 
+                                                    borderRadius: '8px', 
+                                                    fontSize: '11px', 
+                                                    fontWeight: 700, 
+                                                    background: fund.is_tracked ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255,255,255,0.03)', 
+                                                    color: fund.is_tracked ? '#4ade80' : '#94a3b8', 
+                                                    border: `1px solid ${fund.is_tracked ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255,255,255,0.05)'}`, 
+                                                    cursor: syncingCik === fund.cik ? 'wait' : 'pointer', 
+                                                    transition: 'all 0.2s', 
+                                                    textTransform: 'uppercase', 
+                                                    letterSpacing: '0.05em',
+                                                    opacity: syncingCik === fund.cik ? 0.7 : 1
+                                                }}
+                                            >
+                                                {syncingCik === fund.cik ? (
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                ) : !!fund.is_tracked ? (
+                                                    <Check size={12} />
+                                                ) : (
+                                                    <Plus size={12} />
+                                                )}
+                                                {syncingCik === fund.cik ? 'Updating...' : !!fund.is_tracked ? 'Tracked' : 'Track Fund'}
+                                            </button>
+                                        </td>
                                         <td style={{ padding: '24px 32px', textAlign: 'right' }}><button onClick={() => onFollow(fund.cik)} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color: '#f8fafc', padding: '10px 20px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'inline-flex', alignItems: 'center', gap: '10px' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#38bdf8'; e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#38bdf8'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = '#f8fafc'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}><MousePointer2 size={16} /> ANALYZE</button></td>
                                     </tr>
                                 ))}

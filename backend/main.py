@@ -89,9 +89,10 @@ async def get_funds(tracked_only: bool = True, user_id: str = Depends(get_user_i
 @api.post("/funds/{cik}/track")
 async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = True, user_id: str = Depends(get_user_id)):
     try:
+        print(f"DEBUG: Tracking request for CIK {cik}, track={track}, user_id={user_id}")
         cik = db.normalize_cik(cik)
         if track:
-            # 1. Ensure the fund exists in canonical table (even if name is unknown)
+            # 1. Ensure the fund exists in canonical table
             db.save_fund(cik, "")
             
             # 2. Add to user's tracked funds
@@ -99,24 +100,23 @@ async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = 
             
             # 3. Check if it has ever been synced
             if not db.has_filings(cik):
-                # Queue a light sync in background
-                status = db.get_sync_status(cik)
-                if not status or status.get("status") not in ["processing", "pending"]:
-                    db.update_sync_status(cik, "pending")
-                    background_tasks.add_task(background_sync_task, cik)
+                print(f"DEBUG: Triggering background sync for new fund {cik}")
+                background_tasks.add_task(background_sync_task, cik)
         else:
-            # Remove from user's tracked funds
             db.untrack_fund(user_id=user_id, cik=cik)
             
-        return {"status": "success"}
+        return {"status": "success", "cik": cik, "tracked": track}
     except Exception as e:
+        import traceback
+        print(f"ERROR in track_fund: {str(e)}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/search")
-async def global_search(q: str):
+async def global_search(q: str, user_id: str = Depends(get_user_id)):
     """Global search for funds and tickers."""
     try:
-        return db.search_all(q)
+        return db.search_all(q, user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -442,11 +442,10 @@ async def search_cik(q: str, limit: int = 20, user_id: str = Depends(get_user_id
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @api.post("/explorer/search")
-async def explorer_search(request: Request):
-    """Multi-factor search for the Institutional Explorer."""
+async def explorer_search(request: Request, user_id: str = Depends(get_user_id)):
     criteria = await request.json()
     try:
-        results = db.search_explorer(criteria)
+        results = db.search_explorer(criteria, user_id=user_id)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Explorer search failed: {str(e)}")

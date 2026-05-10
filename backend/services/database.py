@@ -12,7 +12,18 @@ from urllib.parse import urlparse
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self, db_path: str = None):
+        if DatabaseManager._initialized:
+            return
+
         self.db_url = os.environ.get("DATABASE_URL")
         self._pool = None
         if not self.db_url:
@@ -32,12 +43,14 @@ class DatabaseManager:
             
         self._init_db()
         self._migrate()
+        DatabaseManager._initialized = True
 
     @contextmanager
     def _get_connection(self):
         """Context manager that yields a connection. For PG, uses the pool."""
         if self.is_postgres:
             conn = self._pool.getconn()
+            conn.autocommit = True
             try:
                 yield conn
             finally:
@@ -393,6 +406,19 @@ class DatabaseManager:
         else:
             query = "SELECT * FROM funds ORDER BY sort_order, name"
             return self._execute(query, fetch='all')
+
+    def ensure_user(self, user_id: str, email: str = None):
+        """Just-In-Time user creation/verification."""
+        if self.is_postgres:
+            self._execute("INSERT INTO users (id, email) VALUES (?, ?) ON CONFLICT (id) DO NOTHING", (user_id, email))
+        else:
+            self._execute("INSERT OR IGNORE INTO users (id, email) VALUES (?, ?)", (user_id, email))
+        
+        # Verify it exists
+        check = self._execute("SELECT id FROM users WHERE id = ?", (user_id,), fetch='one')
+        if not check:
+            raise Exception(f"Failed to ensure user {user_id} in database")
+        return True
 
     def track_fund(self, user_id: str, cik: str):
         """Link a fund to a user's tracked list."""
@@ -1036,7 +1062,7 @@ class DatabaseManager:
         
         self._execute(query, params)
 
-    def search_explorer(self, criteria: Dict) -> List[Dict]:
+    def search_explorer(self, criteria: Dict, user_id: str = "00000000-0000-0000-0000-000000000000") -> List[Dict]:
         """
         Executes a complex multi-factor search for the Institutional Explorer.
         Supports global logic (Match All/Any) and row-level logic (AND/OR).
@@ -1064,13 +1090,14 @@ class DatabaseManager:
         if not filters:
             # Return latest stats for all funds if no filters
             return self._execute("""
-                SELECT f.name, f.cik, s.*
+                SELECT f.name, f.cik, s.*,
+                       CAST(EXISTS (SELECT 1 FROM user_tracked_funds utf WHERE utf.cik = f.cik AND utf.user_id = ?) AS INTEGER) as is_tracked
                 FROM fund_quarterly_stats s
                 JOIN funds f ON s.cik = f.cik
                 WHERE s.period_of_report = (SELECT MAX(period_of_report) FROM fund_quarterly_stats)
                 ORDER BY s.total_aum DESC
                 LIMIT 100
-            """, fetch='all')
+            """, (user_id,), fetch='all')
 
         query_parts = []
         params = []
@@ -1130,7 +1157,8 @@ class DatabaseManager:
                 FROM fund_quarterly_stats
                 GROUP BY cik
             )
-            SELECT f.name, f.cik, s.*
+            SELECT f.name, f.cik, s.*,
+                   CAST(EXISTS (SELECT 1 FROM user_tracked_funds utf WHERE utf.cik = f.cik AND utf.user_id = ?) AS INTEGER) as is_tracked
             FROM fund_quarterly_stats s
             JOIN funds f ON s.cik = f.cik
             JOIN LatestStats ls ON s.cik = ls.cik AND s.period_of_report = ls.latest_period
@@ -1138,7 +1166,9 @@ class DatabaseManager:
             ORDER BY s.total_aum DESC
             LIMIT 200
         """
-        return self._execute(query, tuple(params), fetch='all')
+        # Add user_id to params - it must be FIRST because it's in the SELECT clause
+        full_params = (user_id,) + tuple(params)
+        return self._execute(query, full_params, fetch='all')
 
     def get_whale_favorites(self, limit: int = 100) -> List[Dict]:
         """
@@ -1258,7 +1288,7 @@ class DatabaseManager:
         # Pass params twice because filter_clause is used in two CTEs
         return self._execute(query, tuple(params * 2), fetch='all')
 
-    def search_all(self, query: str) -> Dict:
+    def search_all(self, query: str, user_id: str = "00000000-0000-0000-0000-000000000000") -> Dict:
         """Global search for funds and tickers."""
         query = query.strip().upper()
         if not query:
@@ -1267,11 +1297,11 @@ class DatabaseManager:
         # 1. Search Funds
         funds = self._execute("""
             SELECT f.cik, f.name, 
-                   EXISTS(SELECT 1 FROM user_tracked_funds utf WHERE utf.cik = f.cik AND utf.user_id = 1) as is_tracked
+                   CAST(EXISTS(SELECT 1 FROM user_tracked_funds utf WHERE utf.cik = f.cik AND utf.user_id = ?) AS INTEGER) as is_tracked
             FROM funds f
             WHERE UPPER(f.name) LIKE ? OR f.cik LIKE ?
             LIMIT 10
-        """, (f"%{query}%", f"%{query}%"), fetch='all')
+        """, (user_id, f"%{query}%", f"%{query}%"), fetch='all')
 
         # 2. Search Tickers (latest holdings only)
         # We find which funds hold this ticker in their most recent filing

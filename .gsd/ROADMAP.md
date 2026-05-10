@@ -73,7 +73,7 @@
 ### Phase 7: Update The UI Behavior
 **Status**: ⬜ Not Started
 **Deliverables**:
-- [ ] Discovery Explorer tracking states updated correctly
+- [x] Discovery Explorer tracking states updated correctly
 - [ ] Hover states ("Remove") and immediate UI un-tracking
 - [ ] Search modal changes to "Request fund" if missing
 

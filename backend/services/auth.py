@@ -8,6 +8,9 @@ from typing import Optional
 url: str = os.environ.get("SUPABASE_URL", "")
 key: str = os.environ.get("SUPABASE_ANON_KEY", "")
 
+from backend.services.database import DatabaseManager
+db_manager = DatabaseManager()
+
 # We only initialize if config is present
 supabase: Optional[Client] = create_client(url, key) if url and key else None
 
@@ -30,11 +33,19 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if not user_resp or not user_resp.user:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         
+        user_id = user_resp.user.id
+        user_email = user_resp.user.email
+
+        # JIT: Ensure user exists in our local database to satisfy foreign keys
+        db_manager.ensure_user(user_id, user_email)
+        
         return {
-            "id": user_resp.user.id,
-            "email": user_resp.user.email
+            "id": user_id,
+            "email": user_email
         }
     except Exception as e:
+        import logging
+        logging.error(f"Auth error: {e}")
         raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 def get_user_id(user = Depends(get_current_user)) -> str:
