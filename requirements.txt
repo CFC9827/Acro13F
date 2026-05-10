@@ -8,3 +8,5 @@ yfinance
 pywebview
 psycopg2-binary
 httpx
+alembic
+sqlalchemy

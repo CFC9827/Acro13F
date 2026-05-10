@@ -1,7 +1,7 @@
 # ROADMAP.md
 
-> **Current Phase**: Phase 7 (next up)
-> **Milestone**: v3.0 — Online 13F Platform
+> **Current Phase**: Phase 3: Build The Canonical Fund Universe
+> **Milestone**: v4.0 — Cloud Multi-User Platform
 
 ## v2.0 — Production Ready (CLOSED)
 
@@ -14,71 +14,86 @@
 - [~] Cloud readiness — replaced by v3.0 online deployment
 - [~] Multi-user auth — deferred to future phase
 
-## v3.0 Phases
+## v3.0 — Online 13F Platform (CLOSED)
 
-### Phase 7: Bulk Data Pipeline
-**Status**: 🟡 In Progress
-**Objective**: Build automated ingestion of SEC's quarterly 13F data sets for all filers >$100M AUM
+> Closed 2026-05-06. Dashboard and Explorer refined. Cloud features pushed to v4.0.
+
+- [x] Bulk CSV/ZIP downloader for SEC quarterly 13F data
+- [x] Explore page and Stock Screener integration
+- [x] Interactive Dashboard Sections and Institutional Holder Explorer
+- [x] Advanced Consensus Metrics and Sorting Logic
+- [x] SQLite database implemented (postgres deferred)
+
+## v4.0 — Cloud Transition & Multi-Tenant SaaS
+**Objective:** Transition Abrams13F into a scalable, multi-user SaaS platform. Each user will have their own individual account, login, and personalized dashboard (their own tracked funds and folders). Behind the scenes, all users will seamlessly draw from a single, shared, canonical database of SEC filings and stock prices maintained automatically by our ingestion engine.
+
+### Phase 1: Separate Platform Data From User Data
+**Status**: ✅ Complete
 **Deliverables**:
-- [x] Bulk CSV/ZIP downloader for SEC quarterly 13F data sets (2013–present)
-- [x] Parser for flattened SEC data format into database
-- [x] PostgreSQL migration (from SQLite) to handle scale (COMPLETED)
-- [x] Summary Engine: pre-compute trade activity, AUM, concentration for each fund/quarter
-- [x] Seed database with top 100 funds, then expand to full universe
-- [ ] Amendment monitor for between-quarter updates
+- [x] Define canonical models (funds, filings, holdings, fund_quarterly_stats)
+- [x] Define user-scoped models (users, user_tracked_funds, user_fund_groups, user_fund_group_members)
+- [x] Remove global `funds.is_tracked` logic
 
----
-
-### Phase 8: Explore & Screener
-**Status**: ✅ Completed
-**Objective**: Add fund discovery and stock screener pages
+### Phase 2: Move Fully To Postgres (Supabase)
+**Status**: ✅ Complete
 **Deliverables**:
-- [x] Explore page (`/explore`) with searchable, filterable fund table
-- [x] Typeahead search (fund name, manager, ticker held)
-- [x] Filter bar: Fund Type, AUM Range, Last Filing, Concentration
-- [x] Stock Screener (Reverse lookup) unified into Discovery Explorer
-- [x] Navigation restructure: My Portfolio vs. Explore
-- [x] Multi-factor logic (AND/OR) per-row in builder
-- [x] Premium UI overhaul (Glassmorphism, dark mode polish)
-- [x] Frictionless Navigation: Clickable fund names across Global Dashboard
-- [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
-- [x] Performance CSV Export: Standardized export for fund performance tab
-- [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
-- [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
-- [x] Consensus View Integration: Clickable tickers across Dashboard routing to Stock Consensus view
-- [x] Institutional Holder Explorer: Premium modal for cross-fund stock ownership discovery
-- [x] Interactive Spotlight Sections: Multi-layer interactivity for Global Dashboard sections
-- [x] Deep Insights Backend: Integrated fund sector and turnover data into explorer APIs
-- [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
-- [x] Dashboard Stability: Resolved critical JSX syntax errors and refactored modal rendering architecture
-- [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
-- [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
-- [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
-- [x] Consensus Data Accuracy: Fixed calculation bug for 'Conviction' metric causing discrepancies with 'Avg Allocation'
-- [x] Consensus Sorting Logic: Fixed crash when sorting by ticker and correctly mapped numerical/alphabetical logic for Conviction and Highest Weight
-- [x] Individual Fund Summary Interactivity: Standardized row-level clicks for Holdings/Movers and card-level for Activity sections
-- [x] UI Decluttering: Systematically removed 'VIEW ACTIVITY' labels for a cleaner, premium aesthetic
+- [x] Supabase Postgres pooler connected and verified
+- [x] Alembic migration system initialized with initial cloud schema
+- [x] Performance indexes added for user-scoped queries
+- [x] Legacy fund_groups data migrated to user_fund_groups
 
----
+### Phase 3: Build The Canonical Fund Universe
+**Status**: 🟡 Next Up
+**Deliverables**:
+- [ ] Build background ingestion worker (`worker.py`) for SEC data independent of users
+- [ ] Implement proactive daily price sync for all tickers in the database
+- [ ] Automate `fund_quarterly_stats` pre-computation pipeline
+- [ ] Add `fund_ingestion_status` tracking and logging system
 
-### Phase 9: Cloud Deployment
+### Phase 4: Change Tracking Semantics
 **Status**: ⬜ Not Started
-**Objective**: Deploy the application online with production infrastructure
 **Deliverables**:
-- Containerization (Docker)
-- Cloud deployment (Railway/Render/Vercel)
-- Environment-based configuration (dev/prod)
-- Automated quarterly sync (cron/scheduled task)
-- CDN/static asset optimization for frontend
+- [ ] Update tracking API to use `user_tracked_funds` table
+- [ ] Ensure tracking does NOT trigger SEC downloads
+- [ ] Untracking removes user references without deleting canonical data
 
----
-
-### Phase 10: Polish & Performance
+### Phase 5: Make Global Overview User-Scoped
 **Status**: ⬜ Not Started
-**Objective**: Optimize for production traffic and user experience
 **Deliverables**:
-- API response caching layer
-- Frontend performance optimization (lazy loading, code splitting)
-- Error handling and monitoring (Sentry or similar)
-- SEO basics (meta tags, Open Graph, sitemap)
-- Target: all pages load in <100ms
+- [ ] Update dashboard endpoints to require auth and scope by `user_id`
+- [ ] Dashboard defaults to current user's tracked funds
+
+### Phase 6: Update Sidebar And Folder Logic
+**Status**: ⬜ Not Started
+**Deliverables**:
+- [ ] Sidebar and Folders load from user-specific endpoints
+- [ ] Folder membership implies/requires fund tracking
+
+### Phase 7: Update The UI Behavior
+**Status**: ⬜ Not Started
+**Deliverables**:
+- [ ] Discovery Explorer tracking states updated correctly
+- [ ] Hover states ("Remove") and immediate UI un-tracking
+- [ ] Search modal changes to "Request fund" if missing
+
+### Phase 8: Add Authentication And Accounts
+**Status**: ⬜ Not Started
+**Deliverables**:
+- [ ] Add backend auth (JWT/Session) and provider (Clerk, Supabase Auth, etc.)
+- [ ] User sign up, sign in, sign out
+- [ ] Protected API routes
+
+### Phase 9: Cloud Deployment Architecture
+**Status**: ⬜ Not Started
+**Deliverables**:
+- [ ] Deploy frontend (Vercel/Netlify/etc.)
+- [ ] Deploy backend API (Render/Railway/etc.)
+- [ ] Deploy Postgres
+- [ ] Deploy SEC ingestion background worker
+
+### Phase 10: Migration Path
+**Status**: ⬜ Not Started
+**Deliverables**:
+- [ ] Freeze SQLite and migrate canonical data to Postgres
+- [ ] Migrate local `is_tracked` to single initial user account
+- [ ] Run data verification and deploy to staging

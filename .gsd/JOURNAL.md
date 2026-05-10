@@ -130,3 +130,13 @@
 
 **Open Issues/Pending:**
 - The user reports that 'Net Change' and 'Holders' count still appear incorrect/truncated in their environment. This warrants a deep-dive into the local build process and client-side data propagation in the next session.
+
+
+## 2026-05-06 — Cloud Transition Push
+
+**Session Goal:** Pivot to v4.0 Multi-Tenant Cloud Architecture
+
+**Accomplished:**
+- Transitioned ROADMAP.md to v4.0
+- Updated STATE.md for Phase 1
+- Internalized 10-phase plan for separating canonical and user data

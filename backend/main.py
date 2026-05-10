@@ -87,12 +87,25 @@ async def get_funds(tracked_only: bool = True):
 @api.post("/funds/{cik}/track")
 async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = True):
     try:
-        db.save_fund(cik, "", is_tracked=1 if track else 0)
+        cik = db.normalize_cik(cik)
         if track:
+            # Ensure the fund exists in canonical table
+            db.save_fund(cik, "")
+            # Add to user's tracked funds
+            if db.is_postgres:
+                db._execute("INSERT INTO user_tracked_funds (user_id, cik) VALUES (?, ?) ON CONFLICT DO NOTHING", (1, cik))
+            else:
+                db._execute("INSERT OR IGNORE INTO user_tracked_funds (user_id, cik) VALUES (?, ?)", (1, cik))
+            # Kick off a background sync if needed
             status = db.get_sync_status(cik)
             if not status or status.get("status") != "processing":
                 db.update_sync_status(cik, "pending")
-                background_tasks.add_task(background_sync_task, cik, None, False, False, True)
+                background_tasks.add_task(background_sync_task, cik)
+        else:
+            # Remove from user's tracked funds
+            db._execute("DELETE FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, cik))
+            # Also remove from all of this user's groups
+            db._execute("DELETE FROM user_fund_group_members WHERE user_id = ? AND cik = ?", (1, cik))
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -202,11 +215,11 @@ async def get_history(cik: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def background_sync_task(cik: str, limit: int = None, force_all: bool = False, backfill: bool = False, is_tracked: bool = False):
+def background_sync_task(cik: str, limit: int = None, force_all: bool = False, backfill: bool = False):
     """Worker function for background synchronization."""
     try:
         db.update_sync_status(cik, "processing")
-        result = orch.process_fund(cik, limit=limit, force_refresh_all=force_all, backfill=backfill, is_tracked=is_tracked)
+        result = orch.process_fund(cik, limit=limit, force_refresh_all=force_all, backfill=backfill)
         db.update_sync_status(cik, "completed", newly_added=len(result.get("newly_added", [])))
     except Exception as e:
         import logging
@@ -214,7 +227,7 @@ def background_sync_task(cik: str, limit: int = None, force_all: bool = False, b
         db.update_sync_status(cik, "failed", error=str(e))
 
 @api.post("/funds/{cik}/refresh")
-async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False, is_tracked: bool = False):
+async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False):
     try:
         # Check if already processing
         status = db.get_sync_status(cik)
@@ -223,7 +236,7 @@ async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int =
 
         backfill = limit is not None
         db.update_sync_status(cik, "pending")
-        background_tasks.add_task(background_sync_task, cik, limit, force_all, backfill, is_tracked)
+        background_tasks.add_task(background_sync_task, cik, limit, force_all, backfill)
         
         return {"status": "accepted", "message": "Sync started in background."}
     except Exception as e:
@@ -257,20 +270,24 @@ async def get_market_benchmark(start: str, end: str = None):
 @api.delete("/funds/{cik}")
 async def delete_fund(cik: str):
     try:
-        # Instead of hard deleting, we just untrack it so it remains in the explorer
-        db.save_fund(cik, "", is_tracked=0)
+        cik = db.normalize_cik(cik)
+        # Remove from user's tracked funds and groups (canonical data stays)
+        db._execute("DELETE FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, cik))
+        db._execute("DELETE FROM user_fund_group_members WHERE user_id = ? AND cik = ?", (1, cik))
         return {"status": "success", "message": f"Fund {cik} untracked."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/fund-info/{cik}")
 def get_fund_info(cik: str):
-    """Returns basic info (name, is_tracked) for a specific fund."""
+    """Returns basic info for a specific fund, with is_tracked computed per-user."""
     normalized_cik = db.normalize_cik(cik)
-    funds = db.get_funds(tracked_only=False)
-    for f in funds:
-        if f['cik'] == normalized_cik:
-            return dict(f)
+    fund = db._execute("SELECT * FROM funds WHERE cik = ?", (normalized_cik,), fetch='one')
+    if fund:
+        tracked = db._execute("SELECT 1 FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, normalized_cik), fetch='one')
+        result = dict(fund)
+        result['is_tracked'] = 1 if tracked else 0
+        return result
     
     # If not in the local database, return a generic placeholder
     return {"cik": normalized_cik, "name": f"Fund {normalized_cik}", "is_tracked": 0}

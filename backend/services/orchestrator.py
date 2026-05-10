@@ -12,7 +12,7 @@ class Orchestrator:
         self.parser = InfTableParser()
         self.mapper = CUSIPMapper()
         
-    def process_fund(self, cik: str, limit: int = None, force_refresh_all: bool = False, backfill: bool = False, is_tracked: bool = False):
+    def process_fund(self, cik: str, limit: int = None, force_refresh_all: bool = False, backfill: bool = False):
         """
         Dynamic flow: 
         - If fund is NEW (no filings in DB) -> pull 10-year history.
@@ -30,7 +30,7 @@ class Orchestrator:
         
         data = self.client.get_submissions(cik)
         fund_name = data.get('name')
-        self.db.save_fund(cik, fund_name, is_tracked=1 if is_tracked else 0)
+        self.db.save_fund(cik, fund_name)
         
         filings = data.get('filings', {}).get('recent', {})
         count = 0

@@ -1,56 +1,40 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-05 13:42
+> Last updated: 2026-05-10 09:38
 
-## Current Phase: Phase 8 (refinements)
+## Current Phase: Phase 3: Build The Canonical Fund Universe
 
-**Milestone:** v3.0 — Online 13F Platform
-**Phase:** Maintenance & Stability
-**Status**: 
-- [x] Premium UI overhaul (Glassmorphism, dark mode polish)
-- [x] Frictionless Navigation: Clickable fund names across Global Dashboard
-- [x] Track Fund Toggle: Integrated into analysis view for quick watchlisting
-- [x] Performance CSV Export: Standardized export for fund performance tab
-- [x] Crowding Signal Refinement: Fixed KPI count discrepancy and improved tooltip accuracy
-- [x] UI Aesthetic Polish: Removed fund link underlines and matched font sizes across Dashboard sections
-- [x] Consensus View Integration: Clickable tickers across Dashboard routing to Stock Consensus view
-- [x] Institutional Holder Explorer: Enriched backend with sector/turnover data and added premium Modal discovery
-- [x] Interactive Dashboard Sections: Entire spotlight sections (Crowding, New, Exited, Swoop) now clickable and navigable
-- [x] Cross-Fund Discovery: Added "Who else holds this?" triggers directly to fund holding lists
-- [x] Navigation Cleanup: Automatic reset of Stock Consensus search and selection when returning to Global Dashboard
-- [x] Strict Ticker Search: Clicking dashboard tickers now filters for exact matches only in Consensus view
-- [x] Dashboard Stability: Resolved critical JSX syntax errors and refactored modal rendering architecture
-- [x] Advanced Consensus Metrics: Implemented conviction scoring (breadth vs depth) and top holder identification
-- [x] Dashboard Data Integrity: Fixed net share change aggregation logic and state synchronization
-- [x] UI Terminology Alignment: Renamed 'Top Holder' to 'Highest Weight' and 'Max Allocation' to 'Conviction'
-- [x] Data Verification Fix: Resolved stale cache issues causing truncated holders lists and "0 net change" bugs
-- [x] Consensus Table Redesign: Split "Ticker & Trend" into explicit "Ticker", "Funds Added", and "Funds Out" columns
-- [x] Consensus Data Accuracy: Fixed calculation bug for 'Conviction' metric causing discrepancies with 'Avg Allocation'
-- [x] Consensus Sorting Logic: Fixed crash when sorting by ticker and correctly mapped numerical/alphabetical logic for Conviction and Highest Weight
-- [x] Individual Fund Summary Interactivity: Standardized row-level clicks for Holdings/Movers and card-level for Activity sections
-- [x] UI Decluttering: Systematically removed 'VIEW ACTIVITY' labels for a cleaner, premium aesthetic
-## Last Session Summary
+**Milestone:** v4.0 — Cloud Multi-User Platform
+**Phase:** Background Ingestion & Pre-computation
+**Status**: 🟡 Next Up
 
-### UI Refinement & Navigation
-- **Frictionless Navigation:** Implemented clickable fund links across all Global Dashboard sections (Holders, Big Movers, New Positions, Crowding tooltips).
-- **Aesthetic Polish:** Removed underlines from fund links and standardized font sizes (0.7rem) for "New", "Exited", and "Swoop" positions to match "Big Movers".
-- **Consensus Integration:** Enabled ticker click-through navigation across the dashboard, routing directly to the Stock Consensus view with automatic filtering and terminology alignment.
-- **Data Integrity Fixes:** Resolved a critical bug where `net_shares_change` was resetting to 0 in the aggregation loop and fixed a state sync issue where the dashboard wouldn't reflect backend updates without a refresh.
-- **Terminology Standard:** Renamed table columns to 'Highest Weight' and 'Conviction' to align with institutional analysis standards.
-- **Modal Discovery:** Enriched the institutional holders modal with sector DNA and clarified labels.
-- **Track Fund Toggle:** Added high-fidelity tracking button in the fund analysis header with background sync.
-- **Performance Chart:** Increased vertical space to 600px to accommodate large fund legends.
+## Completed This Session
+
+### Phase 1: Separate Platform Data From User Data ✅
+- Created `users`, `user_tracked_funds`, `user_fund_groups`, `user_fund_group_members` tables
+- Removed global `funds.is_tracked` column from schema
+- Updated all queries in `database.py`, `orchestrator.py`, and `main.py` to use user-scoped tables
+- Migration logic auto-creates default user (id=1) and copies legacy tracked data
+- Frontend contract preserved: `is_tracked` computed dynamically per-user
+
+### Phase 2: Move Fully To Postgres (Supabase) ✅
+- Supabase Postgres pooler connected and verified
+- Alembic migration system initialized with initial cloud schema migration
+- Performance indexes added for user-scoped queries
+- Legacy `fund_groups` data migrated to `user_fund_groups` (3 groups, 21 members)
+- Full smoke test passed: get_funds, get_groups, fund_info, dashboard_summary all working
 
 ## Next Steps
 
-1. **Amendment Monitor:** Build logic to track 13F/A amendments for between-quarter updates.
-2. **Containerization:** Create Dockerfile for backend and frontend serving (Phase 9 initialization).
-3. **Advanced Charting:** Integrate historical price data into the Consensus view.
-4. **Consensus Table Refactor:** Split 'Ticker & Trend' into a single 'Ticker' column and add two new columns: 'Funds Added' and 'Funds Out'.
+1. **Phase 3:** Build a background SEC ingestion pipeline (independent of user actions)
+2. **Phase 3:** Pre-calculate `fund_quarterly_stats` automatically after ingestion
+3. **Phase 4:** Decouple "Track Fund" from SEC downloads — tracking = bookmark only
+4. **Phase 5:** Scope Global Overview to current user's tracked funds
 
 ## Key Files for Context Restoration
 
-- [SESSION_HANDOFF.md](file:///c:/Users/abram/Projects/Abrams13F/.planning/SESSION_HANDOFF.md) — Summary of Dashboard fixes and Consensus implementation
-- `.planning/phases/07-online-platform/07-CONTEXT.md` — all decisions from discussion
-- `.gsd/ROADMAP.md` — v3.0 phases overview
-- `.gsd/JOURNAL.md` — session history
+- `backend/services/database.py` — Core data layer with user-scoped schema
+- `backend/services/orchestrator.py` — SEC fund sync engine (is_tracked removed)
+- `backend/main.py` — API endpoints (track/untrack use user_tracked_funds)
+- `backend/migrations/` — Alembic migration infrastructure
+- `.gsd/ROADMAP.md` — v4.0 cloud transition phases

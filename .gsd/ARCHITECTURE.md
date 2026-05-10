@@ -44,8 +44,9 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     SQLite Database (tracker.db)                    │
-│  Tables: funds, filings, holdings, prices, fund_groups, group_members│
+│                     PostgreSQL Database                             │
+│  Canonical Tables: funds, filings, holdings, prices, fund_stats     │
+│  User Tables: users, user_tracked_funds, user_groups, group_members │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,13 +60,14 @@
 - **Dependencies:** SECClient, InfTableParser, DatabaseManager, CUSIPMapper
 
 #### DatabaseManager (`backend/services/database.py`)
-- **Purpose:** SQLite data access layer with schema migrations
+- **Purpose:** Database access layer for PostgreSQL
 - **Key Features:** 
-  - 981 lines covering CRUD for funds, filings, holdings, prices
-  - Historical holdings with SEC amendment handling (13F-HR/A)
-  - Dashboard aggregation queries
+  - CRUD operations utilizing formal migrations
+  - Separation of platform/canonical data (funds, holdings) and user data (tracking, groups)
+  - Dashboard aggregation queries scoped by user
   - TWR (Time-Weighted Return) performance calculations
-- **Tables:** funds, filings, holdings, prices, fund_groups, group_members
+- **Canonical Tables:** funds, filings, holdings, prices, fund_quarterly_stats, fund_ingestion_status
+- **User Tables:** users, user_tracked_funds, user_fund_groups, user_fund_group_members
 
 #### SECClient (`backend/services/sec_client.py`)
 - **Purpose:** EDGAR API integration for fetching 13F submissions
@@ -163,6 +165,6 @@
 - Backend services in `backend/services/`
 - Frontend components in `ui/src/components/`
 
-**API Pattern:** RESTful with FastAPI, CORS enabled for all origins
+**API Pattern:** RESTful with FastAPI, protected by authentication, CORS enabled for all origins
 
-**Database:** SQLite with inline schema migrations in DatabaseManager._init_db()
+**Database:** PostgreSQL with multi-tenant data structures, using formal schema migrations

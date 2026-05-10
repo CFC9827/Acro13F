@@ -87,12 +87,27 @@ class DatabaseManager:
         id_type = "SERIAL PRIMARY KEY" if self.is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
         
         queries = [
+            f"""
+            CREATE TABLE IF NOT EXISTS users (
+                id {id_type},
+                email TEXT UNIQUE,
+                created_at TEXT
+            )
+            """,
             """
             CREATE TABLE IF NOT EXISTS funds (
                 cik TEXT PRIMARY KEY,
                 name TEXT,
-                sort_order INTEGER DEFAULT 0,
-                is_tracked INTEGER DEFAULT 0
+                sort_order INTEGER DEFAULT 0
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS user_tracked_funds (
+                user_id INTEGER,
+                cik TEXT,
+                PRIMARY KEY (user_id, cik),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (cik) REFERENCES funds(cik) ON DELETE CASCADE
             )
             """,
             """
@@ -129,19 +144,24 @@ class DatabaseManager:
             )
             """,
             f"""
-            CREATE TABLE IF NOT EXISTS fund_groups (
+            CREATE TABLE IF NOT EXISTS user_fund_groups (
                 id {id_type},
-                name TEXT UNIQUE,
-                sort_order INTEGER DEFAULT 0
+                user_id INTEGER,
+                name TEXT,
+                sort_order INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, name)
             )
             """,
             """
-            CREATE TABLE IF NOT EXISTS fund_group_members (
+            CREATE TABLE IF NOT EXISTS user_fund_group_members (
                 group_id INTEGER,
+                user_id INTEGER,
                 cik TEXT,
                 PRIMARY KEY (group_id, cik),
-                FOREIGN KEY (group_id) REFERENCES fund_groups (id) ON DELETE CASCADE,
-                FOREIGN KEY (cik) REFERENCES funds (cik) ON DELETE CASCADE
+                FOREIGN KEY (group_id) REFERENCES user_fund_groups(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (cik) REFERENCES funds(cik) ON DELETE CASCADE
             )
             """,
             """
@@ -188,7 +208,9 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_holdings_accession ON holdings(accession_number)",
             "CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)",
             "CREATE INDEX IF NOT EXISTS idx_prices_ticker_date ON prices(ticker, date)",
-            "CREATE INDEX IF NOT EXISTS idx_stats_cik ON fund_quarterly_stats(cik)"
+            "CREATE INDEX IF NOT EXISTS idx_stats_cik ON fund_quarterly_stats(cik)",
+            "CREATE INDEX IF NOT EXISTS idx_user_tracked_funds ON user_tracked_funds(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_user_groups ON user_fund_groups(user_id)"
         ]
         
         with self._get_connection() as conn:
@@ -208,17 +230,8 @@ class DatabaseManager:
 
     def _migrate(self):
         """Handle migrations and data normalization."""
-        # 0. Add is_tracked column if missing
+        # Check for dividends column in prices
         if self.is_postgres:
-            # PostgreSQL: check information_schema before ALTER
-            col_exists = self._execute("""
-                SELECT 1 FROM information_schema.columns 
-                WHERE table_name = 'funds' AND column_name = 'is_tracked'
-            """, fetch='one')
-            if not col_exists:
-                self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
-            
-            # Check for dividends column in prices
             price_col_exists = self._execute("""
                 SELECT 1 FROM information_schema.columns 
                 WHERE table_name = 'prices' AND column_name = 'dividends'
@@ -227,15 +240,53 @@ class DatabaseManager:
                 self._execute("ALTER TABLE prices ADD COLUMN dividends REAL DEFAULT 0")
         else:
             try:
-                self._execute("ALTER TABLE funds ADD COLUMN is_tracked INTEGER DEFAULT 0")
+                self._execute("ALTER TABLE prices ADD COLUMN dividends REAL DEFAULT 0")
             except Exception:
                 pass
                 
+        # Phase 1 Migration: Ensure default user exists
+        try:
+            default_user = self._execute("SELECT 1 FROM users WHERE id = 1", fetch='one')
+            if not default_user:
+                if self.is_postgres:
+                    self._execute("INSERT INTO users (id, email, created_at) VALUES (1, 'default@abrams13f.local', CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING")
+                else:
+                    self._execute("INSERT OR IGNORE INTO users (id, email, created_at) VALUES (1, 'default@abrams13f.local', datetime('now'))")
+        except Exception as e:
+            logger.error(f"Failed to create default user: {e}")
+
+        # Phase 1 Migration: Move tracked funds to user_tracked_funds for user 1
+        # Check if is_tracked column still exists in funds
+        has_is_tracked = False
+        if self.is_postgres:
+            has_is_tracked = self._execute("""
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_name = 'funds' AND column_name = 'is_tracked'
+            """, fetch='one')
+        else:
             try:
-                self._execute("ALTER TABLE prices ADD COLUMN dividends REAL DEFAULT 0")
+                cols = self._execute("PRAGMA table_info(funds)", fetch='all')
+                has_is_tracked = any(c['name'] == 'is_tracked' for c in cols)
             except Exception:
-                # Column likely already exists
                 pass
+
+        if has_is_tracked:
+            logger.info("Migrating legacy is_tracked funds to user_tracked_funds for user 1")
+            legacy_tracked = self._execute("SELECT cik FROM funds WHERE is_tracked = 1", fetch='all')
+            if legacy_tracked:
+                with self._get_connection() as conn:
+                    cur = conn.cursor()
+                    insert_q = """
+                        INSERT INTO user_tracked_funds (user_id, cik) VALUES (%s, %s) ON CONFLICT DO NOTHING
+                    """ if self.is_postgres else """
+                        INSERT OR IGNORE INTO user_tracked_funds (user_id, cik) VALUES (?, ?)
+                    """
+                    data = [(1, r['cik']) for r in legacy_tracked]
+                    cur.executemany(insert_q, data)
+                    conn.commit()
+            
+            # Note: We do not drop the is_tracked column in SQLite due to limited ALTER TABLE support.
+            # We just stop using it.
 
         # 1. Normalize CIKs
         funds = self._execute("SELECT cik FROM funds", fetch='all')
@@ -250,23 +301,21 @@ class DatabaseManager:
         # 2. Normalize Put/Call
         self._execute("UPDATE holdings SET put_call = UPPER(put_call) WHERE put_call IS NOT NULL")
 
-    def save_fund(self, cik: str, name: str, is_tracked: int = 0):
+    def save_fund(self, cik: str, name: str):
         cik = self.normalize_cik(cik)
         if self.is_postgres:
             self._execute("""
-                INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)
+                INSERT INTO funds (cik, name) VALUES (?, ?)
                 ON CONFLICT (cik) DO UPDATE SET 
-                    name = CASE WHEN EXCLUDED.name != '' THEN EXCLUDED.name ELSE funds.name END,
-                    is_tracked = EXCLUDED.is_tracked
-            """, (cik, name, is_tracked))
+                    name = CASE WHEN EXCLUDED.name != '' THEN EXCLUDED.name ELSE funds.name END
+            """, (cik, name))
         else:
-            # SQLite doesn't have a simple way to conditionally update without overwriting
-            exists = self._execute("SELECT name, is_tracked FROM funds WHERE cik = ?", (cik,), fetch='one')
+            exists = self._execute("SELECT name FROM funds WHERE cik = ?", (cik,), fetch='one')
             if exists:
                 final_name = name if name != "" else exists['name']
-                self._execute("UPDATE funds SET name = ?, is_tracked = ? WHERE cik = ?", (final_name, is_tracked, cik))
+                self._execute("UPDATE funds SET name = ? WHERE cik = ?", (final_name, cik))
             else:
-                self._execute("INSERT INTO funds (cik, name, is_tracked) VALUES (?, ?, ?)", (cik, name, is_tracked))
+                self._execute("INSERT INTO funds (cik, name) VALUES (?, ?)", (cik, name))
 
     def save_filing(self, accession_number: str, cik: str, period: str, date: str):
         cik = self.normalize_cik(cik)
@@ -329,12 +378,18 @@ class DatabaseManager:
                 count += 1
         return count
 
-    def get_funds(self, tracked_only: bool = True) -> List[Dict]:
-        query = "SELECT * FROM funds"
+    def get_funds(self, tracked_only: bool = True, user_id: int = 1) -> List[Dict]:
         if tracked_only:
-            query += " WHERE is_tracked = 1 OR cik IN (SELECT cik FROM fund_group_members)"
-        query += " ORDER BY sort_order, name"
-        return self._execute(query, fetch='all')
+            query = """
+                SELECT * FROM funds 
+                WHERE cik IN (SELECT cik FROM user_tracked_funds WHERE user_id = ?) 
+                   OR cik IN (SELECT cik FROM user_fund_group_members WHERE user_id = ?)
+                ORDER BY sort_order, name
+            """
+            return self._execute(query, (user_id, user_id), fetch='all')
+        else:
+            query = "SELECT * FROM funds ORDER BY sort_order, name"
+            return self._execute(query, fetch='all')
 
     def reorder_funds(self, orders: Dict[str, int]):
         for cik, order in orders.items():
@@ -474,30 +529,30 @@ class DatabaseManager:
             cur.executemany(query, data)
             conn.commit()
 
-    def create_group(self, name: str) -> int:
-        min_order_res = self._execute("SELECT MIN(sort_order) as min_order FROM fund_groups", fetch='one')
+    def create_group(self, name: str, user_id: int = 1) -> int:
+        min_order_res = self._execute("SELECT MIN(sort_order) as min_order FROM user_fund_groups WHERE user_id = ?", (user_id,), fetch='one')
         min_order = min_order_res['min_order'] if min_order_res else None
         new_order = (min_order - 1) if min_order is not None else 0
         
         if self.is_postgres:
-            res = self._execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?) RETURNING id", (name, new_order), fetch='one')
+            res = self._execute("INSERT INTO user_fund_groups (user_id, name, sort_order) VALUES (?, ?, ?) RETURNING id", (user_id, name, new_order), fetch='one')
             return res['id']
         else:
             with self._get_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO fund_groups (name, sort_order) VALUES (?, ?)", (name, new_order))
+                cur.execute("INSERT INTO user_fund_groups (user_id, name, sort_order) VALUES (?, ?, ?)", (user_id, name, new_order))
                 conn.commit()
                 return cur.lastrowid
 
-    def get_groups(self):
-        groups = self._execute("SELECT * FROM fund_groups ORDER BY sort_order ASC, id ASC", fetch='all')
+    def get_groups(self, user_id: int = 1):
+        groups = self._execute("SELECT * FROM user_fund_groups WHERE user_id = ? ORDER BY sort_order ASC, id ASC", (user_id,), fetch='all')
         if not groups: return []
         for g in groups:
-            members = self._execute("SELECT cik FROM fund_group_members WHERE group_id = ?", (g['id'],), fetch='all')
+            members = self._execute("SELECT cik FROM user_fund_group_members WHERE group_id = ?", (g['id'],), fetch='all')
             g['member_ciks'] = [m['cik'] for m in members]
         return groups
 
-    def get_dashboard_summary(self, group_id: int = None) -> Dict:
+    def get_dashboard_summary(self, group_id: int = None, user_id: int = 1) -> Dict:
         # Re-implement using self._execute for all sub-queries
         # To save space and time, I will keep the logic same but wrapped in _execute
         
@@ -515,11 +570,11 @@ class DatabaseManager:
         if group_id:
             all_funds = self._execute("""
                 SELECT f.* FROM funds f
-                JOIN fund_group_members m ON f.cik = m.cik
-                WHERE m.group_id = ?
-            """, (group_id,), fetch='all')
+                JOIN user_fund_group_members m ON f.cik = m.cik
+                WHERE m.group_id = ? AND m.user_id = ?
+            """, (group_id, user_id), fetch='all')
         else:
-            all_funds = self.get_funds()
+            all_funds = self.get_funds(user_id=user_id)
 
         summary = {
             "fund_highlights": [], "big_movers": [], "portfolio_shifts": [],
@@ -869,22 +924,22 @@ class DatabaseManager:
             conn.commit()
 
     def delete_group(self, group_id: int):
-        self._execute("DELETE FROM fund_groups WHERE id = ?", (group_id,))
+        self._execute("DELETE FROM user_fund_groups WHERE id = ?", (group_id,))
 
     def reorder_groups(self, orders: Dict[int, int]):
         for group_id, sort_order in orders.items():
-            self._execute("UPDATE fund_groups SET sort_order = ? WHERE id = ?", (sort_order, group_id))
+            self._execute("UPDATE user_fund_groups SET sort_order = ? WHERE id = ?", (sort_order, group_id))
 
-    def add_fund_to_group(self, group_id: int, cik: str):
+    def add_fund_to_group(self, group_id: int, cik: str, user_id: int = 1):
         cik = self.normalize_cik(cik)
         if self.is_postgres:
-            self._execute("INSERT INTO fund_group_members (group_id, cik) VALUES (?, ?) ON CONFLICT DO NOTHING", (group_id, cik))
+            self._execute("INSERT INTO user_fund_group_members (group_id, user_id, cik) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", (group_id, user_id, cik))
         else:
-            self._execute("INSERT OR IGNORE INTO fund_group_members (group_id, cik) VALUES (?, ?)", (group_id, cik))
+            self._execute("INSERT OR IGNORE INTO user_fund_group_members (group_id, user_id, cik) VALUES (?, ?, ?)", (group_id, user_id, cik))
 
     def remove_fund_from_group(self, group_id: int, cik: str):
         cik = self.normalize_cik(cik)
-        self._execute("DELETE FROM fund_group_members WHERE group_id = ? AND cik = ?", (group_id, cik))
+        self._execute("DELETE FROM user_fund_group_members WHERE group_id = ? AND cik = ?", (group_id, cik))
 
     def update_sync_status(self, cik: str, status: str, error: str = None, newly_added: int = 0):
         cik = self.normalize_cik(cik)
@@ -990,7 +1045,7 @@ class DatabaseManager:
         if not filters:
             # Return latest stats for all funds if no filters
             return self._execute("""
-                SELECT f.name, f.cik, f.is_tracked, s.*
+                SELECT f.name, f.cik, s.*
                 FROM fund_quarterly_stats s
                 JOIN funds f ON s.cik = f.cik
                 WHERE s.period_of_report = (SELECT MAX(period_of_report) FROM fund_quarterly_stats)
@@ -1056,7 +1111,7 @@ class DatabaseManager:
                 FROM fund_quarterly_stats
                 GROUP BY cik
             )
-            SELECT f.name, f.cik, f.is_tracked, s.*
+            SELECT f.name, f.cik, s.*
             FROM fund_quarterly_stats s
             JOIN funds f ON s.cik = f.cik
             JOIN LatestStats ls ON s.cik = ls.cik AND s.period_of_report = ls.latest_period
@@ -1108,7 +1163,7 @@ class DatabaseManager:
         """
         Returns a list of funds that hold the given ticker in their latest filing.
         If group_id is provided, only returns funds in that group.
-        Otherwise, only returns funds that are marked as 'is_tracked'.
+        Otherwise, only returns funds that are tracked by user_id=1.
         """
         ticker = str(ticker).strip().upper()
         
@@ -1117,10 +1172,10 @@ class DatabaseManager:
         params = [ticker]
         
         if group_id:
-            filter_clause += " AND f.cik IN (SELECT cik FROM fund_group_members WHERE group_id = ?)"
+            filter_clause += " AND f.cik IN (SELECT cik FROM user_fund_group_members WHERE group_id = ?)"
             params.append(group_id)
         else:
-            filter_clause += " AND (f.is_tracked = 1 OR f.cik IN (SELECT cik FROM fund_group_members))"
+            filter_clause += " AND (f.cik IN (SELECT cik FROM user_tracked_funds WHERE user_id = 1) OR f.cik IN (SELECT cik FROM user_fund_group_members WHERE user_id = 1))"
 
         query = f"""
             WITH RecentFilings AS (
@@ -1300,16 +1355,16 @@ class DatabaseManager:
             })
 
         return result
-    def get_all_funds_performance(self, group_id: int = None) -> Dict:
+    def get_all_funds_performance(self, group_id: int = None, user_id: int = 1) -> Dict:
         """Calculates TWR performance for all funds (or group) over time for comparison."""
         if group_id:
             all_funds = self._execute("""
                 SELECT f.* FROM funds f
-                JOIN fund_group_members m ON f.cik = m.cik
-                WHERE m.group_id = ?
-            """, (group_id,), fetch='all')
+                JOIN user_fund_group_members m ON f.cik = m.cik
+                WHERE m.group_id = ? AND m.user_id = ?
+            """, (group_id, user_id), fetch='all')
         else:
-            all_funds = self.get_funds()
+            all_funds = self.get_funds(user_id=user_id)
         performance_data = {} # cik -> data
         all_periods = set()
 
