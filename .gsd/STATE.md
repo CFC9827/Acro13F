@@ -39,6 +39,11 @@
 - Added visual feedback (updating states) to tracking buttons in the UI
 - Ensured JIT user creation in auth layer to maintain database integrity
 
+### Phase 4: Decoupled Tracking Logic ✅
+- Removed automatic sync triggers from `track_fund` API
+- Verified `untrack_fund` preserves canonical data while removing user-scoped references
+- Preserved UI feedback loop for immediate "Tracked" state updates
+
 ## Next Steps
 
 1. **Phase 3:** Build a background SEC ingestion pipeline (independent of user actions)

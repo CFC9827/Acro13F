@@ -52,11 +52,11 @@
 - [ ] **Deferred**: Run `BulkIngestor` for entire SEC universe (awaiting Phase 4 stability)
 
 ### Phase 4: Change Tracking Semantics
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Deliverables**:
-- [ ] Update tracking API to use `user_tracked_funds` table
-- [ ] Ensure tracking does NOT trigger SEC downloads
-- [ ] Untracking removes user references without deleting canonical data
+- [x] Update tracking API to use `user_tracked_funds` table
+- [x] Ensure tracking does NOT trigger SEC downloads
+- [x] Untracking removes user references without deleting canonical data
 
 ### Phase 5: Make Global Overview User-Scoped
 **Status**: ✅ Complete
@@ -65,7 +65,7 @@
 - [x] Dashboard defaults to current user's tracked funds
 
 ### Phase 6: Update Sidebar And Folder Logic
-**Status**: ⬜ Not Started
+**Status**: 🟢 In Progress
 **Deliverables**:
 - [ ] Sidebar and Folders load from user-specific endpoints
 - [ ] Folder membership implies/requires fund tracking

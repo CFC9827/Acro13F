@@ -97,11 +97,6 @@ async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = 
             
             # 2. Add to user's tracked funds
             db.track_fund(user_id=user_id, cik=cik)
-            
-            # 3. Check if it has ever been synced
-            if not db.has_filings(cik):
-                print(f"DEBUG: Triggering background sync for new fund {cik}")
-                background_tasks.add_task(background_sync_task, cik)
         else:
             db.untrack_fund(user_id=user_id, cik=cik)
             
