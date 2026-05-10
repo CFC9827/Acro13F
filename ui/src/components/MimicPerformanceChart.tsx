@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 import { TrendingUp, Activity, Info, RefreshCw, BarChart3, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, Layers, Calendar, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { formatCurrency } from './PortfolioChart';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MimicDataPoint {
     date: string;
@@ -47,21 +50,13 @@ interface MimicPerformanceChartProps {
     cik: string;
 }
 
-const formatCurrency = (value: number): string => {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(value);
-};
-
 const timeRanges = ['2Q', 'YTD', '1Y', '3Y', '5Y', '10Y', 'MAX', 'CUSTOM'];
 
 export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ cik }) => {
     const [data, setData] = useState<MimicDataPoint[]>([]);
     const [trades, setTrades] = useState<MimicTrade[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const { session } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const [showBenchmark, setShowBenchmark] = useState(true);
     const [timeRange, setTimeRange] = useState('1Y');
@@ -86,7 +81,7 @@ export const MimicPerformanceChart: React.FC<MimicPerformanceChartProps> = ({ ci
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch(`/api/funds/${cik}/mimic-performance`);
+                const res = await fetchWithAuth(`/api/funds/${cik}/mimic-performance`, {}, session);
                 const result: MimicPerformanceResponse = await res.json();
                 if (result.error) {
                     setError(result.error);

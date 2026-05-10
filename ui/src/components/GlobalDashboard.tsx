@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { TrendingUp, Activity, ChevronRight, ChevronUp, ChevronDown, ArrowUp, ArrowDown, Info, LayoutGrid, Briefcase, DollarSign, PlusCircle, MinusCircle, Users, Sparkles, LineChart as LineIcon, Folder, FolderPlus, Trash2, Edit, AlertCircle, PieChart, GripVertical, Search, MousePointer2, Loader2, X, Target, Zap, Plus, Award } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine } from 'recharts';
 import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
+import { useAuth } from '../contexts/AuthContext';
+import { fetchWithAuth } from '../utils/api';
 
 interface Holding {
     ticker?: string;
@@ -238,7 +240,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
                 const url = groupId
                     ? `/api/dashboard/performance?group_id=${groupId}`
                     : '/api/dashboard/performance';
-                const res = await fetch(url);
+                const res = await fetchWithAuth(url, {}, session);
                 const result = await res.json();
                 setData(result);
                 if (result.funds) setSelectedFunds(result.funds);
@@ -259,7 +261,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
 
     const fetchBenchmark = async (start: string, end: string) => {
         try {
-            const res = await fetch(`/api/market/benchmark?start=${start}&end=${end}`);
+            const res = await fetchWithAuth(`/api/market/benchmark?start=${start}&end=${end}`, {}, session);
             const bData = await res.json();
             if (Array.isArray(bData)) setBenchmarkData(bData);
         } catch (err) {
@@ -640,6 +642,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
 type MoversMode = 'value' | 'shares' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initialSummary, onSelectFund, allFunds }) => {
+    const { session } = useAuth();
     const [summary, setSummary] = useState<DashboardSummary>(initialSummary);
 
     // Sync local state when initialSummary prop changes (e.g. after backend fix/refresh)
@@ -703,7 +706,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         setLoadingHolders(true);
         try {
             const url = `/api/explorer/stock/${encodeURIComponent(ticker)}/holders${selectedGroupId ? `?group_id=${selectedGroupId}` : ''}`;
-            const res = await fetch(url);
+            const res = await fetchWithAuth(url, {}, session);
             const data = await res.json();
             if (Array.isArray(data)) {
                 setHolders(data);
@@ -819,11 +822,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         groups.forEach((g, index) => { orders[g.id] = index; });
 
         try {
-            await fetch('/api/dashboard/groups/reorder', {
+            await fetchWithAuth('/api/dashboard/groups/reorder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(orders)
-            });
+            }, session);
         } catch (err) {
             console.error("Failed to save group order", err);
         }
@@ -835,10 +838,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             const histories: { [cik: string]: any[] } = {};
             for (const fund of fundHighlights) {
                 try {
-                    const res = await fetch(`/api/funds/${fund.cik}/history`);
+                    const res = await fetchWithAuth(`/api/funds/${fund.cik}/history`, {}, session);
                     if (res.ok) {
                         const data = await res.json();
-                        histories[fund.cik] = data;
+                        histories[fund.cik] = Array.isArray(data) ? data : [];
                     }
                 } catch (err) {
                     console.error(`Failed to fetch history for ${fund.cik}`, err);
@@ -953,9 +956,13 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const fetchGroups = async () => {
         try {
-            const res = await fetch('/api/dashboard/groups');
+            const res = await fetchWithAuth('/api/dashboard/groups', {}, session);
             const data = await res.json();
-            setGroups(data);
+            if (Array.isArray(data)) {
+                setGroups(data);
+            } else {
+                setGroups([]);
+            }
         } catch (err) {
             console.error("Failed to fetch groups", err);
         }
@@ -965,9 +972,11 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         setLoading(true);
         try {
             const url = groupId ? `/api/dashboard/summary?group_id=${groupId}` : '/api/dashboard/summary';
-            const res = await fetch(url);
+            const res = await fetchWithAuth(url, {}, session);
             const data = await res.json();
-            setSummary(data);
+            if (data && !data.detail) {
+                setSummary(data);
+            }
         } catch (err) {
             console.error("Failed to fetch filtered summary", err);
         } finally {
@@ -1007,10 +1016,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                 const url = selectedGroupId
                     ? `/api/sectors/allocation?group_id=${selectedGroupId}`
                     : '/api/sectors/allocation';
-                const res = await fetch(url);
+                const res = await fetchWithAuth(url, {}, session);
                 if (res.ok) {
                     const data = await res.json();
-                    setSectorAllocation(data.allocation || []);
+                    setSectorAllocation(Array.isArray(data) ? data : (data.allocation || []));
                 }
             } catch (err) {
                 console.error("Failed to fetch sector allocation", err);
@@ -1023,7 +1032,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const handleCreateGroup = async () => {
         if (!newGroupName.trim()) return;
         try {
-            const res = await fetch('/api/dashboard/groups?name=' + encodeURIComponent(newGroupName), { method: 'POST' });
+            const res = await fetchWithAuth('/api/dashboard/groups?name=' + encodeURIComponent(newGroupName), { method: 'POST' }, session);
             if (res.ok) {
                 setNewGroupName('');
                 fetchGroups();
@@ -1037,7 +1046,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const handleDeleteGroup = async (id: number) => {
         if (window.confirm('Delete this group?')) {
             try {
-                await fetch(`/api/dashboard/groups/${id}`, { method: 'DELETE' });
+                await fetchWithAuth(`/api/dashboard/groups/${id}`, { method: 'DELETE' }, session);
                 if (selectedGroupId === id) setSelectedGroupId(null);
                 fetchGroups();
             } catch (err) {
@@ -1053,7 +1062,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             const url = isMember
                 ? `/api/dashboard/groups/${groupId}/members/${cik}`
                 : `/api/dashboard/groups/${groupId}/members?cik=${cik}`;
-            await fetch(url, { method });
+            await fetchWithAuth(url, { method }, session);
             fetchGroups();
         } catch (err) {
             console.error("Failed to toggle group member", err);
@@ -1098,10 +1107,10 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         setSelectedGroupId(null);
                         // Force refresh dashboard summary
                         setLoading(true);
-                        fetch('/api/dashboard/summary')
+                        fetchWithAuth('/api/dashboard/summary', {}, session)
                             .then(res => res.json())
                             .then(data => {
-                                setSummary(data);
+                                if (data && !data.detail) setSummary(data);
                                 setLoading(false);
                             })
                             .catch(() => setLoading(false));
@@ -1126,7 +1135,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                     <span>All Funds</span>
                 </button>
 
-                {groups.map(g => {
+                {(Array.isArray(groups) ? groups : []).map(g => {
                     const isEmpty = g.member_ciks.length === 0;
                     const isBeingDragged = draggedGroupId === g.id;
 
@@ -2524,7 +2533,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                         </div>
 
                         <div className="groups-list">
-                            {groups.map(group => (
+                            {(Array.isArray(groups) ? groups : []).map(group => (
                                 <div key={group.id} className="group-item-config">
                                     <div className="group-header-row">
                                         <div className="group-title-info">

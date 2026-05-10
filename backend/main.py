@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, APIRouter, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, APIRouter, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +12,9 @@ from backend.services.prices import get_historical_prices
 from backend.services.mimic_performance import MimicPerformanceCalculator
 from backend.services.sector_mapper import SectorMapper
 from backend.services.sec_client import SECClient
+from backend.services.auth import get_current_user, get_user_id
 import os
+import logging
 
 app = FastAPI(title="Stock Screener API")
 
@@ -81,31 +83,31 @@ async def update_config(config: Dict[str, str]):
 
 
 @api.get("/funds")
-async def get_funds(tracked_only: bool = True):
-    return db.get_funds(tracked_only=tracked_only)
+async def get_funds(tracked_only: bool = True, user_id: str = Depends(get_user_id)):
+    return db.get_funds(tracked_only=tracked_only, user_id=user_id)
 
 @api.post("/funds/{cik}/track")
-async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = True):
+async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = True, user_id: str = Depends(get_user_id)):
     try:
         cik = db.normalize_cik(cik)
         if track:
-            # Ensure the fund exists in canonical table
+            # 1. Ensure the fund exists in canonical table (even if name is unknown)
             db.save_fund(cik, "")
-            # Add to user's tracked funds
-            if db.is_postgres:
-                db._execute("INSERT INTO user_tracked_funds (user_id, cik) VALUES (?, ?) ON CONFLICT DO NOTHING", (1, cik))
-            else:
-                db._execute("INSERT OR IGNORE INTO user_tracked_funds (user_id, cik) VALUES (?, ?)", (1, cik))
-            # Kick off a background sync if needed
-            status = db.get_sync_status(cik)
-            if not status or status.get("status") != "processing":
-                db.update_sync_status(cik, "pending")
-                background_tasks.add_task(background_sync_task, cik)
+            
+            # 2. Add to user's tracked funds
+            db.track_fund(user_id=user_id, cik=cik)
+            
+            # 3. Check if it has ever been synced
+            if not db.has_filings(cik):
+                # Queue a light sync in background
+                status = db.get_sync_status(cik)
+                if not status or status.get("status") not in ["processing", "pending"]:
+                    db.update_sync_status(cik, "pending")
+                    background_tasks.add_task(background_sync_task, cik)
         else:
             # Remove from user's tracked funds
-            db._execute("DELETE FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, cik))
-            # Also remove from all of this user's groups
-            db._execute("DELETE FROM user_fund_group_members WHERE user_id = ? AND cik = ?", (1, cik))
+            db.untrack_fund(user_id=user_id, cik=cik)
+            
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -127,17 +129,17 @@ async def reorder_funds(orders: Dict[str, int]):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/summary")
-async def get_dashboard_summary(group_id: int = None):
+async def get_dashboard_summary(group_id: int = None, user_id: str = Depends(get_user_id)):
     try:
-        summary = db.get_dashboard_summary(group_id=group_id)
+        summary = db.get_dashboard_summary(group_id=group_id, user_id=user_id)
         return summary
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/performance")
-async def get_dashboard_performance(group_id: int = None):
+async def get_dashboard_performance(group_id: int = None, user_id: str = Depends(get_user_id)):
     try:
-        return db.get_all_funds_performance(group_id=group_id)
+        return db.get_all_funds_performance(group_id=group_id, user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -150,9 +152,9 @@ async def get_mimic_performance(cik: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/groups")
-async def get_groups():
+async def get_groups(user_id: str = Depends(get_user_id)):
     try:
-        return db.get_groups()
+        return db.get_groups(user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -165,9 +167,9 @@ async def reorder_groups(orders: Dict[int, int]):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.post("/dashboard/groups")
-async def create_group(name: str):
+async def create_group(name: str, user_id: str = Depends(get_user_id)):
     try:
-        group_id = db.create_group(name)
+        group_id = db.create_group(name, user_id=user_id)
         return {"status": "success", "group_id": group_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -197,7 +199,7 @@ async def remove_group_member(id: int, cik: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/funds/{cik}/holdings")
-async def get_holdings(cik: str):
+async def get_holdings(cik: str, user_id: str = Depends(get_user_id)):
     holdings = db.get_latest_holdings(cik)
     if not holdings:
         # Check if fund exists
@@ -208,7 +210,7 @@ async def get_holdings(cik: str):
     return holdings
 
 @api.get("/funds/{cik}/history")
-async def get_history(cik: str):
+async def get_history(cik: str, user_id: str = Depends(get_user_id)):
     try:
         history = db.get_historical_holdings(cik)
         return history
@@ -227,7 +229,7 @@ def background_sync_task(cik: str, limit: int = None, force_all: bool = False, b
         db.update_sync_status(cik, "failed", error=str(e))
 
 @api.post("/funds/{cik}/refresh")
-async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False):
+async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int = None, force_all: bool = False, user_id: str = Depends(get_user_id)):
     try:
         # Check if already processing
         status = db.get_sync_status(cik)
@@ -243,7 +245,7 @@ async def refresh_fund(cik: str, background_tasks: BackgroundTasks, limit: int =
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/funds/{cik}/sync-status")
-async def get_sync_status(cik: str):
+async def get_sync_status(cik: str, user_id: str = Depends(get_user_id)):
     """Returns the current background sync status for a fund."""
     status = db.get_sync_status(cik)
     if not status:
@@ -251,7 +253,7 @@ async def get_sync_status(cik: str):
     return status
 
 @api.get("/funds/{cik}/sector-attribution")
-async def get_sector_attribution(cik: str):
+async def get_sector_attribution(cik: str, user_id: str = Depends(get_user_id)):
     """Returns sector-level portfolio weighting and shifts over time."""
     try:
         attribution = db.get_sector_attribution(cik)
@@ -260,7 +262,7 @@ async def get_sector_attribution(cik: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/market/benchmark")
-async def get_market_benchmark(start: str, end: str = None):
+async def get_market_benchmark(start: str, end: str = None, user_id: str = Depends(get_user_id)):
     try:
         data = get_benchmark_data(start, end)
         return data
@@ -268,23 +270,22 @@ async def get_market_benchmark(start: str, end: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.delete("/funds/{cik}")
-async def delete_fund(cik: str):
+async def delete_fund(cik: str, user_id: str = Depends(get_user_id)):
+    """Untracks a fund for the current user."""
     try:
         cik = db.normalize_cik(cik)
-        # Remove from user's tracked funds and groups (canonical data stays)
-        db._execute("DELETE FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, cik))
-        db._execute("DELETE FROM user_fund_group_members WHERE user_id = ? AND cik = ?", (1, cik))
+        db.untrack_fund(user_id=user_id, cik=cik)
         return {"status": "success", "message": f"Fund {cik} untracked."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/fund-info/{cik}")
-def get_fund_info(cik: str):
+def get_fund_info(cik: str, user_id: str = Depends(get_user_id)):
     """Returns basic info for a specific fund, with is_tracked computed per-user."""
     normalized_cik = db.normalize_cik(cik)
     fund = db._execute("SELECT * FROM funds WHERE cik = ?", (normalized_cik,), fetch='one')
     if fund:
-        tracked = db._execute("SELECT 1 FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (1, normalized_cik), fetch='one')
+        tracked = db._execute("SELECT 1 FROM user_tracked_funds WHERE user_id = ? AND cik = ?", (user_id, normalized_cik), fetch='one')
         result = dict(fund)
         result['is_tracked'] = 1 if tracked else 0
         return result
@@ -293,7 +294,7 @@ def get_fund_info(cik: str):
     return {"cik": normalized_cik, "name": f"Fund {normalized_cik}", "is_tracked": 0}
 
 @api.get("/funds/{cik}/filing-range")
-async def get_filing_range(cik: str):
+async def get_filing_range(cik: str, user_id: str = Depends(get_user_id)):
     """Returns the date range and count of filings stored for a fund."""
     try:
         range_info = db.get_filing_range(cik)
@@ -302,7 +303,7 @@ async def get_filing_range(cik: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/prices/{ticker}")
-async def get_ticker_prices(ticker: str, start: str = None):
+async def get_ticker_prices(ticker: str, start: str = None, user_id: str = Depends(get_user_id)):
     """Returns high-resolution historical prices for a ticker."""
     try:
         prices = get_historical_prices(ticker, db, start)
@@ -311,7 +312,7 @@ async def get_ticker_prices(ticker: str, start: str = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/explorer/stocks/favorites")
-async def get_whale_favorites():
+async def get_whale_favorites(user_id: str = Depends(get_user_id)):
     """Returns the most popular stocks across the institutional universe."""
     try:
         return db.get_whale_favorites()
@@ -319,7 +320,7 @@ async def get_whale_favorites():
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.post("/sectors/update")
-async def update_sectors():
+async def update_sectors(user_id: str = Depends(get_user_id)):
     """Backfill sector data for all holdings that are missing sectors."""
     try:
         updated_count = db.backfill_sectors(sector_mapper.get_sector)
@@ -332,7 +333,7 @@ async def update_sectors():
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/sectors/allocation")
-async def get_sector_allocation(group_id: int = None, cik: str = None):
+async def get_sector_allocation(group_id: int = None, cik: str = None, user_id: str = Depends(get_user_id)):
     """Get aggregated sector allocation across all funds (or a group or single fund)."""
     try:
         # If cik is provided, only get sectors for that fund
@@ -356,7 +357,7 @@ async def get_sector_allocation(group_id: int = None, cik: str = None):
             return {"allocation": allocation, "total_value": total_value}
         
         # Otherwise aggregate across all funds (or group)
-        summary = db.get_dashboard_summary(group_id=group_id)
+        summary = db.get_dashboard_summary(group_id=group_id, user_id=user_id)
         
         # Aggregate sector weights from all fund holdings
         sector_totals = {}
@@ -390,7 +391,7 @@ async def get_sector_allocation(group_id: int = None, cik: str = None):
 _sec_company_cache = {"data": None, "timestamp": 0}
 
 @api.get("/search-cik")
-async def search_cik(q: str, limit: int = 20):
+async def search_cik(q: str, limit: int = 20, user_id: str = Depends(get_user_id)):
     """Search for companies/funds by name using SEC EDGAR search API."""
     import httpx
     
@@ -460,10 +461,10 @@ async def get_whale_favorites(limit: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/explorer/stock/{ticker}/holders")
-async def get_stock_holders(ticker: str, group_id: int = None):
+async def get_stock_holders(ticker: str, group_id: int = None, user_id: str = Depends(get_user_id)):
     """Returns a list of funds that hold a specific stock."""
     try:
-        results = db.get_stock_holders(ticker, group_id=group_id)
+        results = db.get_stock_holders(ticker, group_id=group_id, user_id=user_id)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

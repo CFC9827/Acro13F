@@ -3,6 +3,8 @@ import { Search, Filter, Database, TrendingUp, Info, ArrowRight, Check, Plus, Lo
 import { formatCurrency } from './PortfolioChart';
 import { ResponsiveContainer, AreaChart, Area, YAxis } from 'recharts';
 import { InstitutionalHoldersModal } from './InstitutionalHoldersModal';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface InstitutionalExplorerProps {
     onFollow: (cik: string) => void;
@@ -129,6 +131,7 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
     const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
     const [holders, setHolders] = useState<any[]>([]);
     const [loadingHolders, setLoadingHolders] = useState(false);
+    const { session } = useAuth();
 
     const [activeTab, setActiveTab] = useState<'funds' | 'stocks'>('funds');
     const [filters, setFilters] = useState<FilterRow[]>([
@@ -143,9 +146,9 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
     const toggleTrack = async (cik: string, currentStatus: boolean) => {
         setSyncingCik(cik);
         try {
-            const res = await fetch(`/api/funds/${cik}/track?track=${!currentStatus}`, {
+            const res = await fetchWithAuth(`/api/funds/${cik}/track?track=${!currentStatus}`, {
                 method: 'POST'
-            });
+            }, session);
             if (res.ok) {
                 setFundResults(prev => prev.map(f => f.cik === cik ? { ...f, is_tracked: !currentStatus ? 1 : 0 } : f));
                 if (onTrackToggle) {
@@ -197,13 +200,13 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
     const handleFundSearch = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/explorer/search', {
+            const res = await fetchWithAuth('/api/explorer/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     filters: filters.map(({ logic, metric, op, val }) => ({ logic, metric, op, val }))
                 })
-            });
+            }, session);
             const data = await res.json();
             if (Array.isArray(data)) {
                 const enhanced = data.map((f: FundStats) => ({
@@ -226,7 +229,7 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
     const fetchWhaleFavorites = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/explorer/stocks/favorites');
+            const res = await fetchWithAuth('/api/explorer/stocks/favorites', {}, session);
             const data = await res.json();
             if (Array.isArray(data)) {
                 setStockResults(data);
@@ -246,7 +249,7 @@ export function InstitutionalExplorer({ onFollow, onTrackToggle }: Institutional
         setSelectedTicker(ticker);
         setLoadingHolders(true);
         try {
-            const res = await fetch(`/api/explorer/stock/${encodeURIComponent(ticker)}/holders`);
+            const res = await fetchWithAuth(`/api/explorer/stock/${encodeURIComponent(ticker)}/holders`, {}, session);
             const data = await res.json();
             if (Array.isArray(data)) {
                 setHolders(data);

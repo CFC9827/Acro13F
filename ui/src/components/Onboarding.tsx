@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import {
-    PlusCircle,
-    Search,
-    Clock,
-    TrendingUp,
-    ShieldCheck,
-    User,
-    Mail,
-    ExternalLink
+    Rocket,
+    Sparkles,
+    Shield,
+    ChevronRight,
+    CheckCircle2,
+    LayoutGrid,
+    Zap,
+    Settings,
+    ShieldCheck
 } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import './Onboarding.css';
 
 interface OnboardingProps {
@@ -20,6 +23,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [saving, setSaving] = useState(false);
+    const { session } = useAuth();
     const [error, setError] = useState<string | null>(null);
 
     const handleSave = async () => {
@@ -36,11 +40,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             const domain = domains[Math.floor(Math.random() * domains.length)];
             const userAgent = `SEC Data Node ${randomId} - ${dept} (access_${randomId}@${domain})`;
 
-            const response = await fetch('/api/config', {
+            const response = await fetchWithAuth('/api/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sec_user_agent: userAgent })
-            });
+            }, session);
 
             if (!response.ok) {
                 const data = await response.json();

@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
 import { TrendingUp, ArrowUp, ArrowDown, DollarSign, PlusCircle, MinusCircle, LayoutGrid, Briefcase, ChevronRight, Info, PieChart, Activity, AlertCircle } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import { HistoricalHolding } from './PortfolioChart';
 import { createPortal } from 'react-dom';
 import { calculateIRR } from '../utils/performanceUtils';
@@ -41,6 +43,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
     const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
+    const { session } = useAuth();
 
     const handleMouseEnter = (e: React.MouseEvent, title: string, content: React.ReactNode) => {
         setTooltip({
@@ -264,7 +267,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
 
         const fetchSectors = async () => {
             try {
-                const res = await fetch(`/api/sectors/allocation?cik=${cik}`);
+                const res = await fetchWithAuth(`/api/sectors/allocation?cik=${cik}`, {}, session);
                 if (res.ok) {
                     const data = await res.json();
                     setSectorAllocation(data.allocation || []);

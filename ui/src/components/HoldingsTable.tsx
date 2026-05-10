@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, PlusCircle, MinusCircle, PlayCircle, Clock, ExternalLink, Download, List, Users } from 'lucide-react';
+import { Fingerprint, TrendingUp, Info, DollarSign, Target, PieChart, Users, ChevronDown, ChevronUp, MousePointer2, ExternalLink, Activity, Search, LayoutGrid, Clock, Calendar, BarChart3, AlertCircle, FileText, Download, Filter, Map, Briefcase, Zap, Globe, Shield, RefreshCw, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, MinusCircle, PlayCircle } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
     AreaChart,
     Area,
@@ -50,6 +52,7 @@ const StockHistoryChart: React.FC<{
     const [fetchingPrices, setFetchingPrices] = useState(false);
     const [activeActionIndex, setActiveActionIndex] = useState<number | null>(null);
     const [hoveredData, setHoveredData] = useState<any>(null);
+    const { session } = useAuth();
 
     // Container ref for measuring width
     const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -86,17 +89,22 @@ const StockHistoryChart: React.FC<{
                 startStr = earliestDate.toISOString().split('T')[0];
             }
 
-            fetch(`/api/prices/${ticker}${startStr ? `?start=${startStr}` : ''}`)
-                .then(res => res.json())
-                .then(data => {
+            const fetchData = async () => {
+                try {
+                    const res = await fetchWithAuth(`/api/prices/${ticker}${startStr ? `?start=${startStr}` : ''}`, {}, session);
+                    const data = await res.json();
                     if (Array.isArray(data)) {
                         setPriceHistory(data);
                     }
-                })
-                .catch(err => console.error("Failed to fetch price history", err))
-                .finally(() => setFetchingPrices(false));
+                } catch (err) {
+                    console.error("Failed to fetch price history", err);
+                } finally {
+                    setFetchingPrices(false);
+                }
+            };
+            fetchData();
         }
-    }, [ticker, history.length]); // Re-fetch if ticker or history length changes (might have new older quarters)
+    }, [ticker, history.length, session]); // Re-fetch if ticker or history length changes (might have new older quarters)
 
     const chartData = useMemo(() => {
         const sortedHistory = [...history]
@@ -321,7 +329,7 @@ const StockHistoryChart: React.FC<{
     const [customStartQuarter, setCustomStartQuarter] = useState<string>('');
     const [customEndQuarter, setCustomEndQuarter] = useState<string>('');
     const [showStartDropdown, setShowStartDropdown] = useState(false);
-    const [showEndDropdown, setShowEndDropdown] = useState(false);
+    const [showPriceChart, setShowPriceChart] = useState(false);
 
     // Initialize custom quarters when available
     useEffect(() => {
@@ -1208,7 +1216,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ history, fundName 
     const fetchHolders = async (ticker: string) => {
         setLoadingHolders(true);
         try {
-            const res = await fetch(`/api/explorer/stock/${ticker}/holders`);
+            const res = await fetchWithAuth(`/api/explorer/stock/${ticker}/holders`, {}, session);
             const data = await res.json();
             setHolders(data);
         } catch (err) {

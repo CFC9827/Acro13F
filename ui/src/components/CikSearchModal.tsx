@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, X, Building2, Hash, Check, PlusCircle, Trash2, ExternalLink } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 import './CikSearchModal.css';
 
 interface SearchResult {
@@ -19,6 +21,7 @@ export function CikSearchModal({ isOpen, onClose, onSelectCik, onSelectCiks }: C
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const { session } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const [selectedFunds, setSelectedFunds] = useState<SearchResult[]>([]);
 
@@ -49,7 +52,7 @@ export function CikSearchModal({ isOpen, onClose, onSelectCik, onSelectCiks }: C
             setLoading(true);
             setError(null);
             try {
-                const res = await fetch(`/api/search-cik?q=${encodeURIComponent(query)}&limit=20`);
+                const res = await fetchWithAuth(`/api/search-cik?q=${encodeURIComponent(query)}&limit=20`, {}, session);
                 if (!res.ok) throw new Error('Search failed');
                 const data = await res.json();
                 setResults(data);

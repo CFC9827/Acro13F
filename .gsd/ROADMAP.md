@@ -43,12 +43,13 @@
 - [x] Legacy fund_groups data migrated to user_fund_groups
 
 ### Phase 3: Build The Canonical Fund Universe
-**Status**: 🟡 Next Up
+**Status**: ✅ Complete (Infrastructure), 🟡 Deferred (Bulk Data)
 **Deliverables**:
-- [ ] Build background ingestion worker (`worker.py`) for SEC data independent of users
-- [ ] Implement proactive daily price sync for all tickers in the database
-- [ ] Automate `fund_quarterly_stats` pre-computation pipeline
-- [ ] Add `fund_ingestion_status` tracking and logging system
+- [x] Build background ingestion worker (`worker.py`) for SEC data independent of users
+- [x] Implement proactive daily price sync for all tickers in the database
+- [x] Automate `fund_quarterly_stats` pre-computation pipeline
+- [x] Add `fund_ingestion_status` tracking and logging system
+- [ ] **Deferred**: Run `BulkIngestor` for entire SEC universe (awaiting Phase 4 stability)
 
 ### Phase 4: Change Tracking Semantics
 **Status**: ⬜ Not Started
@@ -58,10 +59,10 @@
 - [ ] Untracking removes user references without deleting canonical data
 
 ### Phase 5: Make Global Overview User-Scoped
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 **Deliverables**:
-- [ ] Update dashboard endpoints to require auth and scope by `user_id`
-- [ ] Dashboard defaults to current user's tracked funds
+- [x] Update dashboard endpoints to require auth and scope by `user_id`
+- [x] Dashboard defaults to current user's tracked funds
 
 ### Phase 6: Update Sidebar And Folder Logic
 **Status**: ⬜ Not Started
@@ -77,11 +78,11 @@
 - [ ] Search modal changes to "Request fund" if missing
 
 ### Phase 8: Add Authentication And Accounts
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete (Supabase Auth)
 **Deliverables**:
-- [ ] Add backend auth (JWT/Session) and provider (Clerk, Supabase Auth, etc.)
-- [ ] User sign up, sign in, sign out
-- [ ] Protected API routes
+- [x] Add backend auth (JWT/Session) and provider (Supabase Auth)
+- [x] User sign up, sign in, sign out
+- [x] Protected API routes (fetchWithAuth integration)
 
 ### Phase 9: Cloud Deployment Architecture
 **Status**: ⬜ Not Started

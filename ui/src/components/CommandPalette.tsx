@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, List, TrendingUp, Info, LayoutGrid, X, Command } from 'lucide-react';
+import { Search, List, TrendingUp, Info, LayoutGrid, X, Command, Briefcase } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface CommandPaletteProps {
     isOpen: boolean;
@@ -18,6 +20,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     const [loading, setLoading] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { session } = useAuth();
 
     useEffect(() => {
         if (isOpen) {
@@ -37,7 +40,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
         const delayDebounce = setTimeout(async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const res = await fetchWithAuth(`/api/search?q=${encodeURIComponent(query)}`, {}, session);
                 if (res.ok) {
                     const data = await res.json();
                     setResults(data);
@@ -214,10 +217,3 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     );
 };
 
-// Simple briefcase icon fallback since lucide-react might not have all icons imported
-const Briefcase = ({ size }: { size: number }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-    </svg>
-);

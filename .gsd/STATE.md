@@ -2,11 +2,13 @@
 
 > Last updated: 2026-05-10 09:38
 
-## Current Phase: Phase 3: Build The Canonical Fund Universe
+## Current Phase: Phase 6: Update Sidebar And Folder Logic
+**Status**: 🟢 In Progress
 
-**Milestone:** v4.0 — Cloud Multi-User Platform
-**Phase:** Background Ingestion & Pre-computation
-**Status**: 🟡 Next Up
+### Project Health
+- **Database**: Supabase (Production) - ✅ Stable (2.8M prices, 123K holdings)
+- **Background Engine**: `worker.py` - ✅ Ready (Infrastructure for entire universe is built)
+- **Data Universe**: Curated "Whale" list (~34 funds) - 🟡 Bulk Ingestion Deferred
 
 ## Completed This Session
 
@@ -23,6 +25,13 @@
 - Performance indexes added for user-scoped queries
 - Legacy `fund_groups` data migrated to `user_fund_groups` (3 groups, 21 members)
 - Full smoke test passed: get_funds, get_groups, fund_info, dashboard_summary all working
+
+### Phase 5 & 8: Authentication & UI Stabilization ✅
+- Implemented `fetchWithAuth` shared utility for Supabase token injection
+- Secured all 15+ UI components (Dashboard, Explorer, Search, etc.) with Bearer tokens
+- Resolved "Blank Screen" crash by adding defensive array guards to all `.map()` calls
+- Fixed application boot sequence: `authLoading` -> `SplashScreen` -> `Login` or `Dashboard`
+- Standardized error boundaries to prevent malformed API responses from breaking the UI
 
 ## Next Steps
 

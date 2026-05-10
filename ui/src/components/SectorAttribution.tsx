@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { PieChart, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
+import { fetchWithAuth } from '../utils/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SectorAttributionProps {
     cik: string;
@@ -22,13 +24,14 @@ interface PeriodData {
 export const SectorAttribution: React.FC<SectorAttributionProps> = ({ cik }) => {
     const [data, setData] = useState<PeriodData[]>([]);
     const [loading, setLoading] = useState(true);
+    const { session } = useAuth();
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/funds/${cik}/sector-attribution`);
+                const res = await fetchWithAuth(`/api/funds/${cik}/sector-attribution`, {}, session);
                 if (!res.ok) throw new Error("Failed to fetch sector attribution");
                 const result = await res.json();
                 setData(result);

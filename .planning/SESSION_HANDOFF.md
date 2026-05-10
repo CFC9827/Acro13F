@@ -17,9 +17,9 @@ We completely refactored the Abrams13F project to utilize a cloud-first, multi-t
 - Created a background streaming script (`scratch/migrate_neon_to_supabase.py`) to safely transfer all data from the previous database into Supabase.
 
 ## 📌 Next Steps
-Once the migration script finishes loading all historical price and holding data into Supabase, Phase 2 is complete. 
-
-The immediate next goal is **Phase 3**: Building a background ingestion pipeline to pull SEC data dynamically, completely independent of the user's frontend interactions.
+- **Phase 3 Infrastructure**: `worker.py` is ready for automated syncs.
+- **Decision**: Deferred the "Entire Universe" bulk ingestion to avoid database bloat until Phase 4 (Tracking Logic) is verified.
+- **Current Action**: Start **Phase 4: Change Tracking Semantics** to update the tracking API to use the `user_tracked_funds` table.
 
 ## 🔑 Key Files
 - `backend/services/database.py` — Now utilizes PostgreSQL `ThreadedConnectionPool`.

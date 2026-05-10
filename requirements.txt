@@ -10,3 +10,5 @@ psycopg2-binary
 httpx
 alembic
 sqlalchemy
+python-jose[cryptography]
+supabase
