@@ -2,7 +2,7 @@
 
 > Last updated: 2026-05-11 00:10
 
-## Current Phase: Phase 9: Cloud Deployment Architecture
+## Current Phase: Phase 10: Migration Path
 **Status**: ⬜ Not Started
 
 ### Project Health
@@ -24,6 +24,12 @@
 - Updated empty states in FundSummary and PortfolioChart components
 - Purged dead sync code and handlers (handleRefresh, handleGlobalRefresh, etc.)
 - Verified UI consistency with background-sync-only architecture
+
+### Phase 9: Cloud Deployment Architecture ✅
+- Hardened backend CORS and configuration for production
+- Containerized application with Docker (API and Worker)
+- Prepared frontend for production API URLs via environment variables
+- Created comprehensive DEPLOY.md guide
 
 ## Next Steps
 

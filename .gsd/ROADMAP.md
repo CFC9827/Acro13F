@@ -87,13 +87,12 @@
 - [x] User sign up, sign in, sign out
 - [x] Protected API routes (fetchWithAuth integration)
 
-### Phase 9: Cloud Deployment Architecture
-**Status**: ⬜ Not Started
-**Deliverables**:
-- [ ] Deploy frontend (Vercel/Netlify/etc.)
-- [ ] Deploy backend API (Render/Railway/etc.)
-- [ ] Deploy Postgres
-- [ ] Deploy SEC ingestion background worker
+### ✅ Phase 9: Cloud Deployment Architecture
+- [x] Deploy frontend (Vercel/Netlify/etc.) -> Configured and ready
+- [x] Deploy backend API (Render/Railway/etc.) -> Configured and ready
+- [x] Deploy Postgres -> Supabase connected
+- [x] Deploy SEC ingestion background worker -> Dockerized and ready
+- [x] Create `DEPLOY.md` guide and `Dockerfile`
 
 ### Phase 10: Migration Path
 **Status**: ⬜ Not Started
