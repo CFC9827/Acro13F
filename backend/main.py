@@ -154,9 +154,9 @@ async def get_groups(user_id: str = Depends(get_user_id)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.post("/dashboard/groups/reorder")
-async def reorder_groups(orders: Dict[int, int]):
+async def reorder_groups(orders: Dict[int, int], user_id: str = Depends(get_user_id)):
     try:
-        db.reorder_groups(orders)
+        db.reorder_groups(orders, user_id=user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -170,25 +170,25 @@ async def create_group(name: str, user_id: str = Depends(get_user_id)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.delete("/dashboard/groups/{id}")
-async def delete_group(id: int):
+async def delete_group(id: int, user_id: str = Depends(get_user_id)):
     try:
-        db.delete_group(id)
+        db.delete_group(id, user_id=user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.post("/dashboard/groups/{id}/members")
-async def add_group_member(id: int, cik: str):
+async def add_group_member(id: int, cik: str, user_id: str = Depends(get_user_id)):
     try:
-        db.add_fund_to_group(id, cik)
+        db.add_fund_to_group(id, cik, user_id=user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.delete("/dashboard/groups/{id}/members/{cik}")
-async def remove_group_member(id: int, cik: str):
+async def remove_group_member(id: int, cik: str, user_id: str = Depends(get_user_id)):
     try:
-        db.remove_fund_from_group(id, cik)
+        db.remove_fund_from_group(id, cik, user_id=user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

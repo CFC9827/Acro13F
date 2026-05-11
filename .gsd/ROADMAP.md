@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: Phase 3: Build The Canonical Fund Universe
+> **Current Phase**: Phase 9: Cloud Deployment Architecture
 > **Milestone**: v4.0 — Cloud Multi-User Platform
 
 ## v2.0 — Production Ready (CLOSED)
@@ -65,17 +65,20 @@
 - [x] Dashboard defaults to current user's tracked funds
 
 ### Phase 6: Update Sidebar And Folder Logic
-**Status**: 🟢 In Progress
+**Status**: ✅ Complete
 **Deliverables**:
-- [ ] Sidebar and Folders load from user-specific endpoints
-- [ ] Folder membership implies/requires fund tracking
+- [x] Sidebar and Folders load from user-specific endpoints
+- [x] Folder membership implies/requires fund tracking
+- [x] Drag-and-drop support for folder organization
 
-### Phase 7: Update The UI Behavior
-**Status**: ⬜ Not Started
-**Deliverables**:
-- [x] Discovery Explorer tracking states updated correctly
-- [ ] Hover states ("Remove") and immediate UI un-tracking
-- [ ] Search modal changes to "Request fund" if missing
+### ✅ Phase 7: UI Consolidation & Multi-Tenant Refactor
+- [x] Refactor `App.tsx` to use `navigate` for all view state management.
+- [x] Purge legacy `handleRefresh`, `handleGlobalRefresh`, and `pollSyncStatus`.
+- [x] Remove manual "Add Fund" and "Refresh" buttons to enforce background-sync-only model.
+- [x] Decouple frontend from SEC-triggering logic; frontend is now a pure view layer.
+- [x] Stabilize dashboard and explorer for cloud-ready deployment.
+- [x] Ensure `toggleTrack` manages fund list state via background sync.
+- [x] Pass production build (`npm run build`) with zero syntax errors.
 
 ### Phase 8: Add Authentication And Accounts
 **Status**: ✅ Complete (Supabase Auth)

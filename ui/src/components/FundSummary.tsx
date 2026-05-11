@@ -301,7 +301,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 <div style={{ fontSize: '18px', fontWeight: 600, color: '#94a3b8' }}>No historical data found for {fundName}</div>
                 <div style={{ fontSize: '14px', color: '#64748b', maxWidth: '400px', lineHeight: 1.5 }}>
                     We couldn't find any processed 13F filings for this CIK.
-                    Try clicking "Refresh Data" or "Fetch Older Filings" to pull history from the SEC.
+                    New funds are automatically queued for background processing. Please check back shortly.
                 </div>
             </div>
         );

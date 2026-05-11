@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command, Check, Plus, Loader2, Download } from 'lucide-react'
+import { Layout, LayoutGrid, TrendingUp, Search, RefreshCw, ChevronRight, ChevronLeft, Trash2, AlertCircle, BarChart3, PieChart, Activity, Info, ChevronDown, PanelLeftClose, PanelLeft, List, Database, PlusCircle, ExternalLink, Command, Check, Plus } from 'lucide-react'
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine, Legend } from 'recharts'
 import { PortfolioChart, formatCurrency } from './components/PortfolioChart'
 import { PerformanceChart } from './components/PerformanceChart'
@@ -12,7 +12,6 @@ import { CommandPalette } from './components/CommandPalette'
 import { AboutPage } from './components/AboutPage'
 import { InstitutionalExplorer } from './components/InstitutionalExplorer'
 import { SplashScreen } from './components/SplashScreen'
-import { CikSearchModal } from './components/CikSearchModal'
 import { ActivityView } from './components/ActivityView'
 import { Onboarding } from './components/Onboarding'
 import { calculateIRR } from './utils/performanceUtils'
@@ -152,8 +151,6 @@ function App() {
     };
     const [history, setHistory] = useState<HistoricalHolding[]>([])
     const [loading, setLoading] = useState(false)
-    const [loadingMessage, setLoadingMessage] = useState("")
-    const [refreshCik, setRefreshCik] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null)
     const [activeFundName, setActiveFundName] = useState<string | null>(null)
@@ -194,10 +191,7 @@ function App() {
     const [filingRange, setFilingRange] = useState<{ earliest: string | null, latest: string | null, total: number } | null>(null)
     const [legacyInfo, setLegacyInfo] = useState<{ count: number, start: string, end: string } | null>(null)
     const [showLegacyTooltip, setShowLegacyTooltip] = useState(false)
-    const [loadingMore, setLoadingMore] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-    const [showCikSearch, setShowCikSearch] = useState(false)
-    const [isAddingFund, setIsAddingFund] = useState(false)
     const [draggedFundCik, setDraggedFundCik] = useState<string | null>(null)
     const [showOnboarding, setShowOnboarding] = useState(false)
     const [isConfigured, setIsConfigured] = useState(true) // Default to true until checked
@@ -331,315 +325,9 @@ function App() {
         }
     }, [selectedCik, user]);
 
-    const loadMoreHistory = async () => {
-        if (!selectedCik || !filingRange) return
-        setLoadingMore(true)
-        try {
-            // Request 20 more than we currently have
-            const nextLimit = (filingRange.total || 0) + 20
-            const res = await fetchWithAuth(`/api/funds/${selectedCik}/refresh?limit=${nextLimit}`, { method: 'POST' }, session)
-            if (res.ok) {
-                const result = await res.json()
-                const addedCount = result.newly_added?.length || 0
-                if (addedCount > 0 || (result.skipped_legacy || 0) > 0) {
-                    // Reload data
-                    const [histRes, rangeRes] = await Promise.all([
-                        fetchWithAuth(`/api/funds/${selectedCik}/history`, {}, session).then(r => r.json()),
-                        fetchWithAuth(`/api/funds/${selectedCik}/filing-range`, {}, session).then(r => r.json())
-                    ])
-                    setHistory(histRes)
-                    setFilingRange(rangeRes)
-
-                    const skippedLegacy = result.skipped_legacy || 0;
-                    let msg = "";
-
-                    if (addedCount > 0) {
-                        msg = `Loaded ${addedCount} additional quarters of history.`;
-                        if (skippedLegacy > 0) {
-                            const start = result.skipped_legacy_start ? formatQ(result.skipped_legacy_start) : '';
-                            const end = result.skipped_legacy_end ? formatQ(result.skipped_legacy_end) : '';
-                            msg += ` (${skippedLegacy} more from ${start} - ${end} were legacy and skipped)`;
-                            setLegacyInfo({ count: skippedLegacy, start, end });
-                        }
-                        setNotification({ message: msg, type: 'success' });
-                    } else if (skippedLegacy > 0) {
-                        const start = result.skipped_legacy_start ? formatQ(result.skipped_legacy_start) : '';
-                        const end = result.skipped_legacy_end ? formatQ(result.skipped_legacy_end) : '';
-                        msg = `Found ${skippedLegacy} older filings (${start} - ${end}), but they were skipped due to legacy format.`;
-                        setLegacyInfo({ count: skippedLegacy, start, end });
-                        setNotification({ message: msg, type: 'info' });
-                    }
-                } else {
-                    setNotification({ message: 'No additional history available on SEC.', type: 'info' })
-                }
-            }
-        } catch (err) {
-            console.error('Failed to load more history', err)
-        } finally {
-            setLoadingMore(false)
-        }
-    }
-
-    const pollSyncStatus = async (cik: string): Promise<any> => {
-        return new Promise((resolve, reject) => {
-            const interval = setInterval(async () => {
-                try {
-                    const res = await fetchWithAuth(`/api/funds/${cik}/sync-status`, {}, session)
-                    if (res.ok) {
-                        const status = await res.json()
-                        if (status.status === 'completed') {
-                            clearInterval(interval)
-                            resolve(status)
-                        } else if (status.status === 'failed') {
-                            clearInterval(interval)
-                            reject(new Error(status.error_message || "Sync failed"))
-                        } else if (status.status === 'processing') {
-                            setLoadingMessage("SEC Data found. Parsing filings and mapping tickers...")
-                        }
-                    }
-                } catch (err) {
-                    clearInterval(interval)
-                    reject(err)
-                }
-            }, 2000)
-        })
-    }
-
-    const handleRefresh = async (cikToAdd?: string) => {
-        const cik = cikToAdd || refreshCik;
-        if (!cik) return
-        setLoading(true)
-        setIsAddingFund(true)
-        setLoadingMessage("Initializing background sync with SEC EDGAR...")
-        setError(null)
-        setNotification(null)
-        try {
-            const res = await fetchWithAuth(`/api/funds/${cik}/refresh`, { method: 'POST' }, session)
-            if (res.ok) {
-                const initResult = await res.json()
-                
-                // If it was already completed or just started, we poll for the final result
-                setLoadingMessage("Waiting for SEC response...")
-                const result = await pollSyncStatus(cik)
-                
-                const addedCount = result.newly_added_count || 0
-                setRefreshCik('')
-                await fetchFunds()
-                
-                // After sync, we need to refresh the UI data if this was the selected fund
-                if (selectedCik === cik) {
-                    await handleCurrentRefresh(true) // skip the initial post
-                }
-
-                setNotification({
-                    message: `Successfully synced fund. ${addedCount} filings processed.`,
-                    type: 'success'
-                })
-                
-                if (cikToAdd) navigate('summary', cik)
-            } else {
-                const errData = await res.json()
-                setError(errData.detail || "Failed to start sync")
-            }
-        } catch (err: any) {
-            setError(err.message || "Network error adding fund")
-        } finally {
-            setLoading(false)
-            setLoadingMessage("")
-            setIsAddingFund(false)
-        }
-    }
-
-    const handleCurrentRefresh = async (skipPost = false) => {
-        if (!selectedCik) return
-        setLoading(true)
-        setLoadingMessage("Checking for new filings and updates...")
-        setError(null)
-        setNotification(null)
-        try {
-            if (!skipPost) {
-                const res = await fetchWithAuth(`/api/funds/${selectedCik}/refresh`, { method: 'POST' }, session)
-                if (res.ok) {
-                    setLoadingMessage("Syncing in progress...")
-                    await pollSyncStatus(selectedCik)
-                } else {
-                    const errData = await res.json()
-                    setError(errData.detail || "Failed to refresh fund")
-                    setLoading(false)
-                    return
-                }
-            }
-
-            // After sync (either skipped or completed), fetch fresh data
-            const p1 = fetchWithAuth(`/api/funds/${selectedCik}/holdings`, {}, session)
-                .then(res => res.json())
-                .then(data => setHoldings(data))
- 
-            const p2 = fetchWithAuth(`/api/funds/${selectedCik}/history`, {}, session)
-                .then(res => res.json())
-                .then(data => setHistory(data))
- 
-            const p3 = fetchWithAuth(`/api/funds/${selectedCik}/filing-range`, {}, session)
-                .then(res => res.json())
-                .then(data => setFilingRange(data))
-
-            await Promise.all([p1, p2, p3])
-
-            if (!skipPost) {
-                setNotification({
-                    message: "Sync complete! Data updated.",
-                    type: 'success'
-                })
-            }
-        } catch (err: any) {
-            setError(err.message || "Network error refreshing fund")
-        } finally {
-            setLoading(false)
-            setLoadingMessage("")
-        }
-    }
-
-    const handleDelete = async (e: React.MouseEvent, cik: string) => {
+    const handleDeleteFromList = async (e: React.MouseEvent, cik: string) => {
         e.stopPropagation()
-        if (!window.confirm("Are you sure you want to delete this fund?")) return
- 
-        setLoading(true)
-        try {
-            const res = await fetchWithAuth(`/api/funds/${cik}`, { method: 'DELETE' }, session)
-            if (res.ok) {
-                if (selectedCik === cik) {
-                    navigate('dashboard', null)
-                    setHoldings([])
-                    setHistory([])
-                }
-                await fetchFunds()
-            } else {
-                setError("Failed to delete fund")
-            }
-        } catch (err) {
-            setError("Network error deleting fund")
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const handleGlobalRefresh = async () => {
-        if (loading) return
-        setLoading(true)
-        setLoadingMessage("Refreshing all funds...")
-        setError(null)
-        setNotification(null)
-
-        let updatedCount = 0
-        let totalProcessed = 0
-
-        try {
-            for (const fund of funds) {
-                setLoadingMessage(`Refreshing ${fund.name} (${totalProcessed + 1}/${funds.length})...`)
-                const res = await fetchWithAuth(`/api/funds/${fund.cik}/refresh`, { method: 'POST' }, session)
-                if (res.ok) {
-                    await pollSyncStatus(fund.cik)
-                    updatedCount++
-                }
-                totalProcessed++
-            }
-
-            // Reload the currently selected fund's data if it exists
-            if (selectedCik) {
-                await handleCurrentRefresh(true)
-            }
-
-            setNotification({
-                message: `Refresh complete. Scanned ${totalProcessed} funds.`,
-                type: 'success'
-            })
-
-        } catch (err) {
-            setError("Error during global refresh")
-        } finally {
-            setLoading(false)
-            setLoadingMessage("")
-        }
-    }
-
-    const handleBatchAddFunds = async (ciks: string[]) => {
-        if (!ciks || ciks.length === 0) return;
-        setLoading(true);
-        setIsAddingFund(true);
-        setError(null);
-        setNotification(null);
-
-        let addedCount = 0;
-        let skippedLegacyCount = 0;
-        let totalNewFilings = 0;
-        let errors: string[] = [];
-        const newFundsList: Fund[] = [];
-
-        try {
-            for (let i = 0; i < ciks.length; i++) {
-                const cik = ciks[i];
-                setLoadingMessage(`Adding fund ${i + 1} of ${ciks.length} (CIK: ${cik})...`);
- 
-                try {
-                    const res = await fetchWithAuth(`/api/funds/${cik}/refresh`, { method: 'POST' }, session);
-                    if (res.ok) {
-                        const result = await res.json();
-                        addedCount++;
-                        totalNewFilings += (result.newly_added?.length || 0);
-                        skippedLegacyCount += (result.skipped_legacy || 0);
-                        if (result.cik && result.fund_name) {
-                            newFundsList.push({ cik: result.cik, name: result.fund_name });
-                        }
-                    } else {
-                        const err = await res.json();
-                        errors.push(`Failed to add ${cik}: ${err.detail || 'Unknown error'}`);
-                    }
-                } catch (e) {
-                    errors.push(`Network error for CIK ${cik}`);
-                }
-            }
-
-            // Optimistically update funds state immediately
-            if (newFundsList.length > 0) {
-                setFunds(prev => {
-                    const existingCiks = new Set(prev.map(f => f.cik));
-                    const uniqueNewFunds = newFundsList.filter(f => !existingCiks.has(f.cik));
-                    return [...prev, ...uniqueNewFunds];
-                });
-            }
-
-            await fetchFunds();
-            if (addedCount > 0) {
-                // Force refresh dashboard data to show new tiles
-                await fetchDashboardSummary();
-            }
-
-            if (addedCount > 0 && ciks.length === 1) {
-                navigate('summary', ciks[0]);
-            } else if (addedCount > 0) {
-                navigate('dashboard', null);
-            }
-
-            let msg = `Batch complete: Added ${addedCount} of ${ciks.length} funds.`;
-            if (totalNewFilings > 0) msg += ` Processed ${totalNewFilings} filings.`;
-            if (skippedLegacyCount > 0) msg += ` Skipped ${skippedLegacyCount} legacy filings.`;
-            if (errors.length > 0) {
-                msg += ` Errors: ${errors.length} failed.`;
-                console.error("Batch add errors:", errors);
-            }
-
-            setNotification({
-                message: msg,
-                type: addedCount > 0 ? 'success' : 'info'
-            });
-
-        } catch (err) {
-            setError("Critical error during batch process");
-        } finally {
-            setLoading(false);
-            setLoadingMessage("");
-            setIsAddingFund(false);
-        }
+        await toggleTrack(cik, true);
     }
 
     // Fund drag-and-drop handlers
@@ -760,27 +448,6 @@ function App() {
                             }}>CTRL K</span>
                         </button>
                         <button
-                            onClick={handleGlobalRefresh}
-                            disabled={loading}
-                            className="refresh-all-btn"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 16px',
-                                background: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: loading ? 'not-allowed' : 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 500
-                            }}
-                        >
-                            <RefreshCw className={loading ? 'spin' : ''} size={16} />
-                            {loading ? 'Refreshing All...' : 'Refresh All Funds'}
-                        </button>
-                        <button
                             onClick={() => navigate('about', null)}
                             className={`tab ${view === 'about' ? 'active' : ''}`}
                             style={{
@@ -797,47 +464,9 @@ function App() {
                                 fontWeight: 500,
                                 transition: 'all 0.2s'
                             }}
-                            onMouseOver={(e) => {
-                                if (view !== 'about') {
-                                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)';
-                                    e.currentTarget.style.color = '#60a5fa';
-                                    e.currentTarget.style.borderColor = '#3b82f6';
-                                }
-                            }}
-                            onMouseOut={(e) => {
-                                if (view !== 'about') {
-                                    e.currentTarget.style.background = 'transparent';
-                                    e.currentTarget.style.color = '#94a3b8';
-                                    e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.2)';
-                                }
-                            }}
                         >
                             <Info size={16} />
                             About
-                        </button>
-                        <button
-                            onClick={() => setShowCikSearch(true)}
-                            className="add-fund-btn"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                padding: '8px 16px',
-                                background: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                transition: 'all 0.2s',
-                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                            }}
-                            onMouseOver={(e) => (e.currentTarget.style.background = '#2563eb')}
-                            onMouseOut={(e) => (e.currentTarget.style.background = '#3b82f6')}
-                        >
-                            <PlusCircle size={16} />
-                            Add Fund
                         </button>
                         
                         <button
@@ -893,30 +522,14 @@ function App() {
                             >
                                 {sidebarCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
                             </button>
-                            {!sidebarCollapsed && (
-                                <button
-                                    className="dashboard-nav-btn add-fund-sidebar"
-                                    onClick={() => setShowCikSearch(true)}
-                                >
-                                    <PlusCircle size={18} />
-                                    Add New Fund
-                                </button>
-                            )}
                         </div>
                         <div className="divider"></div>
                         <div className="sidebar-content">
 
                             <div className="section-title">
                                 {!sidebarCollapsed && <span>TRACKED FUNDS</span>}
-                                {!sidebarCollapsed && (
-                                    <button
-                                        className="refresh-all-small"
-                                        onClick={handleGlobalRefresh}
-                                        title="Refresh all funds"
-                                        disabled={loading}
-                                    >
-                                        <RefreshCw className={loading ? 'spin' : ''} size={12} />
-                                    </button>
+                                 {!sidebarCollapsed && (
+                                    <div style={{ flex: 1 }}></div>
                                 )}
                             </div>
                             {!sidebarCollapsed && (
@@ -937,10 +550,10 @@ function App() {
                                                 <span className="fund-cik">{f.cik}</span>
                                             </div>
                                             <div className="fund-actions">
-                                                <Trash2
+                                                 <Trash2
                                                     size={16}
                                                     className="delete-btn"
-                                                    onClick={(e) => handleDelete(e, f.cik)}
+                                                    onClick={(e) => handleDeleteFromList(e, f.cik)}
                                                 />
                                                 <ChevronRight size={14} className="chevron" />
                                             </div>
@@ -950,16 +563,6 @@ function App() {
                             )}
                         </div>
                     </aside>
-
-                    <CikSearchModal
-                        isOpen={showCikSearch}
-                        onClose={() => setShowCikSearch(false)}
-                        onSelectCik={(cik) => {
-                            setRefreshCik(cik);
-                            handleRefresh(cik);
-                        }}
-                        onSelectCiks={(ciks) => handleBatchAddFunds(ciks)}
-                    />
 
                     <section className="content">
                         {error && (
@@ -976,63 +579,7 @@ function App() {
                             </div>
                         )}
 
-                        {loading && loadingMessage && (
-                            <div className="loading-banner" style={{
-                                background: 'rgba(16, 185, 129, 0.1)',
-                                border: '1px solid #10b981',
-                                color: '#10b981',
-                                padding: '12px 16px',
-                                borderRadius: '8px',
-                                marginBottom: '20px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                animation: 'fadeIn 0.3s ease-in-out'
-                            }}>
-                                <RefreshCw className="spin" size={18} />
-                                <span style={{ fontWeight: 500 }}>{loadingMessage}</span>
-                            </div>
-                        )}
-
-                        {isAddingFund ? (
-                            <div className="adding-fund-screen" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flex: 1,
-                                minHeight: '100%',
-                                gap: '24px',
-                                color: 'var(--text-muted)'
-                            }}>
-                                <div style={{
-                                    width: '80px',
-                                    height: '80px',
-                                    borderRadius: '50%',
-                                    background: 'rgba(56, 189, 248, 0.1)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <RefreshCw className="spin" size={36} style={{ color: '#38bdf8' }} />
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                    <h2 style={{
-                                        color: 'var(--text-main)',
-                                        marginBottom: '8px',
-                                        fontSize: '1.5rem'
-                                    }}>
-                                        Adding New Fund
-                                    </h2>
-                                    <p style={{
-                                        fontSize: '0.95rem',
-                                        maxWidth: '400px'
-                                    }}>
-                                        {loadingMessage || 'Fetching data from SEC EDGAR...'}
-                                    </p>
-                                </div>
-                            </div>
-                        ) : view === 'dashboard' ? (
+                        {view === 'dashboard' ? (
                             <GlobalDashboard
                                 summary={dashboardSummary || { fund_highlights: [], big_movers: [], portfolio_shifts: [], consensus_stocks: [], kpis: { fund_count: 0, total_aum: 0, prior_aum: 0 } }}
                                 onSelectFund={(cik) => {
@@ -1070,15 +617,6 @@ function App() {
                                         )}
                                     </div>
                                     <div className="view-tabs">
-                                        <button
-                                            className="tab refresh-btn-context"
-                                            onClick={handleCurrentRefresh}
-                                            disabled={loading}
-                                        >
-                                            <RefreshCw className={loading ? 'spin' : ''} size={14} />
-                                            {loading ? 'Refreshing...' : 'Refresh Data'}
-                                        </button>
-                                        <div className="tab-divider"></div>
                                         <button
                                             className={`tab track-btn-context ${isCurrentFundTracked ? 'active-tracked' : ''}`}
                                             onClick={() => selectedCik && toggleTrack(selectedCik, isCurrentFundTracked)}
@@ -1202,43 +740,6 @@ function App() {
                                             )}
                                         </div>
 
-                                        <button
-                                            onClick={loadMoreHistory}
-                                            disabled={loadingMore}
-                                            style={{
-                                                fontSize: '12px',
-                                                padding: '8px 16px',
-                                                borderRadius: '6px',
-                                                border: 'none',
-                                                backgroundColor: '#38bdf8', // Solid Electric blue
-                                                color: '#0f172a', // Dark bg color for contrast
-                                                fontWeight: '600',
-                                                cursor: loadingMore ? 'not-allowed' : 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                transition: 'all 0.2s',
-                                                minHeight: '32px',
-                                                lineHeight: '1',
-                                                marginLeft: '4px'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!loadingMore) {
-                                                    e.currentTarget.style.backgroundColor = '#0ea5e9'; // Darker blue hover (Sky 500)
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (!loadingMore) {
-                                                    e.currentTarget.style.backgroundColor = '#38bdf8';
-                                                }
-                                            }}
-                                        >
-                                            {loadingMore ? (
-                                                <><RefreshCw size={12} className="spin" /> Scanning...</>
-                                            ) : (
-                                                <>Fetch Older Filings</>
-                                            )}
-                                        </button>
 
                                         {(view === 'performance' || view === 'mimic') && (
                                             <div style={{ marginLeft: 'auto' }}>
@@ -1300,7 +801,7 @@ function App() {
                                 {loading ? (
                                     <div className="loading-state">
                                         <RefreshCw className="spin" style={{ marginBottom: 16 }} />
-                                        <div>{loadingMessage || "Loading data..."}</div>
+                                <div>Loading data...</div>
                                     </div>
                                 ) : view === 'chart' ? (
                                     <PortfolioChart

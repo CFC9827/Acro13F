@@ -968,23 +968,28 @@ class DatabaseManager:
             conn.executemany(query, params_list)
             conn.commit()
 
-    def delete_group(self, group_id: int):
-        self._execute("DELETE FROM user_fund_groups WHERE id = ?", (group_id,))
+    def delete_group(self, group_id: int, user_id: str):
+        self._execute("DELETE FROM user_fund_groups WHERE id = ? AND user_id = ?", (group_id, user_id))
 
-    def reorder_groups(self, orders: Dict[int, int]):
+    def reorder_groups(self, orders: Dict[int, int], user_id: str):
         for group_id, sort_order in orders.items():
-            self._execute("UPDATE user_fund_groups SET sort_order = ? WHERE id = ?", (sort_order, group_id))
+            self._execute("UPDATE user_fund_groups SET sort_order = ? WHERE id = ? AND user_id = ?", (sort_order, group_id, user_id))
 
-    def add_fund_to_group(self, group_id: int, cik: str, user_id: str = "00000000-0000-0000-0000-000000000000"):
+    def add_fund_to_group(self, group_id: int, cik: str, user_id: str):
         cik = self.normalize_cik(cik)
+        # Verify ownership
+        group = self._execute("SELECT id FROM user_fund_groups WHERE id = ? AND user_id = ?", (group_id, user_id), fetch='one')
+        if not group:
+            raise ValueError(f"Group {group_id} not found or does not belong to user {user_id}")
+            
         if self.is_postgres:
             self._execute("INSERT INTO user_fund_group_members (group_id, user_id, cik) VALUES (?, ?, ?) ON CONFLICT DO NOTHING", (group_id, user_id, cik))
         else:
             self._execute("INSERT OR IGNORE INTO user_fund_group_members (group_id, user_id, cik) VALUES (?, ?, ?)", (group_id, user_id, cik))
 
-    def remove_fund_from_group(self, group_id: int, cik: str):
+    def remove_fund_from_group(self, group_id: int, cik: str, user_id: str):
         cik = self.normalize_cik(cik)
-        self._execute("DELETE FROM user_fund_group_members WHERE group_id = ? AND cik = ?", (group_id, cik))
+        self._execute("DELETE FROM user_fund_group_members WHERE group_id = ? AND cik = ? AND user_id = ?", (group_id, cik, user_id))
 
     def update_sync_status(self, cik: str, status: str, error: str = None, newly_added: int = 0):
         cik = self.normalize_cik(cik)

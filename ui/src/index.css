@@ -292,7 +292,7 @@ body {
   letter-spacing: 0.05em;
 }
 
-.refresh-all-small {
+.sidebar-action-btn {
   background: transparent;
   border: none;
   color: #64748b;
@@ -445,6 +445,172 @@ body {
 .active .delete-btn:hover {
   opacity: 1;
 }
+
+/* Folder & Nested Sidebar Styles */
+.folder-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2px;
+}
+
+.folder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #94a3b8;
+  border: 1px solid transparent;
+}
+
+.folder-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+}
+
+.folder-header.active {
+  background: rgba(56, 189, 248, 0.05);
+  border-color: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.folder-header.drag-over {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: var(--accent) !important;
+  transform: scale(1.01);
+}
+
+
+.folder-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.folder-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.folder-header:hover .folder-actions {
+  opacity: 1;
+}
+
+.folder-content {
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  margin-left: 18px;
+  margin-top: 2px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.folder-content.collapsed {
+  display: none;
+}
+
+.fund-item-mini {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+}
+
+.fund-item-mini:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+}
+
+.fund-item-mini.active {
+  background: var(--accent);
+  color: #0f172a;
+}
+
+.fund-item-mini.active .fund-cik-mini {
+  color: #0f172a;
+  opacity: 0.7;
+}
+
+.fund-info-mini {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fund-name-mini {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fund-cik-mini {
+  font-size: 0.7rem;
+  opacity: 0.5;
+}
+
+.folder-btn-mini {
+  padding: 4px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.folder-btn-mini:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.folder-btn-mini.delete:hover {
+  color: #ef4444;
+}
+
+.sidebar.collapsed .folder-title span,
+.sidebar.collapsed .folder-actions,
+.sidebar.collapsed .folder-content {
+  display: none;
+}
+
+.sidebar.collapsed .folder-header {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.uncategorized-section.drag-over-uncategorized {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  outline: 1px dashed var(--accent);
+}
+
+
 
 .error-banner {
   background: #fef2f2;

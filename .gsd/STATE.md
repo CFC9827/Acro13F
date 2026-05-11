@@ -1,60 +1,40 @@
 # STATE.md — Project State
 
-> Last updated: 2026-05-10 19:46
+> Last updated: 2026-05-11 00:10
 
-## Current Phase: Phase 6: Update Sidebar And Folder Logic
-**Status**: 🟢 In Progress
+## Current Phase: Phase 9: Cloud Deployment Architecture
+**Status**: ⬜ Not Started
 
 ### Project Health
 - **Database**: Supabase (Production) - ✅ Stable (2.8M prices, 123K holdings)
 - **Background Engine**: `worker.py` - ✅ Ready (Infrastructure for entire universe is built)
 - **Data Universe**: Curated "Whale" list (~34 funds) - 🟡 Bulk Ingestion Deferred
+- **Multi-Tenancy**: ✅ Complete (All user data isolated and secure)
+- **UI Consistency**: ✅ Complete (Manual SEC triggers removed, background-sync model adopted)
 
 ## Completed This Session
 
-### Phase 1: Separate Platform Data From User Data ✅
-- Created `users`, `user_tracked_funds`, `user_fund_groups`, `user_fund_group_members` tables
-- Removed global `funds.is_tracked` column from schema
-- Updated all queries in `database.py`, `orchestrator.py`, and `main.py` to use user-scoped tables
-- Migration logic auto-creates default user (id=1) and copies legacy tracked data
-- Frontend contract preserved: `is_tracked` computed dynamically per-user
+### Phase 6: Update Sidebar and Folder Logic ✅
+- Hardened all group management endpoints with user ownership checks
+- Refactored Sidebar to support collapsible folders and nested fund lists
+- Implemented drag-and-drop for folder organization and removal
 
-### Phase 2: Move Fully To Postgres (Supabase) ✅
-- Supabase Postgres pooler connected and verified
-- Alembic migration system initialized with initial cloud schema migration
-- Performance indexes added for user-scoped queries
-- Legacy `fund_groups` data migrated to `user_fund_groups` (3 groups, 21 members)
-- Full smoke test passed: get_funds, get_groups, fund_info, dashboard_summary all working
-
-### Phase 5 & 8: Authentication & UI Stabilization ✅
-- Implemented `fetchWithAuth` shared utility for Supabase token injection
-- Secured all 15+ UI components (Dashboard, Explorer, Search, etc.) with Bearer tokens
-- Resolved "Blank Screen" crash by adding defensive array guards to all `.map()` calls
-- Fixed application boot sequence: `authLoading` -> `SplashScreen` -> `Login` or `Dashboard`
-- Standardized error boundaries to prevent malformed API responses from breaking the UI
-
-### Phase 5 & 7: Search & Explorer User-Scoping ✅
-- Refactored `search_all` and `search_explorer` to be user-scoped and return tracking status
-- Implemented CIK normalization in `InstitutionalExplorer` to fix tracking toggle bugs
-- Added visual feedback (updating states) to tracking buttons in the UI
-- Ensured JIT user creation in auth layer to maintain database integrity
-
-### Phase 4: Decoupled Tracking Logic ✅
-- Removed automatic sync triggers from `track_fund` API
-- Verified `untrack_fund` preserves canonical data while removing user-scoped references
-- Preserved UI feedback loop for immediate "Tracked" state updates
+### Phase 7: Update The UI Behavior ✅
+- Removed manual "Refresh Data" / "Add Fund" buttons in App.tsx
+- Updated empty states in FundSummary and PortfolioChart components
+- Purged dead sync code and handlers (handleRefresh, handleGlobalRefresh, etc.)
+- Verified UI consistency with background-sync-only architecture
 
 ## Next Steps
 
-1. **Phase 3:** Build a background SEC ingestion pipeline (independent of user actions)
-2. **Phase 3:** Pre-calculate `fund_quarterly_stats` automatically after ingestion
-3. **Phase 4:** Decouple "Track Fund" from SEC downloads — tracking = bookmark only
-4. **Phase 5:** Scope Global Overview to current user's tracked funds
+1. **Phase 9:** Configure CI/CD pipelines for frontend and backend
+2. **Phase 9:** Deploy Production API and Frontend on cloud platforms
+3. **Phase 9:** Set up production monitoring and logging (Sentry/Datadog)
+4. **Phase 3:** Run `BulkIngestor` for entire SEC universe once cloud env is stable
 
 ## Key Files for Context Restoration
 
 - `backend/services/database.py` — Core data layer with user-scoped schema
-- `backend/services/orchestrator.py` — SEC fund sync engine (is_tracked removed)
-- `backend/main.py` — API endpoints (track/untrack use user_tracked_funds)
-- `backend/migrations/` — Alembic migration infrastructure
+- `backend/main.py` — API endpoints for user-scoped tracking and folders
+- `ui/src/App.tsx` — Main Sidebar and Folder state management
 - `.gsd/ROADMAP.md` — v4.0 cloud transition phases

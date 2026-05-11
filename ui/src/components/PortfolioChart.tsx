@@ -644,7 +644,7 @@ export const PortfolioChart: React.FC<PortfolioChartProps> = ({
                 <div style={{ fontSize: '18px', fontWeight: 600, color: '#94a3b8' }}>No Composition Data Found</div>
                 <div style={{ fontSize: '14px', color: '#64748b', maxWidth: '400px', lineHeight: 1.5, textAlign: 'center' }}>
                     Historical composition requires processed filings.
-                    If this is a new fund, please wait for background processing or click "Refresh Data".
+                    New funds are automatically queued for background processing. Please check back shortly.
                 </div>
             </div>
         );
