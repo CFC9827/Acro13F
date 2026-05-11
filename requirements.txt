@@ -12,3 +12,4 @@ alembic
 sqlalchemy
 python-jose[cryptography]
 supabase
+apscheduler

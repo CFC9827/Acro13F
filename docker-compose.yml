@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SEC_USER_AGENT=${SEC_USER_AGENT}
+      - FRONTEND_URL=http://localhost:5173
+    depends_on:
+      - worker
+
+  worker:
+    build: .
+    command: python -m backend.worker
+    environment:
+      - ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SEC_USER_AGENT=${SEC_USER_AGENT}

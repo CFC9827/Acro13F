@@ -21,10 +21,18 @@ app = FastAPI(title="Stock Screener API")
 # Create API router with /api prefix for production compatibility
 api = APIRouter(prefix="/api")
 
-# Enable CORS for frontend development
+# CORS Configuration
+frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+origins = [
+    frontend_url,
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins if os.environ.get("ENV") == "production" else ["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -47,7 +55,7 @@ async def get_config():
 
 @api.post("/config")
 async def update_config(config: Dict[str, str]):
-    """Updates the application configuration and persists it to .env."""
+    """Updates the application configuration."""
     user_agent = config.get("sec_user_agent")
     if not user_agent:
         raise HTTPException(status_code=400, detail="sec_user_agent is required")
@@ -58,25 +66,29 @@ async def update_config(config: Dict[str, str]):
     # Re-initialize orchestrator's client with new user agent
     orch.client = SECClient(user_agent=user_agent)
     
-    # Persist to .env file
-    env_path = ".env"
-    lines = []
-    found = False
-    
-    if os.path.exists(env_path):
-        with open(env_path, "r") as f:
-            for line in f:
-                if line.startswith("SEC_USER_AGENT="):
-                    lines.append(f"SEC_USER_AGENT={user_agent}\n")
-                    found = True
-                else:
-                    lines.append(line)
-    
-    if not found:
-        lines.append(f"SEC_USER_AGENT={user_agent}\n")
+    # Persist to .env file ONLY in development
+    if os.environ.get("ENV") != "production":
+        env_path = ".env"
+        lines = []
+        found = False
         
-    with open(env_path, "w") as f:
-        f.writelines(lines)
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                for line in f:
+                    if line.startswith("SEC_USER_AGENT="):
+                        lines.append(f"SEC_USER_AGENT={user_agent}\n")
+                        found = True
+                    else:
+                        lines.append(line)
+        
+        if not found:
+            lines.append(f"SEC_USER_AGENT={user_agent}\n")
+            
+        try:
+            with open(env_path, "w") as f:
+                f.writelines(lines)
+        except Exception as e:
+            logging.warning(f"Failed to persist .env: {e}")
         
     return {"status": "success"}
 

@@ -1,0 +1,35 @@
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Install system dependencies for psycopg2 and other packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the requirements file into the container
+COPY requirements.txt .
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the backend directory into the container
+COPY backend/ ./backend/
+
+# Copy the UI dist directory into the container (for serving the frontend)
+# Note: This assumes 'npm run build' has been run locally or in a CI/CD stage
+COPY ui/dist/ ./ui/dist/
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
+# Default command to run the API
+# For the worker, this should be overridden to: python -m backend.worker
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
