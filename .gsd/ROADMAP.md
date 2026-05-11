@@ -95,7 +95,7 @@
 - [x] Create `DEPLOY.md` guide and `Dockerfile`
 
 ### Phase 10: Migration Path
-**Status**: ⬜ Not Started
+**Status**: 🟡 Planned (Awaiting Approval)
 **Deliverables**:
 - [ ] Freeze SQLite and migrate canonical data to Postgres
 - [ ] Migrate local `is_tracked` to single initial user account

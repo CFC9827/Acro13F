@@ -33,9 +33,9 @@
 
 ## Next Steps
 
-1. **Phase 9:** Configure CI/CD pipelines for frontend and backend
-2. **Phase 9:** Deploy Production API and Frontend on cloud platforms
-3. **Phase 9:** Set up production monitoring and logging (Sentry/Datadog)
+1. **Phase 10:** Execute consolidated migration script (`migrate_to_postgres.py`)
+2. **Phase 10:** Verify data parity with `verify_cloud_data.py`
+3. **Phase 10:** Perform final UAT on the deployed cloud environment
 4. **Phase 3:** Run `BulkIngestor` for entire SEC universe once cloud env is stable
 
 ## Key Files for Context Restoration
