@@ -45,6 +45,8 @@ interface Mover {
     pct_of_fund?: number;
     curr_weight?: number;
     shares_change?: number;
+    share_delta_value?: number;
+    shares?: number;
     value: number;
 }
 
@@ -640,7 +642,7 @@ const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ grou
     );
 };
 
-type MoversMode = 'value' | 'shares' | 'funds';
+type MoversMode = 'shareValue' | 'value' | 'funds';
 
 export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initialSummary, onSelectFund, allFunds }) => {
     const { session } = useAuth();
@@ -655,7 +657,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [loading, setLoading] = useState(false);
-    const [moversMode, setMoversMode] = useState<MoversMode>('value');
+    const [moversMode, setMoversMode] = useState<MoversMode>('shareValue');
     const [moverTooltip, setMoverTooltip] = useState<{ x: number, y: number, ticker: string, index: number } | null>(null);
     const [crowdingTooltip, setCrowdingTooltip] = useState<{ x: number, y: number, ticker: string, source?: string } | null>(null);
     const [kpiTooltip, setKpiTooltip] = useState<{ x: number, y: number, type: string } | null>(null);
@@ -932,12 +934,18 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
             });
     }, [fundHighlights, fundHistories]);
 
+    const getMoverShareDeltaValue = (mover: Mover) => {
+        if (typeof mover.share_delta_value === 'number') return mover.share_delta_value;
+        const currentPrice = mover.shares && mover.shares > 0 ? mover.value / mover.shares : 0;
+        return (mover.shares_change || 0) * currentPrice;
+    };
+
     const getMoverDisplay = (mover: Mover) => {
         const tKey = normalizeTicker(mover.ticker || mover.issuer_name);
         const activity = tickerActivity[tKey];
         switch (moversMode) {
-            case 'shares':
-                return `${mover.shares_change !== undefined && mover.shares_change >= 0 ? '+' : ''}${(mover.shares_change || 0).toLocaleString()}`;
+            case 'shareValue':
+                return formatCurrency(getMoverShareDeltaValue(mover));
             case 'funds':
                 if (activity) {
                     return `${activity.buying}B / ${activity.selling}S`;
@@ -950,12 +958,12 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
     const getMoverDescription = () => {
         switch (moversMode) {
-            case 'shares':
-                return 'Share count change';
+            case 'shareValue':
+                return 'Share-count change × quarter-end price';
             case 'funds':
                 return 'Buying / Selling';
             default:
-                return 'Dollar value change';
+                return 'Change in reported holding value';
         }
     };
 
@@ -1568,22 +1576,44 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 <div className="section-header">
                                     <TrendingUp className="section-icon-small" />
                                     <div>
-                                        <h3 className="section-title-small">Big Movers</h3>
+                                        <h3 className="section-title-small">
+                                            Top Movers
+                                            <span
+                                                className="info-tooltip"
+                                                onMouseEnter={(e) => handleKpiTooltipEnter(e, 'global-movers')}
+                                                onMouseLeave={handleKpiTooltipLeave}
+                                                aria-label="Top Movers metric definitions"
+                                            >
+                                                <Info size={13} />
+                                            </span>
+                                        </h3>
                                         <p className="section-desc-small">{getMoverDescription()}</p>
+                                        {kpiTooltip && kpiTooltip.type === 'global-movers' && (
+                                            <div className="kpi-tooltip" style={{ left: kpiTooltip.x - 90, top: kpiTooltip.y + 18, minWidth: 260 }}>
+                                                <div style={{ maxWidth: '260px', fontSize: '11px', color: '#e2e8f0', lineHeight: 1.45 }}>
+                                                    <div style={{ marginBottom: '8px' }}>
+                                                        <strong style={{ color: '#f8fafc' }}>SHARE Δ $:</strong> Share-count change × quarter-end price. This estimates the dollar value of shares added or removed.
+                                                    </div>
+                                                    <div>
+                                                        <strong style={{ color: '#f8fafc' }}>VALUE:</strong> Change in reported holding value, including both share-count changes and price movement.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="toggle-group" style={{ gap: '4px' }}>
                                         <button
+                                            className={`toggle-btn ${moversMode === 'shareValue' ? 'active' : ''}`}
+                                            onClick={(e) => { e.stopPropagation(); setMoversMode('shareValue'); }}
+                                            title="Share-count change × quarter-end price"
+                                            style={{ fontSize: '9px', fontWeight: 700, lineHeight: 1.05, minWidth: '52px', padding: '4px 7px' }}
+                                        >SHARE<br />Δ $</button>
+                                        <button
                                             className={`toggle-btn ${moversMode === 'value' ? 'active' : ''}`}
                                             onClick={(e) => { e.stopPropagation(); setMoversMode('value'); }}
-                                            title="Dollar change"
+                                            title="Change in reported holding value"
                                             style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px' }}
                                         >VALUE</button>
-                                        <button
-                                            className={`toggle-btn ${moversMode === 'shares' ? 'active' : ''}`}
-                                            onClick={(e) => { e.stopPropagation(); setMoversMode('shares'); }}
-                                            title="Share count change"
-                                            style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px' }}
-                                        >SHARES</button>
                                         <button
                                             className={`toggle-btn ${moversMode === 'funds' ? 'active' : ''}`}
                                             onClick={(e) => { e.stopPropagation(); setMoversMode('funds'); }}
@@ -1611,8 +1641,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
 
                                     return displayMovers
                                         .sort((a, b) => {
-                                            if (moversMode === 'shares') {
-                                                return Math.abs(b.shares_change || 0) - Math.abs(a.shares_change || 0);
+                                            if (moversMode === 'shareValue') {
+                                                return Math.abs(getMoverShareDeltaValue(b)) - Math.abs(getMoverShareDeltaValue(a));
                                             }
                                             if (moversMode === 'funds') {
                                                 const tKeyA = normalizeTicker(a.ticker || a.issuer_name);
@@ -1627,7 +1657,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                         })
                                         .slice(0, 20)
                                         .map((mover, i) => {
-                                            const displayValue = moversMode === 'shares' ? (mover.shares_change || 0) : mover.val_change;
+                                            const displayValue = moversMode === 'shareValue' ? getMoverShareDeltaValue(mover) : mover.val_change;
                                             const isPositive = displayValue >= 0;
 
                                             const tKey = normalizeTicker(mover.ticker || mover.issuer_name);

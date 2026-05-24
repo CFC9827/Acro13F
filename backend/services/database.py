@@ -815,10 +815,14 @@ class DatabaseManager:
                     if (key in new_keys):
                         all_new_positions.append({"ticker": h['ticker'], "issuer_name": h['issuer_name'], "fund_name": fund['name'], "cik": fund['cik'], "value": h['value'], "weight": curr_w})
 
+                    shares_change = h['shares'] - (prev_h['shares'] if prev_h else 0)
+                    quarter_end_price = (h['value'] / h['shares']) if h['shares'] else ((prev_h['value'] / prev_h['shares']) if prev_h and prev_h['shares'] else 0)
+
                     summary["big_movers"].append({
                         "fund_name": fund['name'], "cik": fund['cik'], "ticker": f"{h['ticker']} {h['put_call']}" if h.get('put_call') else h['ticker'],
                         "issuer_name": h['issuer_name'], "val_change": h['value'] - (prev_h['value'] if prev_h else 0),
-                        "shares_change": h['shares'] - (prev_h['shares'] if prev_h else 0),
+                        "shares_change": shares_change,
+                        "share_delta_value": shares_change * quarter_end_price,
                         "pct_of_fund": w_delta, "curr_weight": curr_w, "shares": h['shares'], "value": h['value']
                     })
 
