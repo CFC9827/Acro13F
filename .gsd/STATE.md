@@ -146,6 +146,10 @@
 - Rotated R2 credentials after accidental local terminal exposure:
   - local `.env` validates for `warehouse-upload`,
   - verified the rotated credentials can read uploaded AAPL rows from R2.
+- Published deployment branch:
+  - preserved old remote as `old-origin` (`CFC9827/13F.git`),
+  - set `origin` to `https://github.com/CFC9827/Acro13F.git`,
+  - pushed `codex-cloud-deployment-readiness` to the new `Acro13F` repository.
 
 ## Next Steps
 
