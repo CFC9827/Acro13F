@@ -53,7 +53,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
     const [priceMetric, setPriceMetric] = useState<PriceMetric | null>(null);
-    const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
+    const [moversMode, setMoversMode] = useState<'shareValue' | 'value'>('shareValue');
     const { session } = useAuth();
 
     const handleMouseEnter = (e: React.MouseEvent, title: string, content: React.ReactNode) => {
@@ -147,6 +147,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     val_change: curr.value,
                     weight_change: curr.weight,
                     shares_change: curr.shares,
+                    share_delta_value: curr.value,
                     curr_weight: curr.weight,
                     pct_change: 100
                 });
@@ -155,6 +156,12 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                 const valChange = curr.value - prev.value;
                 const weightChange = curr.weight - prev.weight;
                 const sharesChange = curr.shares - prev.shares;
+                const quarterEndPrice = curr.shares > 0
+                    ? curr.value / curr.shares
+                    : prev.shares > 0
+                        ? prev.value / prev.shares
+                        : 0;
+                const shareDeltaValue = sharesChange * quarterEndPrice;
 
                 movers.push({
                     ticker: curr.ticker,
@@ -162,6 +169,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     val_change: valChange,
                     weight_change: weightChange,
                     shares_change: sharesChange,
+                    share_delta_value: shareDeltaValue,
                     curr_weight: curr.weight,
                     pct_change: prev.value > 0 ? ((curr.value - prev.value) / prev.value) * 100 : 0
                 });
@@ -209,6 +217,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     issuer_name: prev.issuer_name,
                     val_change: -prev.value,
                     weight_change: -((prev.value / priorAum) * 100),
+                    shares_change: -prev.shares,
+                    share_delta_value: -prev.value,
                     curr_weight: 0,
                     pct_change: -100
                 });
@@ -530,7 +540,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             bottom: tooltip.y > window.innerHeight - 300 ? window.innerHeight - tooltip.y + 15 : 'auto'
                         }}
                     >
-                        <div className="tooltip-title">{tooltip.title}</div>
+                        {tooltip.title && <div className="tooltip-title">{tooltip.title}</div>}
                         {tooltip.content}
                     </div>,
                     document.body
@@ -618,12 +628,51 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                 <TrendingUp className="section-icon-small" />
                                 <div>
-                                    <h3 className="section-title-small">Top Movers</h3>
-                                    <p className="section-desc-small">Largest changes QoQ</p>
+                                    <h3 className="section-title-small">
+                                        Top Movers
+                                        <span
+                                            className="info-tooltip"
+                                            onMouseEnter={(e) => handleMouseEnter(e, '', (
+                                                <div style={{ maxWidth: '260px', fontSize: '11px', color: '#e2e8f0', lineHeight: 1.45 }}>
+                                                    <div style={{ marginBottom: '8px' }}>
+                                                        <strong style={{ color: '#f8fafc' }}>SHARE Δ $:</strong> Share-count change × quarter-end price. This estimates the dollar value of shares added or removed.
+                                                    </div>
+                                                    <div>
+                                                        <strong style={{ color: '#f8fafc' }}>VALUE:</strong> Change in reported holding value, including both share-count changes and price movement.
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            onMouseLeave={handleMouseLeave}
+                                            aria-label="Top Movers metric definitions"
+                                        >
+                                            <Info size={13} />
+                                        </span>
+                                    </h3>
+                                    <p className="section-desc-small">
+                                        {moversMode === 'shareValue' ? 'Share-count change × quarter-end price' : 'Change in reported holding value'}
+                                    </p>
                                 </div>
                             </div>
                             
                             <div className="toggle-group" style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.5)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                <button 
+                                    className={`control-btn-mini ${moversMode === 'shareValue' ? 'active' : ''}`}
+                                    onClick={(e) => { e.stopPropagation(); setMoversMode('shareValue'); }}
+                                    style={{ 
+                                        padding: '5px 9px', 
+                                        fontSize: '10px', 
+                                        fontWeight: 700, 
+                                        lineHeight: 1.05,
+                                        minWidth: '52px',
+                                        borderRadius: '4px', 
+                                        border: 'none', 
+                                        cursor: 'pointer',
+                                        backgroundColor: moversMode === 'shareValue' ? '#38bdf8' : 'transparent',
+                                        color: moversMode === 'shareValue' ? '#0f172a' : '#64748b'
+                                    }}
+                                >
+                                    SHARE<br />Δ $
+                                </button>
                                 <button 
                                     className={`control-btn-mini ${moversMode === 'value' ? 'active' : ''}`}
                                     onClick={(e) => { e.stopPropagation(); setMoversMode('value'); }}
@@ -640,33 +689,18 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                 >
                                     VALUE
                                 </button>
-                                <button 
-                                    className={`control-btn-mini ${moversMode === 'shares' ? 'active' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setMoversMode('shares'); }}
-                                    style={{ 
-                                        padding: '4px 8px', 
-                                        fontSize: '10px', 
-                                        fontWeight: 700, 
-                                        borderRadius: '4px', 
-                                        border: 'none', 
-                                        cursor: 'pointer',
-                                        backgroundColor: moversMode === 'shares' ? '#38bdf8' : 'transparent',
-                                        color: moversMode === 'shares' ? '#0f172a' : '#64748b'
-                                    }}
-                                >
-                                    SHARES
-                                </button>
                             </div>
                         </div>
 
                         <div className="movers-list scrollable">
-                            {movers
+                            {[...movers]
                                 .sort((a, b) => {
                                     if (moversMode === 'value') return Math.abs(b.val_change) - Math.abs(a.val_change);
-                                    return Math.abs(b.shares_change) - Math.abs(a.shares_change);
+                                    return Math.abs(b.share_delta_value || 0) - Math.abs(a.share_delta_value || 0);
                                 })
                                 .slice(0, 10).map((mover, i) => {
-                                const isPositive = moversMode === 'value' ? mover.val_change >= 0 : mover.shares_change >= 0;
+                                const displayValue = moversMode === 'value' ? mover.val_change : mover.share_delta_value;
+                                const isPositive = displayValue >= 0;
                                 return (
                                     <div 
                                         key={i} 
@@ -686,7 +720,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                                             <span style={{ fontWeight: 600 }}>
                                                 {moversMode === 'value' 
                                                     ? formatCurrency(mover.val_change) 
-                                                    : Math.abs(mover.shares_change).toLocaleString()
+                                                    : formatCurrency(mover.share_delta_value || 0)
                                                 }
                                             </span>
                                             {moversMode === 'value' && (
