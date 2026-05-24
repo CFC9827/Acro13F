@@ -19,10 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the backend directory into the container
 COPY backend/ ./backend/
 
-# Copy the UI dist directory into the container (for serving the frontend)
-# Note: This assumes 'npm run build' has been run locally or in a CI/CD stage
-COPY ui/dist/ ./ui/dist/
-
 # Expose the port the app runs on
 EXPOSE 8000
 
