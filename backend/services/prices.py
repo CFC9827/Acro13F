@@ -4,6 +4,7 @@ import requests
 import os
 from datetime import datetime
 from backend.services.database import DatabaseManager
+from backend.services.price_warehouse import PriceWarehouse
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,30 @@ def price_backfill_enabled() -> bool:
     return os.environ.get("ENABLE_PRICE_SYNC", "").lower() in {"1", "true", "yes", "on"}
 
 
-def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = None):
+def warehouse_prices_enabled() -> bool:
+    return os.environ.get("PRICE_WAREHOUSE_BACKEND", "local").lower() in {"s3", "r2"}
+
+
+def get_warehouse_prices(ticker: str, start_date: str = None, warehouse=None):
+    if not warehouse_prices_enabled() and warehouse is None:
+        return []
+
+    try:
+        source = warehouse or PriceWarehouse()
+        return [
+            {
+                "date": row["date"],
+                "price": row["close"],
+                "dividends": row.get("dividends", 0.0),
+            }
+            for row in source.read_prices(ticker, start=start_date)
+        ]
+    except Exception as e:
+        logger.warning(f"Failed to read warehouse prices for {ticker}: {e}")
+        return []
+
+
+def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = None, warehouse=None):
     """
     Returns historical prices for a ticker. 
     First checks the database, then fetches from Yahoo Finance if needed.
@@ -64,6 +88,10 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         if days_old < 7 and not need_earlier_data:
             logger.info(f"Using cached prices for {ticker} ({len(prices)} points)")
             return prices
+
+    warehouse_prices = get_warehouse_prices(ticker, start_date, warehouse=warehouse)
+    if warehouse_prices:
+        return warehouse_prices
 
     if not price_backfill_enabled():
         logger.info("Price backfill disabled; returning cached prices only.")
