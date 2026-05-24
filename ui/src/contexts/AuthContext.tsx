@@ -3,8 +3,11 @@ import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const devAuthEnabled = !supabaseUrl || !supabaseAnonKey;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = devAuthEnabled
+    ? null
+    : createClient(supabaseUrl, supabaseAnonKey);
 
 interface AuthContextType {
     user: User | null;
@@ -21,6 +24,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (devAuthEnabled) {
+            setUser({
+                id: '00000000-0000-0000-0000-000000000000',
+                email: 'dev@abrams13f.local',
+                app_metadata: {},
+                user_metadata: {},
+                aud: 'authenticated',
+                created_at: new Date().toISOString(),
+            } as User);
+            setSession(null);
+            setLoading(false);
+            return;
+        }
+
         console.log("AuthContext: Checking active session...");
         supabase.auth.getSession().then(({ data: { session } }) => {
             console.log("AuthContext: Session received:", session ? "Active" : "None");
@@ -46,6 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = async () => {
+        if (devAuthEnabled) {
+            return;
+        }
+
         await supabase.auth.signOut();
     };
 

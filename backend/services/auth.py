@@ -14,17 +14,22 @@ db_manager = DatabaseManager()
 # We only initialize if config is present
 supabase: Optional[Client] = create_client(url, key) if url and key else None
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
     """
     Dependency that validates the Supabase JWT and returns the user object.
     Uses the 'sub' field from the JWT as the unique user_id.
     """
+    if not credentials or not credentials.credentials:
+        if os.environ.get("ENV") != "production":
+            return {"id": "00000000-0000-0000-0000-000000000000", "email": "dev@abrams13f.local"}
+        raise HTTPException(status_code=401, detail="Missing authorization token")
+
     token = credentials.credentials
     if not supabase:
-        # Fallback for development if keys are missing
-        # In a real production environment, this would raise a 500 error
+        if os.environ.get("ENV") == "production":
+            raise HTTPException(status_code=500, detail="Supabase Auth is not configured")
         return {"id": "00000000-0000-0000-0000-000000000000", "email": "dev@abrams13f.local"}
 
     try:

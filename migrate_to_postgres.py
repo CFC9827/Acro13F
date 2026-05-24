@@ -13,16 +13,14 @@ def migrate_data():
         print("Error: DATABASE_URL not found in environment.")
         return
 
-    print("Connecting to PostgreSQL to disable read-only mode...")
+    print("Connecting to PostgreSQL...")
     try:
         temp_conn = psycopg2.connect(pg_url)
-        temp_cur = temp_conn.cursor()
-        temp_cur.execute("SET default_transaction_read_only = off;")
-        temp_conn.commit()
         temp_conn.close()
-        print("Read-only mode disabled.")
+        print("PostgreSQL connection verified.")
     except Exception as e:
-        print(f"Warning: Could not disable read-only mode manually: {e}")
+        print(f"Error: Could not connect to PostgreSQL: {e}")
+        return
 
     # Initialize DB schemas using the app's manager
     print("Initializing Database Schemas...")
@@ -92,9 +90,10 @@ def migrate_data():
             pg_conn.rollback()
             print(f"  Error migrating {table}: {e}")
 
-    # SKIP 'prices' for now to save disk space on Supabase free tier.
-    # Cloud worker can fetch them as needed.
-    print("\nSkipping 'prices' table migration to conserve Supabase disk space.")
+    # SKIP 'prices' by default. The local SQLite database contains millions of
+    # daily price rows, and a full load exceeded the current Neon project limit
+    # during Phase 11 UAT. Choose a price storage strategy before loading them.
+    print("\nSkipping 'prices' table migration. Full daily prices require a separate storage/tier decision.")
 
     # Handle 'holdings' in chunks
     print("\nMigrating table: holdings (Chunked)...")
@@ -142,10 +141,6 @@ def migrate_data():
             print(f"{v_mark} {table:<25}: SQLite={s_count:<10} PG={p_count:<10}")
         except:
             print(f"[?] {table:<25}: Error counting rows.")
-
-    print("\nMigration complete! Closing connections.")
-    sqlite_conn.close()
-    pg_conn.close()
 
     print("\nMigration complete! Closing connections.")
     sqlite_conn.close()

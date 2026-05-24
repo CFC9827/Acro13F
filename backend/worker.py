@@ -6,6 +6,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from backend.services.database import DatabaseManager
 from backend.services.orchestrator import Orchestrator
 from backend.services.prices import get_historical_prices
+from backend.services.price_warehouse import PriceWarehouse
+from backend.scripts.build_price_derived_metrics import build_recent_price_metrics
 
 # Setup logging
 logging.basicConfig(
@@ -18,11 +20,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger("worker")
 
+def price_sync_enabled() -> bool:
+    """Full historical prices are too large for the default Neon tier."""
+    return os.environ.get("ENABLE_PRICE_SYNC", "").lower() in {"1", "true", "yes", "on"}
+
+def price_metrics_sync_enabled() -> bool:
+    """Derived price metrics are refreshed only when the warehouse path is configured."""
+    enabled = os.environ.get("ENABLE_PRICE_METRICS_SYNC", "").lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return False
+
+    backend = os.environ.get("PRICE_WAREHOUSE_BACKEND", "local").lower()
+    if backend in {"s3", "r2"}:
+        required = [
+            "PRICE_WAREHOUSE_BUCKET",
+            "PRICE_WAREHOUSE_ENDPOINT_URL",
+            "PRICE_WAREHOUSE_ACCESS_KEY_ID",
+            "PRICE_WAREHOUSE_SECRET_ACCESS_KEY",
+        ]
+        missing = [name for name in required if not os.environ.get(name)]
+        if missing:
+            logger.warning("Price metrics sync disabled; missing warehouse config: %s", ", ".join(missing))
+            return False
+
+    return True
+
+def price_metrics_refresh_limit() -> int:
+    try:
+        return max(1, int(os.environ.get("PRICE_METRICS_REFRESH_LIMIT", "25")))
+    except ValueError:
+        return 25
+
+def price_metrics_refresh_hours() -> int:
+    try:
+        return max(1, int(os.environ.get("PRICE_METRICS_REFRESH_HOURS", "24")))
+    except ValueError:
+        return 24
+
 class BackgroundWorker:
     def __init__(self):
         self.db = DatabaseManager()
         self.orchestrator = Orchestrator()
-        logger.info("BackgroundWorker initialized with Supabase connectivity.")
+        logger.info("BackgroundWorker initialized.")
 
     def sync_funds_task(self):
         """Task to sync stale funds from the SEC."""
@@ -57,6 +96,10 @@ class BackgroundWorker:
 
     def sync_prices_task(self):
         """Task to proactively update stock prices."""
+        if not price_sync_enabled():
+            logger.info("Price sync skipped. Set ENABLE_PRICE_SYNC=1 to enable scheduled price backfills.")
+            return
+
         logger.info("Starting sync_prices_task...")
         tickers = self.db.get_all_tickers()
         
@@ -109,6 +152,17 @@ class BackgroundWorker:
             except Exception as e:
                 logger.error(f"Failed to calculate stats for {m['accession_number']}: {str(e)}")
 
+    def sync_price_metrics_task(self):
+        """Refresh compact price-derived metrics from the Parquet warehouse into Neon."""
+        limit = price_metrics_refresh_limit()
+        logger.info(f"Starting sync_price_metrics_task for {limit} recent filings...")
+        try:
+            results = build_recent_price_metrics(self.db, PriceWarehouse(), limit=limit)
+            logger.info(f"Built {len(results)} fund price metric rows.")
+        except Exception as e:
+            logger.error(f"Failed to refresh fund price metrics: {str(e)}")
+            raise
+
     def run(self):
         """Start the scheduler."""
         scheduler = BlockingScheduler()
@@ -116,11 +170,19 @@ class BackgroundWorker:
         # Sync funds every 12 hours
         scheduler.add_job(self.sync_funds_task, 'interval', hours=12, next_run_time=datetime.now())
         
-        # Sync prices every 24 hours (run at 11:00 PM EST / 03:00 UTC)
-        scheduler.add_job(self.sync_prices_task, 'cron', hour=23)
+        # Sync prices every 24 hours only when explicitly enabled.
+        if price_sync_enabled():
+            scheduler.add_job(self.sync_prices_task, 'cron', hour=23)
+        else:
+            logger.info("Scheduled price sync disabled. Set ENABLE_PRICE_SYNC=1 to enable it.")
 
         # Cleanup: Ensure stats are calculated every 6 hours
         scheduler.add_job(self.sync_missing_stats_task, 'interval', hours=6)
+
+        if price_metrics_sync_enabled():
+            scheduler.add_job(self.sync_price_metrics_task, 'interval', hours=price_metrics_refresh_hours())
+        else:
+            logger.info("Scheduled price metrics refresh disabled. Set ENABLE_PRICE_METRICS_SYNC=1 to enable it.")
         
         logger.info("Scheduler started. Background tasks are now running.")
         try:

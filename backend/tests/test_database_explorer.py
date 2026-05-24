@@ -2,6 +2,9 @@ import pytest
 import os
 import sys
 import tempfile
+
+os.environ["DATABASE_URL"] = ""
+
 # Ensure the backend directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.services.database import DatabaseManager
@@ -12,6 +15,8 @@ def test_fund_quarterly_stats_schema():
         db_path = tmp.name
     
     try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
         db = DatabaseManager(db_path=db_path)
         
         # This should fail if the table doesn't exist or save_quarterly_stats is not implemented
@@ -42,6 +47,48 @@ def test_fund_quarterly_stats_schema():
         assert res["primary_sector"] == "Technology"
         
     finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+
+def test_fund_price_metrics_schema():
+    """Verify compact price-derived metrics can be persisted separately from warehouse data."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        db = DatabaseManager(db_path=db_path)
+
+        metric = {
+            "cik": "0001067983",
+            "period_of_report": "2024-12-31",
+            "accession_number": "0001067983-25-000001",
+            "start_date": "2024-10-01",
+            "end_date": "2024-12-31",
+            "weighted_return": 0.1234,
+            "coverage_pct": 95.5,
+            "positions_priced": 42,
+            "positions_total": 45,
+        }
+
+        db.save_fund_price_metric(metric)
+        res = db._execute(
+            "SELECT * FROM fund_price_metrics WHERE cik = ? AND period_of_report = ?",
+            (db.normalize_cik("0001067983"), "2024-12-31"),
+            fetch="one",
+        )
+
+        assert res is not None
+        assert res["weighted_return"] == 0.1234
+        assert res["coverage_pct"] == 95.5
+
+    finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
         if os.path.exists(db_path):
             os.remove(db_path)
 

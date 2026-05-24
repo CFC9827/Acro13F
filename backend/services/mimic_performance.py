@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 from typing import List, Dict
-from backend.services.prices import get_historical_prices
 from backend.services.benchmark import get_benchmark_data
 from backend.services.cusip_mapper import CUSIPMapper
 
@@ -46,17 +45,24 @@ class MimicPerformanceCalculator:
                 return mapped if mapped else h['cusip']
             return "Unknown"
 
-        # 1. Identify all unique tickers to pre-fetch prices
+        def get_implied_price(holding):
+            shares = holding.get('shares') or 0
+            value = holding.get('value') or 0
+            return (value / shares) if shares > 0 else 0.0
+
+        # 1. Identify all unique tickers to load from the existing price cache.
+        # Do not fetch external prices during this request; missing prices fall
+        # back to filing-implied prices so the UI remains responsive.
         all_tickers = set()
         for f in periods_map.values():
             for h in f['holdings']:
                 all_tickers.add(get_best_label(h))
         
-        # 2. Pre-fetch all prices
+        # 2. Load cached prices only.
         abs_start = periods_map[sorted_periods[0]]['filing_date']
         price_cache = {}
         for ticker in all_tickers:
-            price_cache[ticker] = get_historical_prices(ticker, self.db, abs_start)
+            price_cache[ticker] = self.db.get_prices(ticker, abs_start)
 
         mimic_series = []
         trades_log = []
@@ -64,7 +70,7 @@ class MimicPerformanceCalculator:
         # Helper to get price and dividends for a specific date range
         def get_price_data(symbol, start_date, end_date):
             prices = price_cache.get(symbol, [])
-            if not prices: return 0.0, 0.0
+            if not prices: return 0.0, 0.0, 0.0
             
             # 1. Get ending price (on or before end_date)
             p_end = next((p['price'] for p in reversed(prices) if p['date'] <= end_date), 0.0)
@@ -138,7 +144,7 @@ class MimicPerformanceCalculator:
                 if p <= 0:
                     # Fallback to filing implied price
                     h_file = next((x for x in curr_filing['holdings'] if get_best_label(x) == symbol), None)
-                    p = get_implied_price(h_file, symbol) if h_file else 0.0
+                    p = get_implied_price(h_file) if h_file else 0.0
                 
                 target_holdings_detailed.append({
                     "ticker": symbol,
@@ -199,11 +205,9 @@ class MimicPerformanceCalculator:
 
         # Fund name
         fund_name = ""
-        with self.db._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM funds WHERE cik = ?", (self.db.normalize_cik(cik),))
-            row = cursor.fetchone()
-            if row: fund_name = row[0]
+        row = self.db._execute("SELECT name FROM funds WHERE cik = ?", (self.db.normalize_cik(cik),), fetch='one')
+        if row:
+            fund_name = row['name']
 
         return {
             "cik": cik,

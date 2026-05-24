@@ -1,6 +1,6 @@
 # ROADMAP.md
 
-> **Current Phase**: Phase 9: Cloud Deployment Architecture
+> **Current Phase**: Phase 11: Production Polish & Scalability
 > **Milestone**: v4.0 — Cloud Multi-User Platform
 
 ## v2.0 — Production Ready (CLOSED)
@@ -34,10 +34,10 @@
 - [x] Define user-scoped models (users, user_tracked_funds, user_fund_groups, user_fund_group_members)
 - [x] Remove global `funds.is_tracked` logic
 
-### Phase 2: Move Fully To Postgres (Supabase)
+### Phase 2: Move Fully To Postgres
 **Status**: ✅ Complete
 **Deliverables**:
-- [x] Supabase Postgres pooler connected and verified
+- [x] Supabase Postgres pooler connected and verified initially; primary database target moved to Neon after Supabase Free entered read-only mode
 - [x] Alembic migration system initialized with initial cloud schema
 - [x] Performance indexes added for user-scoped queries
 - [x] Legacy fund_groups data migrated to user_fund_groups
@@ -101,6 +101,17 @@
 - [x] Refactor `migrate_to_postgres.py` for multi-tenancy
 - [x] Implement "Slim Migration" for disk space handling
 - [x] Verify data integrity (row count parity)
+- [x] Migrate slim canonical/user dataset into Neon Postgres 17.8
 
 ### Phase 11: Production Polish & Scalability 🟡
-**Status**: 🟡 Planned
+**Status**: 🟡 In Progress
+**Deliverables**:
+- [x] Stabilize Neon-backed API paths for core dashboard/fund/explorer workflows
+- [x] Disable default full price backfills on the current Neon tier
+- [x] Add Postgres pooled-connection retry handling for transient connection aborts
+- [x] Update deployment/setup docs for Neon-first architecture
+- [x] Run frontend/browser UAT against the Neon-backed API
+- [x] Reduce dashboard/fund-detail background history fan-out before broad ingestion
+- [x] Choose long-term price-history storage strategy
+- [x] Implement local Parquet price warehouse service
+- [ ] Confirm Render/Vercel production env vars and deployment readiness

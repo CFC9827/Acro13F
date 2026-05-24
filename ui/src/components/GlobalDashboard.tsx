@@ -210,6 +210,7 @@ const COLORS = [
 ];
 
 const PerformanceComparisonChart: React.FC<{ groupId: number | null }> = ({ groupId }) => {
+    const { session } = useAuth();
     const [data, setData] = useState<{ chart_data: any[], funds: string[] } | null>(null);
     const [loading, setLoading] = useState(true);
     const [showBenchmark, setShowBenchmark] = useState(true);
@@ -662,6 +663,8 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     const [exitPosSort, setExitPosSort] = useState<'value' | 'weight'>('value');
     const [swoopTooltip, setSwoopTooltip] = useState<{ x: number, y: number } | null>(null);
     const [fundHistories, setFundHistories] = useState<{ [cik: string]: any[] }>({});
+    const [swoopLoaded, setSwoopLoaded] = useState(false);
+    const [swoopLoading, setSwoopLoading] = useState(false);
     const [sectorAllocation, setSectorAllocation] = useState<SectorItem[]>([]);
     const [draggedGroupId, setDraggedGroupId] = useState<number | null>(null);
     const [isFundSummariesMinimized, setIsFundSummariesMinimized] = useState(false);
@@ -832,27 +835,29 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
         }
     };
 
-    // Fetch history data for all funds to calculate swoop opportunities
-    useEffect(() => {
-        const fetchAllHistories = async () => {
-            const histories: { [cik: string]: any[] } = {};
-            for (const fund of fundHighlights) {
-                try {
-                    const res = await fetchWithAuth(`/api/funds/${fund.cik}/history`, {}, session);
-                    if (res.ok) {
-                        const data = await res.json();
-                        histories[fund.cik] = Array.isArray(data) ? data : [];
-                    }
-                } catch (err) {
-                    console.error(`Failed to fetch history for ${fund.cik}`, err);
+    const loadSwoopOpportunities = async () => {
+        if (swoopLoading || swoopLoaded || fundHighlights.length === 0) return;
+
+        setSwoopLoading(true);
+        const histories: { [cik: string]: any[] } = {};
+        const fundsToAnalyze = fundHighlights.slice(0, 6);
+
+        await Promise.all(fundsToAnalyze.map(async (fund) => {
+            try {
+                const res = await fetchWithAuth(`/api/funds/${fund.cik}/history`, {}, session);
+                if (res.ok) {
+                    const data = await res.json();
+                    histories[fund.cik] = Array.isArray(data) ? data : [];
                 }
+            } catch (err) {
+                console.error(`Failed to fetch history for ${fund.cik}`, err);
             }
-            setFundHistories(histories);
-        };
-        if (fundHighlights.length > 0) {
-            fetchAllHistories();
-        }
-    }, [fundHighlights]);
+        }));
+
+        setFundHistories(histories);
+        setSwoopLoaded(true);
+        setSwoopLoading(false);
+    };
 
     // Calculate aggregated Swoop Opportunities across all funds using implied price methodology
     const swoopOpportunities = useMemo((): SwoopOpportunity[] => {
@@ -2063,7 +2068,36 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
                                 </div>
                                 <p className="section-desc-small" style={{ marginLeft: '28px', marginTop: '-4px' }}>Conviction (&gt;3%) share price dips</p>
                                 <div className="swoop-list scrollable" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                                    {swoopOpportunities.length > 0 ? (
+                                    {!swoopLoaded ? (
+                                        <div style={{ padding: '12px', color: '#64748b', fontSize: '13px', textAlign: 'center' }}>
+                                            <p style={{ margin: '0 0 10px 0', fontStyle: 'italic' }}>
+                                                Load on demand to scan top highlighted funds without slowing dashboard startup.
+                                            </p>
+                                            <button
+                                                onClick={loadSwoopOpportunities}
+                                                disabled={swoopLoading}
+                                                className="toggle-btn"
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '6px',
+                                                    padding: '6px 10px',
+                                                    fontSize: '11px',
+                                                    fontWeight: 700
+                                                }}
+                                            >
+                                                {swoopLoading ? (
+                                                    <>
+                                                        <Loader2 className="spin" size={13} />
+                                                        Loading
+                                                    </>
+                                                ) : (
+                                                    'Load Opportunities'
+                                                )}
+                                            </button>
+                                        </div>
+                                    ) : swoopOpportunities.length > 0 ? (
                                         swoopOpportunities.map((op, i) => (
                                             <div 
                                                 key={i} 

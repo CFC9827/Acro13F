@@ -7,6 +7,11 @@ from backend.services.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
+
+def price_backfill_enabled() -> bool:
+    return os.environ.get("ENABLE_PRICE_SYNC", "").lower() in {"1", "true", "yes", "on"}
+
+
 def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = None):
     """
     Returns historical prices for a ticker. 
@@ -59,6 +64,10 @@ def get_historical_prices(ticker: str, db: DatabaseManager, start_date: str = No
         if days_old < 7 and not need_earlier_data:
             logger.info(f"Using cached prices for {ticker} ({len(prices)} points)")
             return prices
+
+    if not price_backfill_enabled():
+        logger.info("Price backfill disabled; returning cached prices only.")
+        return prices
 
     # 2. Fetch from Yahoo Finance
     try:

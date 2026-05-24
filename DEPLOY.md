@@ -1,77 +1,155 @@
 # Abrams13F Deployment Guide
 
-This guide covers the steps required to deploy Abrams13F to a cloud environment (Render + Vercel + Supabase).
+This guide covers the current cloud shape for Abrams13F:
+
+- **Neon Postgres** for canonical application data.
+- **Render** for the backend API and background worker.
+- **Vercel** for the Vite frontend.
+- **R2/S3-compatible object storage** for the full historical price warehouse.
+- **Supabase Auth is optional**. Use it only if you want production login/signup now; it is no longer the primary database.
 
 ## Prerequisites
 
-1.  **Supabase Account**: A Postgres database is required.
-2.  **Render Account**: For hosting the Backend API and Background Worker.
-3.  **Vercel Account**: For hosting the Frontend UI.
-4.  **SEC User Agent**: You must have a valid User-Agent string (e.g., `Name (email)`) for SEC EDGAR access.
+1. **Neon account** with a Postgres 17 project.
+2. **Render account** for the backend API and background worker.
+3. **Vercel account** for the frontend UI.
+4. **SEC User-Agent** string, e.g. `Name (email)`, for EDGAR access.
+5. **R2/S3-compatible bucket** for historical price Parquet files.
+6. Optional: **Supabase project for Auth only**.
 
----
+## 1. Database Setup (Neon)
 
-## 1. Database Setup (Supabase)
+1. Create a Neon project using Postgres 17.
+2. Copy the pooled or direct Postgres connection string.
+3. Set it as:
+   ```env
+   DATABASE_URL=postgresql://...
+   ```
+4. Run the migration from a trusted local machine:
+   ```bash
+   python migrate_to_postgres.py
+   ```
 
-1.  Create a new project in Supabase.
-2.  Go to **Project Settings > Database** and copy the **Connection String** (URI).
-    - It should look like: `postgresql://postgres.[ID]:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres`
-3.  Ensure you have the Supabase URL and Anon Key from **Project Settings > API**.
+The migration intentionally skips the full `prices` table. The local SQLite source currently has millions of daily price rows, and a full load exceeded a 512 MB Neon project limit during testing. Keep prices out of the default migration until the storage strategy is chosen.
 
----
+## 2. Optional Auth Setup
 
-## 2. Backend Deployment (Render)
+For local development, no Supabase Auth is required. If `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are absent, the frontend uses a default dev user, and the backend allows the same dev user when `ENV` is not `production`.
 
-### A. Deploying the API
-1.  Create a new **Web Service** on Render.
-2.  Connect your GitHub repository.
-3.  Settings:
-    - **Environment**: `Docker`
-    - **Plan**: `Starter` (or higher)
-4.  **Environment Variables**:
-    - `ENV`: `production`
-    - `DATABASE_URL`: Your Supabase connection string.
-    - `SUPABASE_URL`: Your Supabase project URL.
-    - `SUPABASE_KEY`: Your Supabase service role key (or anon key depending on your RLS).
-    - `SEC_USER_AGENT`: Your declared SEC User-Agent.
-    - `FRONTEND_URL`: The URL of your Vercel deployment (you can update this later).
-5.  Deploy the service.
+For production, configure real Supabase Auth or another auth layer. With `ENV=production`, missing or unconfigured Supabase Auth is rejected.
 
-### B. Deploying the Background Worker
-1.  Create a new **Background Worker** on Render.
-2.  Connect the same GitHub repository.
-3.  Settings:
-    - **Environment**: `Docker`
-    - **Docker Command Override**: `python -m backend.worker`
-4.  **Environment Variables**: Use the same variables as the API service.
+Required env vars when using Supabase Auth:
 
----
-
-## 3. Frontend Deployment (Vercel)
-
-1.  Create a new project in Vercel.
-2.  Connect your GitHub repository.
-3.  **Framework Preset**: `Vite`
-4.  **Root Directory**: `ui`
-5.  **Environment Variables**:
-    - `VITE_API_URL`: The URL of your Render API service (e.g., `https://abrams13f-api.onrender.com`).
-    - `VITE_SUPABASE_URL`: Your Supabase project URL.
-    - `VITE_SUPABASE_ANON_KEY`: Your Supabase anon key.
-6.  Deploy.
-
----
-
-## 4. Final Configuration
-
-1.  Once the Vercel app is deployed, copy its URL.
-2.  Go back to your **Render API Service** and update the `FRONTEND_URL` environment variable with the Vercel URL.
-3.  This ensures that CORS is correctly locked down to your specific frontend.
-
----
-
-## Local Production Testing
-You can test the production setup locally using Docker Compose:
-```bash
-# Set your environment variables first
-docker-compose up --build
+```env
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
 ```
+
+Never expose a service-role key to the frontend.
+
+## 3. Backend Deployment (Render)
+
+Create a Render **Web Service**:
+
+- **Environment**: Docker
+- **Plan**: Starter or higher
+- **Environment variables**:
+  ```env
+  ENV=production
+  DATABASE_URL=<Neon connection string>
+  SEC_USER_AGENT=<your SEC User-Agent>
+  FRONTEND_URL=<your Vercel URL>
+  SUPABASE_URL=<optional auth URL>
+  SUPABASE_ANON_KEY=<optional auth anon key>
+  ENABLE_PRICE_SYNC=0
+  ENABLE_PRICE_METRICS_SYNC=0
+  PRICE_METRICS_REFRESH_LIMIT=25
+  PRICE_METRICS_REFRESH_HOURS=24
+  PRICE_WAREHOUSE_BACKEND=s3
+  PRICE_WAREHOUSE_PATH=backend/data/price_warehouse
+  PRICE_WAREHOUSE_BUCKET=<R2/S3 bucket>
+  PRICE_WAREHOUSE_ENDPOINT_URL=<R2/S3 endpoint>
+  PRICE_WAREHOUSE_ACCESS_KEY_ID=<R2/S3 access key>
+  PRICE_WAREHOUSE_SECRET_ACCESS_KEY=<R2/S3 secret>
+  PRICE_WAREHOUSE_PREFIX=abrams13f/price_warehouse
+  ```
+
+Deploy the service.
+
+## 4. Background Worker Deployment (Render)
+
+Create a Render **Background Worker** from the same repo:
+
+- **Environment**: Docker
+- **Docker Command Override**:
+  ```bash
+  python -m backend.worker
+  ```
+- Use the same backend environment variables.
+- Keep `ENABLE_PRICE_SYNC=0` on the current Neon tier.
+- Set `ENABLE_PRICE_METRICS_SYNC=1` only after the price warehouse files are available to the worker environment.
+- With R2 or S3-compatible storage, set `PRICE_WAREHOUSE_BACKEND=s3`. The local backend is only for development and local batch jobs.
+
+The worker infrastructure exists, but broad SEC universe ingestion should be run in controlled batches after API/UAT is stable.
+
+## 5. Frontend Deployment (Vercel)
+
+Create a Vercel project:
+
+- **Framework preset**: Vite
+- **Root directory**: `ui`
+- **Environment variables**:
+  ```env
+  VITE_API_URL=<Render API URL>
+  VITE_SUPABASE_URL=<optional auth URL>
+  VITE_SUPABASE_ANON_KEY=<optional auth anon key>
+  ```
+
+Deploy, then copy the Vercel URL into Render as `FRONTEND_URL`.
+
+## 6. Local Testing
+
+Backend:
+```bash
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+Frontend:
+```bash
+cd ui
+npm run dev -- --host 127.0.0.1
+```
+
+Verification:
+```bash
+python -m pytest backend/tests -q -p no:cacheprovider
+cd ui && npm run build
+```
+
+## 7. Price Warehouse
+
+Price-heavy views now avoid synchronous Yahoo backfills during a user request. `mimic-performance` uses cached DB prices when present and falls back to filing-implied prices when missing.
+
+The worker's scheduled price backfill is disabled unless `ENABLE_PRICE_SYNC=1` is set. Keep this off on the current Neon size tier.
+
+Full daily prices should live outside Neon in Parquet files. For production, upload the local warehouse to R2/S3-compatible storage:
+
+```bash
+python -m backend.scripts.upload_price_warehouse --prefix abrams13f/price_warehouse --upload
+```
+
+Dry-run first by omitting `--upload`:
+
+```bash
+python -m backend.scripts.upload_price_warehouse --prefix abrams13f/price_warehouse
+```
+
+Current local dry-run shape:
+
+- 3,335 Parquet files
+- about 90 MB
+- object prefix `abrams13f/price_warehouse`
+
+Compact app-facing outputs, such as `fund_price_metrics`, are written back into Neon by batch jobs.

@@ -13,3 +13,6 @@ sqlalchemy
 python-jose[cryptography]
 supabase
 apscheduler
+duckdb
+pyarrow
+boto3

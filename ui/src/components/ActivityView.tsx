@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { TrendingUp, TrendingDown, Filter, Download, ChevronUp, ChevronDown, Flame, Target, Check } from 'lucide-react';
 import { ActivityExportModal } from './ActivityExportModal';
 
@@ -426,7 +426,7 @@ export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) 
                         </thead>
                         <tbody>
                             {Array.from(groupedByPeriod.entries()).map(([period, items]) => (
-                                <>
+                                <Fragment key={period}>
                                     <tr key={`header-${period}`} className="activity-period-header">
                                         <td colSpan={6}>{formatQ(period)}</td>
                                     </tr>
@@ -466,7 +466,7 @@ export function ActivityView({ history, fundName = 'Fund' }: ActivityViewProps) 
                                             </td>
                                         </tr>
                                     ))}
-                                </>
+                                </Fragment>
                             ))}
                         </tbody>
                     </table>

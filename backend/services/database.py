@@ -51,10 +51,14 @@ class DatabaseManager:
         if self.is_postgres:
             conn = self._pool.getconn()
             conn.autocommit = True
+            discard = False
             try:
                 yield conn
+            except (psycopg2.InterfaceError, psycopg2.OperationalError):
+                discard = True
+                raise
             finally:
-                self._pool.putconn(conn)
+                self._pool.putconn(conn, close=discard)
         else:
             conn = sqlite3.connect(self.db_path)
             try:
@@ -64,6 +68,17 @@ class DatabaseManager:
 
     def _execute(self, query: str, params: tuple = (), fetch: str = None) -> Any:
         """Helper to execute queries and handle connection/cursor cleanup."""
+        attempts = 2 if self.is_postgres else 1
+        for attempt in range(attempts):
+            try:
+                return self._execute_once(query, params, fetch)
+            except (psycopg2.InterfaceError, psycopg2.OperationalError):
+                if attempt == attempts - 1:
+                    raise
+                logger.warning("PostgreSQL connection failed; retrying with a fresh pooled connection.")
+
+    def _execute_once(self, query: str, params: tuple = (), fetch: str = None) -> Any:
+        """Execute a query once using the current backend."""
         with self._get_connection() as conn:
             if self.is_postgres:
                 # Use RealDictCursor for PostgreSQL to match sqlite3.Row behavior
@@ -214,6 +229,21 @@ class DatabaseManager:
                 herding_score REAL,
                 PRIMARY KEY (cik, period_of_report)
             );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS fund_price_metrics (
+                cik TEXT,
+                period_of_report TEXT,
+                accession_number TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                weighted_return REAL,
+                coverage_pct REAL,
+                positions_priced INTEGER,
+                positions_total INTEGER,
+                updated_at TEXT,
+                PRIMARY KEY (cik, period_of_report)
+            );
             """
         ]
 
@@ -224,6 +254,7 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_holdings_ticker ON holdings(ticker)",
             "CREATE INDEX IF NOT EXISTS idx_prices_ticker_date ON prices(ticker, date)",
             "CREATE INDEX IF NOT EXISTS idx_stats_cik ON fund_quarterly_stats(cik)",
+            "CREATE INDEX IF NOT EXISTS idx_price_metrics_cik_period ON fund_price_metrics(cik, period_of_report)",
             "CREATE INDEX IF NOT EXISTS idx_user_tracked_funds ON user_tracked_funds(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_user_groups ON user_fund_groups(user_id)"
         ]
@@ -1066,6 +1097,49 @@ class DatabaseManager:
         params = (cik,) + params[1:]
         
         self._execute(query, params)
+
+    def save_fund_price_metric(self, metric: Dict):
+        """Persist compact price-derived metrics for app/API use."""
+        cik = self.normalize_cik(metric["cik"])
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        fields = [
+            "cik", "period_of_report", "accession_number", "start_date", "end_date",
+            "weighted_return", "coverage_pct", "positions_priced", "positions_total",
+            "updated_at"
+        ]
+        values = {**metric, "cik": cik, "updated_at": metric.get("updated_at", now)}
+        placeholders = ", ".join(["?" for _ in fields])
+        columns = ", ".join(fields)
+
+        if self.is_postgres:
+            update_clause = ", ".join(
+                [f"{field} = EXCLUDED.{field}" for field in fields if field not in ["cik", "period_of_report"]]
+            )
+            query = f"""
+                INSERT INTO fund_price_metrics ({columns})
+                VALUES ({placeholders})
+                ON CONFLICT (cik, period_of_report) DO UPDATE SET {update_clause}
+            """
+        else:
+            query = f"INSERT OR REPLACE INTO fund_price_metrics ({columns}) VALUES ({placeholders})"
+
+        self._execute(query, tuple(values.get(field) for field in fields))
+
+    def get_fund_price_metrics(self, cik: str, limit: int = 8) -> List[Dict]:
+        """Return compact price-derived metrics for a fund, newest period first."""
+        cik = self.normalize_cik(cik)
+        return self._execute(
+            """
+            SELECT cik, period_of_report, accession_number, start_date, end_date,
+                   weighted_return, coverage_pct, positions_priced, positions_total, updated_at
+            FROM fund_price_metrics
+            WHERE cik = ?
+            ORDER BY period_of_report DESC
+            LIMIT ?
+            """,
+            (cik, limit),
+            fetch="all",
+        )
 
     def search_explorer(self, criteria: Dict, user_id: str = "00000000-0000-0000-0000-000000000000") -> List[Dict]:
         """

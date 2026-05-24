@@ -13,6 +13,7 @@ venv/
 # Data
 backend/data/CUSIP.csv
 backend/data/cusip_cache.json
+backend/data/price_warehouse/
 
 # Node / Frontend
 node_modules/
@@ -23,6 +24,12 @@ dist/
 backups/
 *.txt
 !requirements.txt
+worker.log
+.uvicorn*.log
+old_*.tsx
+scratch/*.json
+scratch/capture_*.py
+scratch/check_*.py
 
 # Desktop Distribution
 Abrams13F_v*.zip

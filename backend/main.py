@@ -3,7 +3,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-load_dotenv()
+import os
+from pathlib import Path
+if os.environ.get("ABRAMS13F_SKIP_DOTENV") != "1":
+    load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=os.environ.get("ENV") != "production")
 from typing import List, Dict
 from backend.services.database import DatabaseManager
 from backend.services.orchestrator import Orchestrator
@@ -13,8 +16,9 @@ from backend.services.mimic_performance import MimicPerformanceCalculator
 from backend.services.sector_mapper import SectorMapper
 from backend.services.sec_client import SECClient
 from backend.services.auth import get_current_user, get_user_id
-import os
 import logging
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Stock Screener API")
 
@@ -56,6 +60,9 @@ async def get_config():
 @api.post("/config")
 async def update_config(config: Dict[str, str]):
     """Updates the application configuration."""
+    if os.environ.get("ENV") == "production":
+        raise HTTPException(status_code=403, detail="Runtime configuration changes are disabled in production")
+
     user_agent = config.get("sec_user_agent")
     if not user_agent:
         raise HTTPException(status_code=400, detail="sec_user_agent is required")
@@ -156,6 +163,16 @@ async def get_mimic_performance(cik: str):
         return mimic_calc.get_mimic_performance(cik)
     except Exception as e:
         logger.error(f"Error calculating mimic performance for {cik}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api.get("/funds/{cik}/price-metrics")
+async def get_fund_price_metrics(cik: str, user_id: str = Depends(get_user_id)):
+    try:
+        return {
+            "cik": db.normalize_cik(cik),
+            "metrics": db.get_fund_price_metrics(cik),
+        }
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/groups")
@@ -318,14 +335,6 @@ async def get_ticker_prices(ticker: str, start: str = None, user_id: str = Depen
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@api.get("/explorer/stocks/favorites")
-async def get_whale_favorites(user_id: str = Depends(get_user_id)):
-    """Returns the most popular stocks across the institutional universe."""
-    try:
-        return db.get_whale_favorites()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @api.post("/sectors/update")
 async def update_sectors(user_id: str = Depends(get_user_id)):
     """Backfill sector data for all holdings that are missing sectors."""
@@ -458,7 +467,7 @@ async def explorer_search(request: Request, user_id: str = Depends(get_user_id))
         raise HTTPException(status_code=500, detail=f"Explorer search failed: {str(e)}")
 
 @api.get("/explorer/stocks/favorites")
-async def get_whale_favorites(limit: int = 100):
+async def get_whale_favorites(limit: int = 100, user_id: str = Depends(get_user_id)):
     """Returns the top stocks held by 'whale' funds."""
     try:
         results = db.get_whale_favorites(limit)

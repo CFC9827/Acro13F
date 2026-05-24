@@ -5,6 +5,10 @@ import tempfile
 import json
 from fastapi.testclient import TestClient
 
+# Tests should never initialize the cloud database during module import.
+os.environ["ABRAMS13F_SKIP_DOTENV"] = "1"
+os.environ["DATABASE_URL"] = ""
+
 # Ensure the backend directory is in the path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.main import app
@@ -17,9 +21,16 @@ def client():
     
     # Overwrite the global db in main.py for testing
     import backend.main as main
+    DatabaseManager._instance = None
+    DatabaseManager._initialized = False
     main.db = DatabaseManager(db_path=db_path)
+    main.app.dependency_overrides[main.get_user_id] = lambda: "00000000-0000-0000-0000-000000000000"
     
     yield TestClient(app)
+
+    main.app.dependency_overrides.clear()
+    DatabaseManager._instance = None
+    DatabaseManager._initialized = False
     
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -107,6 +118,70 @@ def test_explorer_search_endpoint(client):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
+
+def test_fund_price_metrics_endpoint_returns_compact_online_metrics(client):
+    import backend.main as main
+    db = main.db
+
+    db.save_fund("0001067983", "Berkshire Hathaway")
+    db.save_fund_price_metric({
+        "cik": "0001067983",
+        "period_of_report": "2024-12-31",
+        "accession_number": "ACC1",
+        "start_date": "2024-10-01",
+        "end_date": "2024-12-31",
+        "weighted_return": 0.1234,
+        "coverage_pct": 98.5,
+        "positions_priced": 40,
+        "positions_total": 42,
+    })
+
+    resp = client.get("/api/funds/0001067983/price-metrics")
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "cik": "0001067983",
+        "metrics": [
+            {
+                "cik": "0001067983",
+                "period_of_report": "2024-12-31",
+                "accession_number": "ACC1",
+                "start_date": "2024-10-01",
+                "end_date": "2024-12-31",
+                "weighted_return": 0.1234,
+                "coverage_pct": 98.5,
+                "positions_priced": 40,
+                "positions_total": 42,
+                "updated_at": resp.json()["metrics"][0]["updated_at"],
+            }
+        ],
+    }
+
+def test_api_routes_do_not_register_duplicate_method_path_pairs():
+    """Each API method/path pair should be registered once to avoid shadowed handlers."""
+    seen = set()
+    duplicates = []
+
+    for route in app.routes:
+        path = getattr(route, "path", None)
+        methods = getattr(route, "methods", set()) or set()
+        for method in methods:
+            if method in {"HEAD", "OPTIONS"}:
+                continue
+            key = (method, path)
+            if key in seen:
+                duplicates.append(key)
+            seen.add(key)
+
+    assert duplicates == []
+
+def test_config_update_is_disabled_in_production(client, monkeypatch):
+    monkeypatch.setenv("ENV", "production")
+
+    resp = client.post("/api/config", json={"sec_user_agent": "Abrams13F/1.0 admin@example.com"})
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Runtime configuration changes are disabled in production"
 
 if __name__ == "__main__":
     pytest.main([__file__])

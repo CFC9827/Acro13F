@@ -24,6 +24,16 @@ interface TooltipState {
     content: React.ReactNode;
 }
 
+interface PriceMetric {
+    period_of_report: string;
+    weighted_return: number;
+    coverage_pct: number;
+    positions_priced: number;
+    positions_total: number;
+    start_date: string;
+    end_date: string;
+}
+
 const formatCurrency = (value: number): string => {
     const absValue = Math.abs(value);
     if (absValue >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(1)}B`;
@@ -42,6 +52,7 @@ const formatQ = (dateStr: string) => {
 export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik, onOpenHoldings, onOpenActivity, onOpenComposition, onOpenPerformance }) => {
     const [tooltip, setTooltip] = useState<TooltipState | null>(null);
     const [sectorAllocation, setSectorAllocation] = useState<{ sector: string, value: number, weight: number }[]>([]);
+    const [priceMetric, setPriceMetric] = useState<PriceMetric | null>(null);
     const [moversMode, setMoversMode] = useState<'value' | 'shares'>('value');
     const { session } = useAuth();
 
@@ -265,19 +276,28 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
     useEffect(() => {
         if (!cik) return;
 
-        const fetchSectors = async () => {
+        const fetchSummaryData = async () => {
             try {
-                const res = await fetchWithAuth(`/api/sectors/allocation?cik=${cik}`, {}, session);
-                if (res.ok) {
-                    const data = await res.json();
+                const [sectorRes, metricsRes] = await Promise.all([
+                    fetchWithAuth(`/api/sectors/allocation?cik=${cik}`, {}, session),
+                    fetchWithAuth(`/api/funds/${cik}/price-metrics`, {}, session)
+                ]);
+
+                if (sectorRes.ok) {
+                    const data = await sectorRes.json();
                     setSectorAllocation(data.allocation || []);
                 }
+
+                if (metricsRes.ok) {
+                    const data = await metricsRes.json();
+                    setPriceMetric(data.metrics?.[0] || null);
+                }
             } catch (err) {
-                console.error("Failed to fetch sector allocation", err);
+                console.error("Failed to fetch fund summary data", err);
             }
         };
-        fetchSectors();
-    }, [cik, history]);
+        fetchSummaryData();
+    }, [cik, history, session]);
 
     const aumChange = aum - priorAum;
     const aumChangePercent = priorAum > 0 ? (aumChange / priorAum) * 100 : 0;
@@ -293,6 +313,8 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
     const turnoverValue = movers.reduce((sum, m) => sum + Math.abs(m.val_change), 0) / 2;
     const avgAum = (aum + priorAum) / 2;
     const turnoverRate = avgAum > 0 ? (turnoverValue / avgAum) * 100 : 0;
+    const displayedReturn = priceMetric ? priceMetric.weighted_return * 100 : totalReturnQoQ;
+    const returnLabel = priceMetric ? 'Price Return' : 'QoQ TWR';
 
     if (!history || history.length === 0) {
         return (
@@ -373,7 +395,7 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     </div>
                 </div>
 
-                {/* QOQ TWR TILE */}
+                {/* PRICE RETURN TILE */}
                 <div
                     className="kpi-tile"
                     role={onOpenPerformance ? 'button' : undefined}
@@ -381,17 +403,33 @@ export const FundSummary: React.FC<FundSummaryProps> = ({ history, fundName, cik
                     onClick={onOpenPerformance}
                     onKeyDown={(e) => handleNavigationKeyDown(e, onOpenPerformance)}
                     style={{ cursor: onOpenPerformance ? 'pointer' : 'default' }}
+                    onMouseEnter={(e) => priceMetric && handleMouseEnter(e, 'Warehouse Price Return', (
+                        <div style={{ maxWidth: '220px', fontSize: '11px', color: '#cbd5e1' }}>
+                            <div style={{ marginBottom: '6px' }}>
+                                Weighted holding-period return from cached Parquet prices promoted into Neon.
+                            </div>
+                            <div>Period: {formatQ(priceMetric.period_of_report)}</div>
+                            <div>Coverage: {priceMetric.coverage_pct.toFixed(1)}%</div>
+                            <div>Priced: {priceMetric.positions_priced}/{priceMetric.positions_total}</div>
+                        </div>
+                    ))}
+                    onMouseLeave={handleMouseLeave}
                 >
-                    <div className="kpi-icon" style={{ color: totalReturnQoQ >= 0 ? '#10b981' : '#ef4444', background: totalReturnQoQ >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
+                    <div className="kpi-icon" style={{ color: displayedReturn >= 0 ? '#10b981' : '#ef4444', background: displayedReturn >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }}>
                         <TrendingUp size={18} />
                     </div>
                     <div className="kpi-content">
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                            <span className={`kpi-value ${totalReturnQoQ > 0 ? 'positive' : totalReturnQoQ < 0 ? 'negative' : ''}`}>
-                                {totalReturnQoQ > 0 ? '+' : ''}{totalReturnQoQ.toFixed(1)}%
+                            <span className={`kpi-value ${displayedReturn > 0 ? 'positive' : displayedReturn < 0 ? 'negative' : ''}`}>
+                                {displayedReturn > 0 ? '+' : ''}{displayedReturn.toFixed(1)}%
                             </span>
+                            {priceMetric && (
+                                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#38bdf8' }}>
+                                    {priceMetric.coverage_pct.toFixed(0)}%
+                                </span>
+                            )}
                         </div>
-                        <span className="kpi-label">QoQ TWR</span>
+                        <span className="kpi-label">{returnLabel}</span>
                     </div>
                 </div>
 
