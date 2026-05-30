@@ -24,6 +24,27 @@ def test_worker_does_not_schedule_price_sync_by_default_on_postgres(monkeypatch)
     assert "sync_price_metrics_task" not in jobs
 
 
+def test_worker_initializes_orchestrator_with_shared_database(monkeypatch):
+    from backend import worker as worker_module
+
+    created = {}
+
+    class FakeDb:
+        pass
+
+    class FakeOrchestrator:
+        def __init__(self, db):
+            created["db"] = db
+
+    monkeypatch.setattr(worker_module, "DatabaseManager", FakeDb)
+    monkeypatch.setattr(worker_module, "Orchestrator", FakeOrchestrator)
+
+    worker = worker_module.BackgroundWorker()
+
+    assert isinstance(worker.db, FakeDb)
+    assert created["db"] is worker.db
+
+
 def test_worker_uses_configured_fund_refresh_schedule(monkeypatch):
     from backend import worker as worker_module
 

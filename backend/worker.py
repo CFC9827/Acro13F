@@ -86,7 +86,7 @@ def build_recent_price_metrics_for_worker(db, limit: int):
 class BackgroundWorker:
     def __init__(self):
         self.db = DatabaseManager()
-        self.orchestrator = Orchestrator()
+        self.orchestrator = Orchestrator(self.db)
         logger.info("BackgroundWorker initialized.")
 
     def sync_funds_task(self):

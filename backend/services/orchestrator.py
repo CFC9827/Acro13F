@@ -4,6 +4,7 @@ from backend.services.database import DatabaseManager
 from backend.services.cusip_mapper import CUSIPMapper
 from backend.services.whale_index import WhaleIndexService
 import logging
+import os
 
 class Orchestrator:
     def __init__(self, db_manager: DatabaseManager):
@@ -118,9 +119,11 @@ class Orchestrator:
                     if metrics:
                         whale_svc.save_metrics(metrics)
                 logging.info(f"Auto-calculated quarterly stats for {fund_name} ({len(filings)} quarters).")
-                
-                # NEW: Auto-fetch prices for all tickers in the fund
-                self.sync_fund_prices(cik)
+
+                if os.environ.get("ENABLE_PRICE_SYNC", "").lower() in {"1", "true", "yes", "on"}:
+                    self.sync_fund_prices(cik)
+                else:
+                    logging.info("Skipping fund price sync; ENABLE_PRICE_SYNC is not enabled.")
                 
             except Exception as e:
                 logging.warning(f"Failed to auto-calculate metrics for {fund_name}: {e}")
