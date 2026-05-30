@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
+import time
 from pathlib import Path
 if os.environ.get("ABRAMS13F_SKIP_DOTENV") != "1":
     load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / ".env", override=os.environ.get("ENV") != "production")
@@ -46,6 +47,27 @@ db = DatabaseManager()
 mimic_calc = MimicPerformanceCalculator(db)
 orch = Orchestrator(db)
 sector_mapper = SectorMapper()
+_dashboard_summary_cache: Dict[tuple, Dict[str, object]] = {}
+
+
+def dashboard_summary_cache_ttl_seconds() -> int:
+    try:
+        return max(0, int(os.environ.get("DASHBOARD_SUMMARY_CACHE_TTL_SECONDS", "300")))
+    except ValueError:
+        return 300
+
+
+def invalidate_dashboard_summary_cache(user_id: str = None):
+    global _dashboard_summary_cache
+    if user_id is None:
+        _dashboard_summary_cache.clear()
+        return
+
+    _dashboard_summary_cache = {
+        key: value
+        for key, value in _dashboard_summary_cache.items()
+        if key[0] != user_id
+    }
 
 @api.get("/config")
 async def get_config():
@@ -118,7 +140,8 @@ async def track_fund(cik: str, background_tasks: BackgroundTasks, track: bool = 
             db.track_fund(user_id=user_id, cik=cik)
         else:
             db.untrack_fund(user_id=user_id, cik=cik)
-            
+
+        invalidate_dashboard_summary_cache(user_id)
         return {"status": "success", "cik": cik, "tracked": track}
     except Exception as e:
         import traceback
@@ -143,9 +166,20 @@ async def reorder_funds(orders: Dict[str, int]):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api.get("/dashboard/summary")
-async def get_dashboard_summary(group_id: int = None, user_id: str = Depends(get_user_id)):
+async def get_dashboard_summary(group_id: int = None, refresh: bool = False, user_id: str = Depends(get_user_id)):
     try:
+        ttl = dashboard_summary_cache_ttl_seconds()
+        cache_key = (user_id, group_id)
+        now = time.monotonic()
+
+        if ttl > 0 and not refresh:
+            cached = _dashboard_summary_cache.get(cache_key)
+            if cached and now - cached["created_at"] < ttl:
+                return cached["summary"]
+
         summary = db.get_dashboard_summary(group_id=group_id, user_id=user_id)
+        if ttl > 0:
+            _dashboard_summary_cache[cache_key] = {"created_at": now, "summary": summary}
         return summary
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -194,6 +228,7 @@ async def reorder_groups(orders: Dict[int, int], user_id: str = Depends(get_user
 async def create_group(name: str, user_id: str = Depends(get_user_id)):
     try:
         group_id = db.create_group(name, user_id=user_id)
+        invalidate_dashboard_summary_cache(user_id)
         return {"status": "success", "group_id": group_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -202,6 +237,7 @@ async def create_group(name: str, user_id: str = Depends(get_user_id)):
 async def delete_group(id: int, user_id: str = Depends(get_user_id)):
     try:
         db.delete_group(id, user_id=user_id)
+        invalidate_dashboard_summary_cache(user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -210,6 +246,7 @@ async def delete_group(id: int, user_id: str = Depends(get_user_id)):
 async def add_group_member(id: int, cik: str, user_id: str = Depends(get_user_id)):
     try:
         db.add_fund_to_group(id, cik, user_id=user_id)
+        invalidate_dashboard_summary_cache(user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -218,6 +255,7 @@ async def add_group_member(id: int, cik: str, user_id: str = Depends(get_user_id
 async def remove_group_member(id: int, cik: str, user_id: str = Depends(get_user_id)):
     try:
         db.remove_fund_from_group(id, cik, user_id=user_id)
+        invalidate_dashboard_summary_cache(user_id)
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

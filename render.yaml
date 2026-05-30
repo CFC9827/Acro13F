@@ -17,6 +17,8 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      - key: DASHBOARD_SUMMARY_CACHE_TTL_SECONDS
+        value: "300"
       - key: ENABLE_PRICE_SYNC
         value: "0"
       - key: ENABLE_PRICE_METRICS_SYNC

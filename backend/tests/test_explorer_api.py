@@ -24,11 +24,13 @@ def client():
     DatabaseManager._instance = None
     DatabaseManager._initialized = False
     main.db = DatabaseManager(db_path=db_path)
+    main.invalidate_dashboard_summary_cache()
     main.app.dependency_overrides[main.get_user_id] = lambda: "00000000-0000-0000-0000-000000000000"
     
     yield TestClient(app)
 
     main.app.dependency_overrides.clear()
+    main.invalidate_dashboard_summary_cache()
     DatabaseManager._instance = None
     DatabaseManager._initialized = False
     
@@ -174,6 +176,51 @@ def test_api_routes_do_not_register_duplicate_method_path_pairs():
             seen.add(key)
 
     assert duplicates == []
+
+
+def test_dashboard_summary_endpoint_caches_and_can_force_refresh(client, monkeypatch):
+    import backend.main as main
+
+    calls = []
+
+    def fake_summary(group_id=None, user_id=None):
+        calls.append({"group_id": group_id, "user_id": user_id})
+        return {"call_count": len(calls), "group_id": group_id}
+
+    monkeypatch.setenv("DASHBOARD_SUMMARY_CACHE_TTL_SECONDS", "300")
+    monkeypatch.setattr(main.db, "get_dashboard_summary", fake_summary)
+    main.invalidate_dashboard_summary_cache()
+
+    first = client.get("/api/dashboard/summary")
+    second = client.get("/api/dashboard/summary")
+    forced = client.get("/api/dashboard/summary?refresh=true")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert forced.status_code == 200
+    assert first.json()["call_count"] == 1
+    assert second.json()["call_count"] == 1
+    assert forced.json()["call_count"] == 2
+
+
+def test_tracking_fund_invalidates_dashboard_summary_cache(client, monkeypatch):
+    import backend.main as main
+
+    calls = []
+
+    def fake_summary(group_id=None, user_id=None):
+        calls.append(user_id)
+        return {"call_count": len(calls)}
+
+    monkeypatch.setenv("DASHBOARD_SUMMARY_CACHE_TTL_SECONDS", "300")
+    monkeypatch.setattr(main.db, "get_dashboard_summary", fake_summary)
+    main.invalidate_dashboard_summary_cache()
+
+    assert client.get("/api/dashboard/summary").json()["call_count"] == 1
+    track_resp = client.post("/api/funds/0000000001/track?track=true")
+    assert track_resp.status_code == 200
+    assert client.get("/api/dashboard/summary").json()["call_count"] == 2
+
 
 def test_config_update_is_disabled_in_production(client, monkeypatch):
     monkeypatch.setenv("ENV", "production")
