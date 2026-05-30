@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: Acro13F
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/config
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SEC_USER_AGENT
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ENABLE_PRICE_SYNC
+        value: "0"
+      - key: ENABLE_PRICE_METRICS_SYNC
+        value: "0"
+      - key: PRICE_WAREHOUSE_BACKEND
+        value: s3
+      - key: PRICE_WAREHOUSE_BUCKET
+        sync: false
+      - key: PRICE_WAREHOUSE_ENDPOINT_URL
+        sync: false
+      - key: PRICE_WAREHOUSE_ACCESS_KEY_ID
+        sync: false
+      - key: PRICE_WAREHOUSE_SECRET_ACCESS_KEY
+        sync: false
+      - key: PRICE_WAREHOUSE_PREFIX
+        value: abrams13f/price_warehouse
+
+  - type: worker
+    name: Acro13F-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python -m backend.worker
+    envVars:
+      - key: ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SEC_USER_AGENT
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: FUND_REFRESH_INTERVAL_HOURS
+        value: "12"
+      - key: FUND_REFRESH_STALE_HOURS
+        value: "12"
+      - key: FUND_REFRESH_LIMIT
+        value: "25"
+      - key: FUND_REFRESH_TRACKED_ONLY
+        value: "1"
+      - key: ENABLE_PRICE_SYNC
+        value: "0"
+      - key: ENABLE_PRICE_METRICS_SYNC
+        value: "0"
+      - key: PRICE_METRICS_REFRESH_LIMIT
+        value: "25"
+      - key: PRICE_METRICS_REFRESH_HOURS
+        value: "24"
+      - key: PRICE_WAREHOUSE_BACKEND
+        value: s3
+      - key: PRICE_WAREHOUSE_BUCKET
+        sync: false
+      - key: PRICE_WAREHOUSE_ENDPOINT_URL
+        sync: false
+      - key: PRICE_WAREHOUSE_ACCESS_KEY_ID
+        sync: false
+      - key: PRICE_WAREHOUSE_SECRET_ACCESS_KEY
+        sync: false
+      - key: PRICE_WAREHOUSE_PREFIX
+        value: abrams13f/price_warehouse

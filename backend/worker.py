@@ -57,6 +57,24 @@ def price_metrics_refresh_hours() -> int:
     except ValueError:
         return 24
 
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except ValueError:
+        return default
+
+def fund_refresh_interval_hours() -> int:
+    return _positive_int_env("FUND_REFRESH_INTERVAL_HOURS", 12)
+
+def fund_refresh_stale_hours() -> int:
+    return _positive_int_env("FUND_REFRESH_STALE_HOURS", 12)
+
+def fund_refresh_limit() -> int:
+    return _positive_int_env("FUND_REFRESH_LIMIT", 25)
+
+def fund_refresh_tracked_only() -> bool:
+    return os.environ.get("FUND_REFRESH_TRACKED_ONLY", "1").lower() not in {"0", "false", "no", "off"}
+
 class BackgroundWorker:
     def __init__(self):
         self.db = DatabaseManager()
@@ -66,13 +84,19 @@ class BackgroundWorker:
     def sync_funds_task(self):
         """Task to sync stale funds from the SEC."""
         logger.info("Starting sync_funds_task...")
-        stale_funds = self.db.get_stale_funds(hours=12) # Check every 12 hours
+        stale_hours = fund_refresh_stale_hours()
+        limit = fund_refresh_limit()
+        tracked_only = fund_refresh_tracked_only()
+        stale_funds = self.db.get_stale_funds(hours=stale_hours, limit=limit, tracked_only=tracked_only)
         
         if not stale_funds:
             logger.info("No stale funds found.")
             return
 
-        logger.info(f"Found {len(stale_funds)} stale funds to sync.")
+        logger.info(
+            f"Found {len(stale_funds)} stale funds to sync "
+            f"(stale_hours={stale_hours}, limit={limit}, tracked_only={tracked_only})."
+        )
         
         for fund in stale_funds:
             cik = fund['cik']
@@ -167,8 +191,7 @@ class BackgroundWorker:
         """Start the scheduler."""
         scheduler = BlockingScheduler()
         
-        # Sync funds every 12 hours
-        scheduler.add_job(self.sync_funds_task, 'interval', hours=12, next_run_time=datetime.now())
+        scheduler.add_job(self.sync_funds_task, 'interval', hours=fund_refresh_interval_hours(), next_run_time=datetime.now())
         
         # Sync prices every 24 hours only when explicitly enabled.
         if price_sync_enabled():

@@ -83,11 +83,20 @@ Deploy the service.
 Create a Render **Background Worker** from the same repo:
 
 - **Environment**: Docker
+- **Plan**: Starter or higher. Render does not offer background workers on the free instance type.
 - **Docker Command Override**:
   ```bash
   python -m backend.worker
   ```
 - Use the same backend environment variables.
+- Recommended fund refresh settings:
+  ```env
+  FUND_REFRESH_INTERVAL_HOURS=12
+  FUND_REFRESH_STALE_HOURS=12
+  FUND_REFRESH_LIMIT=25
+  FUND_REFRESH_TRACKED_ONLY=1
+  ```
+- `FUND_REFRESH_TRACKED_ONLY=1` keeps the scheduled worker focused on user-tracked funds. Leave broad corpus ingestion for a separate controlled batch job.
 - Keep `ENABLE_PRICE_SYNC=0` on the current Neon tier.
 - Set `ENABLE_PRICE_METRICS_SYNC=1` only after the price warehouse files are available to the worker environment.
 - With R2 or S3-compatible storage, set `PRICE_WAREHOUSE_BACKEND=s3`. The local backend is only for development and local batch jobs.

@@ -1611,15 +1611,36 @@ class DatabaseManager:
 
 
 
-    def get_stale_funds(self, hours: int = 24) -> List[Dict]:
+    def get_stale_funds(self, hours: int = 24, limit: int = None, tracked_only: bool = True) -> List[Dict]:
         """Fetch funds that haven't been synced recently."""
+        hours = max(1, int(hours))
+        limit = max(1, int(limit)) if limit is not None else None
+        tracked_join = """
+                JOIN (SELECT DISTINCT cik FROM user_tracked_funds) tracked ON tracked.cik = f.cik
+        """ if tracked_only else ""
+
         if self.is_postgres:
-            # For Postgres, we can pass the interval as a parameter safely
-            query = f"SELECT cik, name FROM funds WHERE last_synced_at IS NULL OR last_synced_at < NOW() - INTERVAL '{hours} hours'"
-            return self._execute(query, fetch='all')
+            query = f"""
+                SELECT f.cik, f.name
+                FROM funds f
+                {tracked_join}
+                WHERE f.last_synced_at IS NULL OR f.last_synced_at < NOW() - (? * INTERVAL '1 hour')
+                ORDER BY f.last_synced_at NULLS FIRST, f.name
+            """
         else:
-            query = f"SELECT cik, name FROM funds WHERE last_synced_at IS NULL OR datetime(last_synced_at) < datetime('now', '-{hours} hours')"
-            return self._execute(query, fetch='all')
+            query = f"""
+                SELECT f.cik, f.name
+                FROM funds f
+                {tracked_join}
+                WHERE f.last_synced_at IS NULL OR datetime(f.last_synced_at) < datetime('now', '-' || ? || ' hours')
+                ORDER BY f.last_synced_at IS NOT NULL, datetime(f.last_synced_at), f.name
+            """
+
+        params = [hours]
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+        return self._execute(query, tuple(params), fetch='all')
 
     def update_fund_sync_status(self, cik: str, status: str):
         """Update the real-time syncing status of a fund."""

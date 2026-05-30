@@ -24,6 +24,63 @@ def test_worker_does_not_schedule_price_sync_by_default_on_postgres(monkeypatch)
     assert "sync_price_metrics_task" not in jobs
 
 
+def test_worker_uses_configured_fund_refresh_schedule(monkeypatch):
+    from backend import worker as worker_module
+
+    jobs = {}
+
+    class FakeScheduler:
+        def add_job(self, func, *args, **kwargs):
+            jobs[func.__name__] = {"args": args, "kwargs": kwargs}
+
+        def start(self):
+            return None
+
+    monkeypatch.setenv("FUND_REFRESH_INTERVAL_HOURS", "4")
+    monkeypatch.setattr(worker_module, "BlockingScheduler", FakeScheduler)
+
+    worker = worker_module.BackgroundWorker.__new__(worker_module.BackgroundWorker)
+    worker_module.BackgroundWorker.run(worker)
+
+    assert jobs["sync_funds_task"]["args"] == ("interval",)
+    assert jobs["sync_funds_task"]["kwargs"]["hours"] == 4
+
+
+def test_sync_funds_task_uses_configured_stale_hours_and_limit(monkeypatch):
+    from backend import worker as worker_module
+
+    calls = []
+    processed = []
+
+    class FakeDb:
+        def get_stale_funds(self, hours, limit, tracked_only):
+            calls.append({"hours": hours, "limit": limit, "tracked_only": tracked_only})
+            return [{"cik": "0000000001", "name": "Fund One"}]
+
+        def update_fund_sync_status(self, cik, status):
+            calls.append({"status": status, "cik": cik})
+
+        def update_fund_last_synced(self, cik):
+            calls.append({"last_synced": cik})
+
+    class FakeOrchestrator:
+        def process_fund(self, cik):
+            processed.append(cik)
+
+    monkeypatch.setenv("FUND_REFRESH_STALE_HOURS", "36")
+    monkeypatch.setenv("FUND_REFRESH_LIMIT", "2")
+    monkeypatch.setattr(worker_module.time, "sleep", lambda seconds: None)
+
+    worker = worker_module.BackgroundWorker.__new__(worker_module.BackgroundWorker)
+    worker.db = FakeDb()
+    worker.orchestrator = FakeOrchestrator()
+
+    worker_module.BackgroundWorker.sync_funds_task(worker)
+
+    assert calls[0] == {"hours": 36, "limit": 2, "tracked_only": True}
+    assert processed == ["0000000001"]
+
+
 def test_worker_can_schedule_price_sync_when_explicitly_enabled(monkeypatch):
     from backend import worker as worker_module
 

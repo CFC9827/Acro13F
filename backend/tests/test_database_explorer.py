@@ -92,5 +92,37 @@ def test_fund_price_metrics_schema():
         if os.path.exists(db_path):
             os.remove(db_path)
 
+
+def test_get_stale_funds_honors_limit_and_excludes_recent_funds():
+    """Worker refresh batches should be bounded and skip recently synced funds."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        db = DatabaseManager(db_path=db_path)
+
+        db.save_fund("1", "Never Synced Fund")
+        db.save_fund("2", "Old Fund")
+        db.save_fund("3", "Recent Fund")
+        db.save_fund("4", "Untracked Old Fund")
+        db.track_fund("00000000-0000-0000-0000-000000000000", "1")
+        db.track_fund("00000000-0000-0000-0000-000000000000", "2")
+        db.track_fund("00000000-0000-0000-0000-000000000000", "3")
+        db._execute("UPDATE funds SET last_synced_at = datetime('now', '-48 hours') WHERE cik = ?", (db.normalize_cik("2"),))
+        db._execute("UPDATE funds SET last_synced_at = datetime('now', '-1 hours') WHERE cik = ?", (db.normalize_cik("3"),))
+        db._execute("UPDATE funds SET last_synced_at = datetime('now', '-48 hours') WHERE cik = ?", (db.normalize_cik("4"),))
+
+        stale = db.get_stale_funds(hours=12, limit=3)
+
+        assert [row["cik"] for row in stale] == [db.normalize_cik("1"), db.normalize_cik("2")]
+
+    finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
 if __name__ == "__main__":
     pytest.main([__file__])
