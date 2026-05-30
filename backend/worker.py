@@ -5,9 +5,6 @@ from datetime import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 from backend.services.database import DatabaseManager
 from backend.services.orchestrator import Orchestrator
-from backend.services.prices import get_historical_prices
-from backend.services.price_warehouse import PriceWarehouse
-from backend.scripts.build_price_derived_metrics import build_recent_price_metrics
 
 # Setup logging
 logging.basicConfig(
@@ -75,6 +72,17 @@ def fund_refresh_limit() -> int:
 def fund_refresh_tracked_only() -> bool:
     return os.environ.get("FUND_REFRESH_TRACKED_ONLY", "1").lower() not in {"0", "false", "no", "off"}
 
+def fetch_historical_prices_for_worker(ticker, db):
+    from backend.services.prices import get_historical_prices
+
+    return get_historical_prices(ticker, db)
+
+def build_recent_price_metrics_for_worker(db, limit: int):
+    from backend.services.price_warehouse import PriceWarehouse
+    from backend.scripts.build_price_derived_metrics import build_recent_price_metrics
+
+    return build_recent_price_metrics(db, PriceWarehouse(), limit=limit)
+
 class BackgroundWorker:
     def __init__(self):
         self.db = DatabaseManager()
@@ -137,7 +145,7 @@ class BackgroundWorker:
             try:
                 logger.info(f"Updating price: {ticker}")
                 # get_historical_prices naturally fetches latest and saves to DB
-                get_historical_prices(ticker, self.db)
+                fetch_historical_prices_for_worker(ticker, self.db)
                 
                 # Sleep to be polite to Yahoo Finance
                 time.sleep(0.5)
@@ -181,7 +189,7 @@ class BackgroundWorker:
         limit = price_metrics_refresh_limit()
         logger.info(f"Starting sync_price_metrics_task for {limit} recent filings...")
         try:
-            results = build_recent_price_metrics(self.db, PriceWarehouse(), limit=limit)
+            results = build_recent_price_metrics_for_worker(self.db, limit=limit)
             logger.info(f"Built {len(results)} fund price metric rows.")
         except Exception as e:
             logger.error(f"Failed to refresh fund price metrics: {str(e)}")

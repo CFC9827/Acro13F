@@ -152,16 +152,12 @@ def test_sync_price_metrics_task_uses_configured_limit(monkeypatch):
 
     calls = []
 
-    class FakeWarehouse:
-        pass
-
-    def fake_build_recent_price_metrics(db, warehouse, limit):
-        calls.append({"db": db, "warehouse": warehouse, "limit": limit})
+    def fake_build_recent_price_metrics_for_worker(db, limit):
+        calls.append({"db": db, "limit": limit})
         return [{"cik": "0000000001"}]
 
     monkeypatch.setenv("PRICE_METRICS_REFRESH_LIMIT", "7")
-    monkeypatch.setattr(worker_module, "PriceWarehouse", FakeWarehouse)
-    monkeypatch.setattr(worker_module, "build_recent_price_metrics", fake_build_recent_price_metrics)
+    monkeypatch.setattr(worker_module, "build_recent_price_metrics_for_worker", fake_build_recent_price_metrics_for_worker)
 
     worker = worker_module.BackgroundWorker.__new__(worker_module.BackgroundWorker)
     worker.db = object()
@@ -169,7 +165,6 @@ def test_sync_price_metrics_task_uses_configured_limit(monkeypatch):
     worker_module.BackgroundWorker.sync_price_metrics_task(worker)
 
     assert calls[0]["db"] is worker.db
-    assert isinstance(calls[0]["warehouse"], FakeWarehouse)
     assert calls[0]["limit"] == 7
 
 
