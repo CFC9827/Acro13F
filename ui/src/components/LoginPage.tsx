@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { supabase } from '../contexts/AuthContext';
+import { supabase, useAuth } from '../contexts/AuthContext';
 import { TrendingUp, Mail, Lock, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
+    const { authConfigError } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -13,6 +14,12 @@ export const LoginPage: React.FC = () => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+
+        if (!supabase) {
+            setError('Authentication is not configured for this deployment.');
+            setLoading(false);
+            return;
+        }
 
         try {
             if (isSignUp) {
@@ -71,7 +78,25 @@ export const LoginPage: React.FC = () => {
                     </p>
                 </div>
 
-                <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {authConfigError ? (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '14px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        borderRadius: '10px',
+                        color: '#fca5a5',
+                        fontSize: '0.95rem',
+                        lineHeight: 1.5
+                    }}>
+                        <AlertCircle size={18} />
+                        Production auth is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel.
+                    </div>
+                ) : (
+                    <>
+                    <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ position: 'relative' }}>
                         <Mail size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                         <input
@@ -182,6 +207,8 @@ export const LoginPage: React.FC = () => {
                         {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
                     </button>
                 </div>
+                    </>
+                )}
             </div>
         </div>
     );

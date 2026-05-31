@@ -3,16 +3,22 @@ import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const devAuthEnabled = !supabaseUrl || !supabaseAnonKey;
+const authEnvConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const devAuthEnabled = !import.meta.env.PROD && !authEnvConfigured;
+const authConfigError = import.meta.env.PROD && !authEnvConfigured;
 
 export const supabase = devAuthEnabled
     ? null
-    : createClient(supabaseUrl, supabaseAnonKey);
+    : authEnvConfigured
+        ? createClient(supabaseUrl, supabaseAnonKey)
+        : null;
 
 interface AuthContextType {
     user: User | null;
     session: Session | null;
     loading: boolean;
+    devAuthEnabled: boolean;
+    authConfigError: boolean;
     signOut: () => Promise<void>;
 }
 
@@ -24,6 +30,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (authConfigError) {
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+            return;
+        }
+
         if (devAuthEnabled) {
             setUser({
                 id: '00000000-0000-0000-0000-000000000000',
@@ -38,9 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
         }
 
-        console.log("AuthContext: Checking active session...");
         supabase.auth.getSession().then(({ data: { session } }) => {
-            console.log("AuthContext: Session received:", session ? "Active" : "None");
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
@@ -49,9 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(false);
         });
 
-        console.log("AuthContext: Subscribing to auth changes...");
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log("AuthContext: Auth state change:", _event, session ? "Session present" : "No session");
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
@@ -63,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signOut = async () => {
-        if (devAuthEnabled) {
+        if (!supabase) {
             return;
         }
 
@@ -71,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, session, loading, signOut }}>
+        <AuthContext.Provider value={{ user, session, loading, devAuthEnabled, authConfigError, signOut }}>
             {children}
         </AuthContext.Provider>
     );

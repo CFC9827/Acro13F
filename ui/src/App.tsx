@@ -469,6 +469,15 @@ function App() {
                             About
                         </button>
                         
+                        {user?.email && (
+                            <span
+                                title={user.email}
+                                style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 600 }}
+                            >
+                                {user.email}
+                            </span>
+                        )}
+
                         <button
                             onClick={() => signOut()}
                             style={{
