@@ -216,3 +216,23 @@ def test_worker_once_runs_one_fund_sync_and_exits(monkeypatch):
     worker_once.run_once()
 
     assert calls == ["sync_funds_task"]
+
+
+def test_worker_once_loads_local_env_before_creating_worker(monkeypatch):
+    from backend import worker_once
+
+    calls = []
+
+    class FakeBackgroundWorker:
+        def __init__(self):
+            calls.append("worker_init")
+
+        def sync_funds_task(self):
+            calls.append("sync_funds_task")
+
+    monkeypatch.setattr(worker_once, "load_local_env", lambda: calls.append("load_env"))
+    monkeypatch.setattr(worker_once, "BackgroundWorker", FakeBackgroundWorker)
+
+    worker_once.run_once()
+
+    assert calls == ["load_env", "worker_init", "sync_funds_task"]
