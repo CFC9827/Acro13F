@@ -79,6 +79,10 @@ async def get_config():
         "is_configured": not is_placeholder
     }
 
+@api.get("/me")
+async def get_me(user: Dict[str, str] = Depends(get_current_user)):
+    return user
+
 @api.post("/config")
 async def update_config(config: Dict[str, str]):
     """Updates the application configuration."""

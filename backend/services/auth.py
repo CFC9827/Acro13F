@@ -48,6 +48,8 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
             "id": user_id,
             "email": user_email
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import logging
         logging.error(f"Auth error: {e}")
