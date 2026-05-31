@@ -1085,7 +1085,7 @@ export const GlobalDashboard: React.FC<GlobalDashboardProps> = ({ summary: initi
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <div className="dashboard-badge">GLOBAL OVERVIEW</div>
+                <div className="dashboard-badge">TRACKED FUNDS</div>
                 <h1 className="dashboard-title">Portfolio Intelligence</h1>
                 <p className="dashboard-subtitle">Aggregated insights across all tracked hedge funds</p>
                 {summary.latest_period && (

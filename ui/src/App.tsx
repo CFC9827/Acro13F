@@ -504,7 +504,7 @@ function App() {
                                 }}
                             >
                                 <LayoutGrid size={18} />
-                                {!sidebarCollapsed && <span>Global Overview</span>}
+                                {!sidebarCollapsed && <span>Tracked Funds</span>}
                             </button>
                             <button
                                 className={`dashboard-nav-btn ${view === 'explorer' ? 'active' : ''}`}
