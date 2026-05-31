@@ -150,5 +150,80 @@ def test_failed_fund_sync_gets_cooldown_before_next_retry():
         if os.path.exists(db_path):
             os.remove(db_path)
 
+
+def test_get_funds_returns_only_user_tracked_funds():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        db = DatabaseManager(db_path=db_path)
+
+        db.ensure_user("user-a", "a@example.com")
+        db.ensure_user("user-b", "b@example.com")
+        db.save_fund("1", "Fund One")
+        db.save_fund("2", "Fund Two")
+        db.track_fund("user-a", "1")
+        db.track_fund("user-b", "2")
+
+        user_a_funds = db.get_funds(tracked_only=True, user_id="user-a")
+        user_b_funds = db.get_funds(tracked_only=True, user_id="user-b")
+
+        assert [fund["cik"] for fund in user_a_funds] == [db.normalize_cik("1")]
+        assert [fund["cik"] for fund in user_b_funds] == [db.normalize_cik("2")]
+
+    finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+
+def test_explorer_search_marks_is_tracked_for_requesting_user_only():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        db = DatabaseManager(db_path=db_path)
+
+        db.ensure_user("user-a", "a@example.com")
+        db.ensure_user("user-b", "b@example.com")
+        db.save_fund("1", "Fund One")
+        db.save_filing("acc-1", db.normalize_cik("1"), "2026-03-31", "2026-05-15")
+        db.save_quarterly_stats({
+            "cik": db.normalize_cik("1"),
+            "period_of_report": "2026-03-31",
+            "accession_number": "acc-1",
+            "total_aum": 1000000000,
+            "position_count": 10,
+            "top_10_concentration": 50.0,
+            "avg_position_size": 100000000,
+            "primary_sector": "Technology",
+            "primary_sector_weight": 40.0,
+            "mega_cap_pct": 80.0,
+            "mid_cap_pct": 10.0,
+            "small_cap_pct": 10.0,
+            "portfolio_turnover": 12.0,
+            "avg_holding_period": 4.0,
+            "herding_score": 30.0,
+        })
+        db.track_fund("user-a", "1")
+
+        criteria = {"logic": "AND", "filters": []}
+        user_a_results = db.search_explorer(criteria, user_id="user-a")
+        user_b_results = db.search_explorer(criteria, user_id="user-b")
+
+        assert user_a_results[0]["is_tracked"] == 1
+        assert user_b_results[0]["is_tracked"] == 0
+
+    finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
 if __name__ == "__main__":
     pytest.main([__file__])
