@@ -49,6 +49,14 @@ VITE_SUPABASE_ANON_KEY=...
 
 Never expose a service-role key to the frontend.
 
+To preserve the existing shared tracked dashboard for the first real account, set `INITIAL_USER_ID` to the Supabase Auth user id and optionally set `INITIAL_USER_EMAIL`, then run:
+
+```bash
+python -m backend.scripts.bootstrap_initial_user
+```
+
+The script is idempotent and can be run again without duplicating tracked funds or groups.
+
 ## 3. Backend Deployment (Render)
 
 Create a Render **Web Service**:
