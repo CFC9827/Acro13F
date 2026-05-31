@@ -1644,11 +1644,19 @@ class DatabaseManager:
 
     def update_fund_sync_status(self, cik: str, status: str):
         """Update the real-time syncing status of a fund."""
-        query = "UPDATE funds SET sync_status = ? WHERE cik = ?"
+        cik = self.normalize_cik(cik)
+        if status == "failed":
+            if self.is_postgres:
+                query = "UPDATE funds SET sync_status = ?, last_synced_at = NOW() WHERE cik = ?"
+            else:
+                query = "UPDATE funds SET sync_status = ?, last_synced_at = CURRENT_TIMESTAMP WHERE cik = ?"
+        else:
+            query = "UPDATE funds SET sync_status = ? WHERE cik = ?"
         self._execute(query, (status, cik))
 
     def update_fund_last_synced(self, cik: str):
         """Mark a fund as successfully synced with current timestamp."""
+        cik = self.normalize_cik(cik)
         if self.is_postgres:
             query = "UPDATE funds SET last_synced_at = NOW(), sync_status = 'idle' WHERE cik = ?"
         else:

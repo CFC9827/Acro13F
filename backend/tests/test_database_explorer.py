@@ -124,5 +124,31 @@ def test_get_stale_funds_honors_limit_and_excludes_recent_funds():
         if os.path.exists(db_path):
             os.remove(db_path)
 
+
+def test_failed_fund_sync_gets_cooldown_before_next_retry():
+    """A failing fund should not monopolize every scheduled refresh run."""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = tmp.name
+
+    try:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        db = DatabaseManager(db_path=db_path)
+
+        db.save_fund("1", "Bad CIK Fund")
+        db.track_fund("00000000-0000-0000-0000-000000000000", "1")
+
+        assert [row["cik"] for row in db.get_stale_funds(hours=12, limit=5)] == [db.normalize_cik("1")]
+
+        db.update_fund_sync_status("1", "failed")
+
+        assert db.get_stale_funds(hours=12, limit=5) == []
+
+    finally:
+        DatabaseManager._instance = None
+        DatabaseManager._initialized = False
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
 if __name__ == "__main__":
     pytest.main([__file__])

@@ -103,6 +103,8 @@ Create a Render **Cron Job** from the same repo:
 
 The cron job runs one bounded refresh pass and exits. For a manual test, trigger a run from the Render cron job page and watch for `Starting one-shot fund refresh...` in the logs.
 
+This job is intentionally separate from the API service so user requests keep using the existing web process while refresh work runs elsewhere. Refresh batches are bounded by `FUND_REFRESH_LIMIT`, run tracked funds sequentially, and failed funds receive a stale-window cooldown before retry so one bad CIK cannot monopolize every scheduled run.
+
 ## 5. Frontend Deployment (Vercel)
 
 Create a Vercel project:
