@@ -67,7 +67,7 @@ python migrate_to_postgres.py
 
 The migration intentionally skips the full `prices` table. Keep daily prices in a separate storage plan until the app is on a database tier or external cache designed for that volume.
 
-The background worker also leaves scheduled price backfills off by default. Set `ENABLE_PRICE_SYNC=1` only after choosing a database tier or price-storage design that can handle the volume.
+Scheduled refresh jobs leave price backfills off by default. Set `ENABLE_PRICE_SYNC=1` only after choosing a database tier or price-storage design that can handle the volume.
 
 ## Platform Data Plan
 
@@ -89,7 +89,7 @@ npm run build
 ## Project Structure
 
 ```text
-backend/                 FastAPI app, services, tests, worker
+backend/                 FastAPI app, services, tests, refresh jobs
 backend/data/tracker.db  Local SQLite source/cache, ignored by git
 ui/                      React/Vite frontend
 migrate_to_postgres.py   SQLite-to-Postgres migration utility

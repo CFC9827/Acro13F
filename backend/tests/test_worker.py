@@ -200,3 +200,19 @@ def test_price_metrics_sync_requires_s3_config_when_s3_backend_enabled(monkeypat
     monkeypatch.delenv("PRICE_WAREHOUSE_SECRET_ACCESS_KEY", raising=False)
 
     assert worker_module.price_metrics_sync_enabled() is False
+
+
+def test_worker_once_runs_one_fund_sync_and_exits(monkeypatch):
+    from backend import worker_once
+
+    calls = []
+
+    class FakeBackgroundWorker:
+        def sync_funds_task(self):
+            calls.append("sync_funds_task")
+
+    monkeypatch.setattr(worker_once, "BackgroundWorker", FakeBackgroundWorker)
+
+    worker_once.run_once()
+
+    assert calls == ["sync_funds_task"]

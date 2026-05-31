@@ -36,11 +36,12 @@ services:
       - key: PRICE_WAREHOUSE_PREFIX
         value: abrams13f/price_warehouse
 
-  - type: worker
-    name: Acro13F-worker
+  - type: cron
+    name: Acro13F-refresh
     runtime: docker
     dockerfilePath: ./Dockerfile
-    dockerCommand: python -m backend.worker
+    dockerCommand: python -m backend.worker_once
+    schedule: "0 */12 * * *"
     envVars:
       - key: ENV
         value: production
@@ -52,8 +53,6 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
-      - key: FUND_REFRESH_INTERVAL_HOURS
-        value: "12"
       - key: FUND_REFRESH_STALE_HOURS
         value: "12"
       - key: FUND_REFRESH_LIMIT

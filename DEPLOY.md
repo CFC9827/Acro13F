@@ -3,7 +3,7 @@
 This guide covers the current cloud shape for Abrams13F:
 
 - **Neon Postgres** for canonical application data.
-- **Render** for the backend API and background worker.
+- **Render** for the backend API and scheduled refresh cron job.
 - **Vercel** for the Vite frontend.
 - **R2/S3-compatible object storage** for the full historical price warehouse.
 - **Supabase Auth is optional**. Use it only if you want production login/signup now; it is no longer the primary database.
@@ -11,7 +11,7 @@ This guide covers the current cloud shape for Abrams13F:
 ## Prerequisites
 
 1. **Neon account** with a Postgres 17 project.
-2. **Render account** for the backend API and background worker.
+2. **Render account** for the backend API and scheduled refresh cron job.
 3. **Vercel account** for the frontend UI.
 4. **SEC User-Agent** string, e.g. `Name (email)`, for EDGAR access.
 5. **R2/S3-compatible bucket** for historical price Parquet files.
@@ -79,30 +79,29 @@ Create a Render **Web Service**:
 
 Deploy the service.
 
-## 4. Background Worker Deployment (Render)
+## 4. Scheduled Refresh Deployment (Render)
 
-Create a Render **Background Worker** from the same repo:
+Create a Render **Cron Job** from the same repo:
 
 - **Environment**: Docker
-- **Plan**: Starter or higher. Render does not offer background workers on the free instance type.
-- **Docker Command Override**:
+- **Schedule**: `0 */12 * * *` to run every 12 hours in UTC.
+- **Command**:
   ```bash
-  python -m backend.worker
+  python -m backend.worker_once
   ```
 - Use the same backend environment variables.
 - Recommended fund refresh settings:
   ```env
-  FUND_REFRESH_INTERVAL_HOURS=12
   FUND_REFRESH_STALE_HOURS=12
   FUND_REFRESH_LIMIT=25
   FUND_REFRESH_TRACKED_ONLY=1
   ```
-- `FUND_REFRESH_TRACKED_ONLY=1` keeps the scheduled worker focused on user-tracked funds. Leave broad corpus ingestion for a separate controlled batch job.
+- `FUND_REFRESH_TRACKED_ONLY=1` keeps the scheduled refresh focused on user-tracked funds. Leave broad corpus ingestion for a separate controlled batch job.
 - Keep `ENABLE_PRICE_SYNC=0` on the current Neon tier.
 - Set `ENABLE_PRICE_METRICS_SYNC=1` only after the price warehouse files are available to the worker environment.
 - With R2 or S3-compatible storage, set `PRICE_WAREHOUSE_BACKEND=s3`. The local backend is only for development and local batch jobs.
 
-The worker infrastructure exists, but broad SEC universe ingestion should be run in controlled batches after API/UAT is stable.
+The cron job runs one bounded refresh pass and exits. For a manual test, trigger a run from the Render cron job page and watch for `Starting one-shot fund refresh...` in the logs.
 
 ## 5. Frontend Deployment (Vercel)
 
